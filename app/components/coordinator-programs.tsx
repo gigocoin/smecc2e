@@ -16,6 +16,20 @@ const inputClass =
 const tableFilterClass =
   "w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-900 outline-none focus:border-[#062763] focus:ring-1 focus:ring-[#062763]/15";
 
+function ProgramStatusBadge({ isActive }: { isActive: boolean }) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+        isActive
+          ? "bg-emerald-100 text-emerald-900"
+          : "bg-slate-200 text-slate-800"
+      }`}
+    >
+      {isActive ? "Active" : "Inactive"}
+    </span>
+  );
+}
+
 export function CoordinatorPrograms() {
   const [universities, setUniversities] = useState<UniversityWithPrograms[]>(
     []
@@ -54,6 +68,8 @@ export function CoordinatorPrograms() {
   const [filterType, setFilterType] = useState<ProgramTypeLabel | "all">("all");
   const [filterCountry, setFilterCountry] = useState("all");
   const [filterThematicArea, setFilterThematicArea] = useState("all");
+  const [updatingProgramId, setUpdatingProgramId] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   const loadPrograms = useCallback(async () => {
     try {
@@ -339,6 +355,35 @@ export function CoordinatorPrograms() {
     }
   };
 
+  const handleToggleProgramActive = async (
+    programId: string,
+    isActive: boolean
+  ) => {
+    setUpdatingProgramId(programId);
+    setStatusError(null);
+    try {
+      const res = await fetch(`/api/programs/${encodeURIComponent(programId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ isActive }),
+      });
+      const data = (await res.json()) as {
+        universities?: UniversityWithPrograms[];
+        error?: string;
+      };
+      if (!res.ok) {
+        setStatusError(data.error ?? "Could not update program status.");
+        return;
+      }
+      if (data.universities) setUniversities(data.universities);
+    } catch {
+      setStatusError("Could not update program status.");
+    } finally {
+      setUpdatingProgramId(null);
+    }
+  };
+
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6 lg:pl-6">
@@ -421,6 +466,12 @@ export function CoordinatorPrograms() {
                     ? `Showing ${filteredPrograms.length} of ${sortedPrograms.length} programme${sortedPrograms.length === 1 ? "" : "s"}.`
                     : `${sortedPrograms.length} programme${sortedPrograms.length === 1 ? "" : "s"} across partner institutions.`}
               </p>
+              <p className="mt-1 text-xs text-slate-600">
+                Only active programmes appear in the applicant application form.
+              </p>
+              {statusError && (
+                <p className="mt-2 text-sm font-medium text-red-700">{statusError}</p>
+              )}
               {hasActiveFilters && (
                 <button
                   type="button"
@@ -441,6 +492,8 @@ export function CoordinatorPrograms() {
                     <th className="px-5 py-3">Country</th>
                     <th className="px-5 py-3">Thematic area</th>
                     <th className="px-5 py-3">Accreditation</th>
+                    <th className="px-5 py-3">Status</th>
+                    <th className="px-5 py-3">Actions</th>
                   </tr>
                   <tr className="border-b border-slate-200 bg-white text-xs font-semibold normal-case tracking-normal text-slate-800">
                     <th className="px-3 py-2" scope="col">
@@ -533,13 +586,15 @@ export function CoordinatorPrograms() {
                     <th className="px-3 py-2" scope="col" aria-hidden>
                       <span className="sr-only">Accreditation filter uses program search</span>
                     </th>
+                    <th className="px-3 py-2" scope="col" aria-hidden />
+                    <th className="px-3 py-2" scope="col" aria-hidden />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {sortedPrograms.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={8}
                         className="px-5 py-10 text-center text-sm font-semibold text-slate-700"
                       >
                         No programs yet. Create one or upload a CSV to get
@@ -549,7 +604,7 @@ export function CoordinatorPrograms() {
                   ) : filteredPrograms.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={8}
                         className="px-5 py-10 text-center text-sm font-semibold text-slate-700"
                       >
                         No programmes match your filters.
@@ -557,7 +612,10 @@ export function CoordinatorPrograms() {
                     </tr>
                   ) : (
                     filteredPrograms.map((program) => (
-                      <tr key={program.id} className="hover:bg-slate-50">
+                      <tr
+                        key={program.id}
+                        className={`hover:bg-slate-50 ${program.isActive ? "" : "bg-slate-50/80 opacity-75"}`}
+                      >
                         <td className="px-5 py-3 font-semibold text-[#062763]">
                           {program.universityName}
                         </td>
@@ -580,6 +638,32 @@ export function CoordinatorPrograms() {
                           <span className="line-clamp-2">
                             {program.accreditationDetails}
                           </span>
+                        </td>
+                        <td className="px-5 py-3">
+                          <ProgramStatusBadge isActive={program.isActive} />
+                        </td>
+                        <td className="px-5 py-3">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleToggleProgramActive(
+                                program.id,
+                                !program.isActive
+                              )
+                            }
+                            disabled={updatingProgramId === program.id}
+                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
+                              program.isActive
+                                ? "border border-red-200 bg-red-50 text-red-800 hover:bg-red-100"
+                                : "border border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+                            }`}
+                          >
+                            {updatingProgramId === program.id
+                              ? "Saving…"
+                              : program.isActive
+                                ? "Deactivate"
+                                : "Activate"}
+                          </button>
                         </td>
                       </tr>
                     ))

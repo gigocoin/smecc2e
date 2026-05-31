@@ -79,7 +79,10 @@ async function uploadApplicationDocumentFile(
 const TOTAL_PAGES = 18;
 const APPLICATION_ID_KEY = "smecc2e_application_id";
 const APPLICATION_PAGE_KEY = "smecc2e_application_page";
-const APPLICATION_GUIDELINE_PDF = "/files/AplicationGuideline.pdf";
+import {
+  APPLICATION_GUIDELINE_DOWNLOAD_NAME,
+  APPLICATION_GUIDELINE_PDF,
+} from "@/lib/application-guidelines";
 
 const pageTitles: Record<number, string> = {
   1: "Instructions",
@@ -903,6 +906,18 @@ export function ApplicationForm({
   }, []);
 
   useEffect(() => {
+    const freshStart = startOnly && searchParams.get("fresh") === "1";
+
+    if (freshStart) {
+      localStorage.removeItem(APPLICATION_PAGE_KEY);
+      localStorage.removeItem("smecc2e_instructions");
+      setInstructionsAccepted(false);
+      setCurrentPage(1);
+      setIsHydrated(true);
+      router.replace("/application?page=1", { scroll: false });
+      return;
+    }
+
     if (localStorage.getItem("smecc2e_instructions") === "1") {
       setInstructionsAccepted(true);
     }
@@ -914,21 +929,21 @@ export function ApplicationForm({
       if (pageNum >= 1 && pageNum <= maxPage) {
         setCurrentPage(pageNum);
       }
-    }
-
-    const storedPage = localStorage.getItem(APPLICATION_PAGE_KEY);
-    if (storedPage) {
-      const pageNum = parseInt(storedPage, 10);
-      const maxPage = startOnly ? 2 : TOTAL_PAGES;
-      if (pageNum >= 1 && pageNum <= maxPage) {
-        setCurrentPage(pageNum);
-      } else if (startOnly) {
-        localStorage.setItem(APPLICATION_PAGE_KEY, "2");
+    } else {
+      const storedPage = localStorage.getItem(APPLICATION_PAGE_KEY);
+      if (storedPage) {
+        const pageNum = parseInt(storedPage, 10);
+        const maxPage = startOnly ? 2 : TOTAL_PAGES;
+        if (pageNum >= 1 && pageNum <= maxPage) {
+          setCurrentPage(pageNum);
+        } else if (startOnly) {
+          localStorage.setItem(APPLICATION_PAGE_KEY, "2");
+        }
       }
     }
 
     setIsHydrated(true);
-  }, [searchParams, startOnly]);
+  }, [searchParams, startOnly, router]);
 
   useEffect(() => {
     if (!isHydrated || !portalMode) return;
@@ -4455,7 +4470,7 @@ function InstructionsPanel({
               <span>Or access the PDF directly:</span>
               <a
                 href={APPLICATION_GUIDELINE_PDF}
-                download="SMECC2E-Application-Guidelines.pdf"
+                download={APPLICATION_GUIDELINE_DOWNLOAD_NAME}
                 onClick={markGuidelinesEngaged}
                 className="font-semibold text-[#062763] underline hover:text-[#0a3a8a]"
               >

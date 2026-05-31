@@ -5,11 +5,17 @@ import {
   type UniversityRecord,
 } from "./universities";
 
-export async function listUniversities(): Promise<UniversityRecord[]> {
+export async function listUniversities(options?: {
+  activeProgramsOnly?: boolean;
+}): Promise<UniversityRecord[]> {
+  const activeProgramsOnly = options?.activeProgramsOnly ?? false;
   const universities = await prisma.university.findMany({
     orderBy: { name: "asc" },
     include: {
-      programs: { orderBy: { name: "asc" } },
+      programs: {
+        where: activeProgramsOnly ? { isActive: true } : undefined,
+        orderBy: { name: "asc" },
+      },
     },
   });
   return universities.map((university) => ({
@@ -18,6 +24,10 @@ export async function listUniversities(): Promise<UniversityRecord[]> {
       mapPrismaProgram(program, university.name)
     ),
   }));
+}
+
+export async function listUniversitiesForApplicants(): Promise<UniversityRecord[]> {
+  return listUniversities({ activeProgramsOnly: true });
 }
 
 export async function createUniversity(

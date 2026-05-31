@@ -1,5 +1,9 @@
 import Image from "next/image";
 import { SiteFooter } from "./components/site-footer";
+import {
+  APPLICATION_GUIDELINE_DOWNLOAD_NAME,
+  APPLICATION_GUIDELINE_PDF,
+} from "@/lib/application-guidelines";
 
 export default function Home() {
   return (
@@ -31,7 +35,14 @@ export default function Home() {
                 consortium.
               </p>
               <a
-                href="/application"
+                href={APPLICATION_GUIDELINE_PDF}
+                download={APPLICATION_GUIDELINE_DOWNLOAD_NAME}
+                className="mr-3 mt-3 inline-block rounded-full border border-[#f7be2a]/60 bg-transparent px-5 py-2 text-[0.65rem] font-extrabold uppercase tracking-[0.14em] text-[#f7be2a] transition hover:bg-[#f7be2a]/10 focus:outline-none focus:ring-4 focus:ring-[#f7be2a]/40 sm:mt-4 sm:px-6 sm:py-2.5 sm:text-xs sm:tracking-[0.16em]"
+              >
+                Download Application Guidelines
+              </a>
+              <a
+                href="/application?fresh=1"
                 className="mt-3 inline-block rounded-full bg-[#f7be2a] px-5 py-2 text-[0.65rem] font-extrabold uppercase tracking-[0.14em] text-[#062763] transition hover:bg-white focus:outline-none focus:ring-4 focus:ring-[#f7be2a]/40 sm:mt-4 sm:px-6 sm:py-2.5 sm:text-xs sm:tracking-[0.16em]"
               >
                 Start Application

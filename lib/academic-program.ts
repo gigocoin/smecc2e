@@ -8,6 +8,7 @@ export type ProgramRecord = {
   name: string;
   thematicArea: string;
   accreditationDetails: string;
+  isActive: boolean;
 };
 
 export const PROGRAM_TYPES = ["Master", "Doctorate"] as const;

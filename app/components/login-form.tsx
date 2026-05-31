@@ -163,13 +163,6 @@ function LoginFormContent() {
           </Link>
           <span className="mx-2 text-slate-300">·</span>
           <Link
-            href="/application"
-            className="font-semibold text-[#062763] hover:underline"
-          >
-            Application form
-          </Link>
-          <span className="mx-2 text-slate-300">·</span>
-          <Link
             href={APPLICANT_LOGIN_PATH}
             className="font-semibold text-[#062763] hover:underline"
           >

@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { toUserFacingDatabaseError } from "@/lib/prisma-errors";
-import { createUniversity, listUniversities } from "@/lib/universities-service";
+import {
+  createUniversity,
+  listUniversitiesForApplicants,
+} from "@/lib/universities-service";
 
 export async function GET() {
   try {
-    const universities = await listUniversities();
+    const universities = await listUniversitiesForApplicants();
     return NextResponse.json({
       universities,
       universityNames: universities.map((u) => u.name),

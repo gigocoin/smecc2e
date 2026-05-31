@@ -66,6 +66,7 @@ export function mapPrismaProgram(
     name: program.name,
     thematicArea: program.thematicArea,
     accreditationDetails: program.accreditationDetails,
+    isActive: program.isActive ?? true,
   };
 }
 
