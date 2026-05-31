@@ -24,6 +24,8 @@ export type CreateProgramInput = {
   accreditationDetails: string;
 };
 
+export type UpdateProgramInput = CreateProgramInput;
+
 export function programTypeToPrisma(type: ProgramTypeLabel): "MASTER" | "DOCTORATE" {
   return type === "Doctorate" ? "DOCTORATE" : "MASTER";
 }

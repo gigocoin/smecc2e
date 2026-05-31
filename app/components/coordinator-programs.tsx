@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AFRICAN_COUNTRY_OPTIONS } from "@/lib/african-countries";
-import type { ProgramTypeLabel } from "@/lib/academic-program";
+import type { ProgramRecord, ProgramTypeLabel } from "@/lib/academic-program";
 import { PROGRAM_TYPES } from "@/lib/academic-program";
 import { THEMATIC_AREA_OPTIONS } from "@/lib/thematic-areas";
 import { parseCsv } from "@/lib/csv-parse";
@@ -15,6 +15,28 @@ const inputClass =
 
 const tableFilterClass =
   "w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-900 outline-none focus:border-[#062763] focus:ring-1 focus:ring-[#062763]/15";
+
+const actionIconBtnClass =
+  "inline-flex h-9 w-9 items-center justify-center rounded-lg border-2 transition disabled:cursor-not-allowed disabled:opacity-50";
+
+function EditIcon() {
+  return (
+    <svg
+      className="h-4 w-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+      />
+    </svg>
+  );
+}
 
 function ProgramStatusBadge({ isActive }: { isActive: boolean }) {
   return (
@@ -70,6 +92,18 @@ export function CoordinatorPrograms() {
   const [filterThematicArea, setFilterThematicArea] = useState("all");
   const [updatingProgramId, setUpdatingProgramId] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+
+  const [editingProgram, setEditingProgram] = useState<ProgramRecord | null>(null);
+  const [editInstitutionId, setEditInstitutionId] = useState("");
+  const [editCountry, setEditCountry] = useState("");
+  const [editProgramType, setEditProgramType] = useState<ProgramTypeLabel>("Master");
+  const [editProgramName, setEditProgramName] = useState("");
+  const [editThematicArea, setEditThematicArea] = useState("");
+  const [editAccreditationDetails, setEditAccreditationDetails] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const tableBusy = creating || editing || updatingProgramId !== null;
 
   const loadPrograms = useCallback(async () => {
     try {
@@ -384,6 +418,100 @@ export function CoordinatorPrograms() {
     }
   };
 
+  const resetEditForm = () => {
+    setEditInstitutionId("");
+    setEditCountry("");
+    setEditProgramType("Master");
+    setEditProgramName("");
+    setEditThematicArea("");
+    setEditAccreditationDetails("");
+    setEditError(null);
+  };
+
+  const openEdit = (program: ProgramRecord) => {
+    if (tableBusy) return;
+    setEditingProgram(program);
+    setEditInstitutionId(program.universityId);
+    setEditCountry(program.country);
+    setEditProgramType(program.type);
+    setEditProgramName(program.name);
+    setEditThematicArea(program.thematicArea);
+    setEditAccreditationDetails(program.accreditationDetails);
+    setEditError(null);
+  };
+
+  const closeEditModal = () => {
+    if (editing) return;
+    setEditingProgram(null);
+    resetEditForm();
+  };
+
+  const handleEditInstitutionChange = (dbId: string) => {
+    setEditInstitutionId(dbId);
+    setEditError(null);
+  };
+
+  const handleEditProgram = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProgram) return;
+    if (!editInstitutionId) {
+      setEditError("Select an institution.");
+      return;
+    }
+    if (!editCountry.trim()) {
+      setEditError("Select a country.");
+      return;
+    }
+    if (!editProgramName.trim()) {
+      setEditError("Enter the name of the program.");
+      return;
+    }
+    if (!editThematicArea) {
+      setEditError("Select a thematic area.");
+      return;
+    }
+    if (!editAccreditationDetails.trim()) {
+      setEditError("Enter details of accreditation.");
+      return;
+    }
+
+    setEditing(true);
+    setEditError(null);
+    try {
+      const res = await fetch(
+        `/api/programs/${encodeURIComponent(editingProgram.id)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+          body: JSON.stringify({
+            institutionId: editInstitutionId,
+            country: editCountry.trim(),
+            type: editProgramType,
+            name: editProgramName.trim(),
+            thematicArea: editThematicArea,
+            accreditationDetails: editAccreditationDetails.trim(),
+          }),
+        }
+      );
+      const data = (await res.json()) as {
+        universities?: UniversityWithPrograms[];
+        error?: string;
+      };
+      if (!res.ok) {
+        setEditError(data.error ?? "Could not update program.");
+        return;
+      }
+      if (data.universities) setUniversities(data.universities);
+      setEditingProgram(null);
+      resetEditForm();
+    } catch {
+      setEditError("Could not update program.");
+    } finally {
+      setEditing(false);
+    }
+  };
+
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6 lg:pl-6">
@@ -643,27 +771,39 @@ export function CoordinatorPrograms() {
                           <ProgramStatusBadge isActive={program.isActive} />
                         </td>
                         <td className="px-5 py-3">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              void handleToggleProgramActive(
-                                program.id,
-                                !program.isActive
-                              )
-                            }
-                            disabled={updatingProgramId === program.id}
-                            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
-                              program.isActive
-                                ? "border border-red-200 bg-red-50 text-red-800 hover:bg-red-100"
-                                : "border border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
-                            }`}
-                          >
-                            {updatingProgramId === program.id
-                              ? "Saving…"
-                              : program.isActive
-                                ? "Deactivate"
-                                : "Activate"}
-                          </button>
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openEdit(program)}
+                              disabled={tableBusy}
+                              className={`${actionIconBtnClass} border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
+                              aria-label={`Edit ${program.name}`}
+                              title="Edit program"
+                            >
+                              <EditIcon />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleToggleProgramActive(
+                                  program.id,
+                                  !program.isActive
+                                )
+                              }
+                              disabled={updatingProgramId === program.id || editing}
+                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
+                                program.isActive
+                                  ? "border border-red-200 bg-red-50 text-red-800 hover:bg-red-100"
+                                  : "border border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+                              }`}
+                            >
+                              {updatingProgramId === program.id
+                                ? "Saving…"
+                                : program.isActive
+                                  ? "Deactivate"
+                                  : "Activate"}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -863,6 +1003,201 @@ export function CoordinatorPrograms() {
                   className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
                 >
                   {creating ? "Creating…" : "Create"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingProgram && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-program-title"
+          onClick={closeEditModal}
+        >
+          <div
+            className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="edit-program-title"
+              className="text-lg font-bold text-[#062763]"
+            >
+              Edit program
+            </h2>
+            <p className="mt-1 text-sm font-semibold text-slate-800">
+              Update programme details for {editingProgram.universityName}.
+            </p>
+            <form onSubmit={handleEditProgram} className="mt-5 space-y-4">
+              <div>
+                <label
+                  htmlFor="edit-program-institution"
+                  className="block text-xs font-bold text-slate-800"
+                >
+                  Institution
+                </label>
+                <select
+                  id="edit-program-institution"
+                  value={editInstitutionId}
+                  onChange={(e) => handleEditInstitutionChange(e.target.value)}
+                  disabled={editing}
+                  required
+                  className={inputClass}
+                >
+                  <option value="">Select institution</option>
+                  {universities.map((university) => (
+                    <option key={university.dbId} value={university.dbId}>
+                      {university.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="edit-program-country"
+                  className="block text-xs font-bold text-slate-800"
+                >
+                  Country
+                </label>
+                <select
+                  id="edit-program-country"
+                  value={editCountry}
+                  onChange={(e) => {
+                    setEditCountry(e.target.value);
+                    setEditError(null);
+                  }}
+                  disabled={editing}
+                  required
+                  className={inputClass}
+                >
+                  <option value="">Select country</option>
+                  {AFRICAN_COUNTRY_OPTIONS.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="edit-program-type"
+                  className="block text-xs font-bold text-slate-800"
+                >
+                  Type of program
+                </label>
+                <select
+                  id="edit-program-type"
+                  value={editProgramType}
+                  onChange={(e) => {
+                    setEditProgramType(e.target.value as ProgramTypeLabel);
+                    setEditError(null);
+                  }}
+                  disabled={editing}
+                  required
+                  className={inputClass}
+                >
+                  {PROGRAM_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="edit-program-name"
+                  className="block text-xs font-bold text-slate-800"
+                >
+                  Name of program
+                </label>
+                <input
+                  id="edit-program-name"
+                  type="text"
+                  value={editProgramName}
+                  onChange={(e) => {
+                    setEditProgramName(e.target.value);
+                    setEditError(null);
+                  }}
+                  placeholder="e.g. MSc Renewable Energy Systems"
+                  disabled={editing}
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="edit-program-thematic-area"
+                  className="block text-xs font-bold text-slate-800"
+                >
+                  Thematic area
+                </label>
+                <select
+                  id="edit-program-thematic-area"
+                  value={editThematicArea}
+                  onChange={(e) => {
+                    setEditThematicArea(e.target.value);
+                    setEditError(null);
+                  }}
+                  disabled={editing}
+                  required
+                  className={inputClass}
+                >
+                  <option value="">Select thematic area</option>
+                  {THEMATIC_AREA_OPTIONS.map((area) => (
+                    <option key={area} value={area}>
+                      {area}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="edit-program-accreditation"
+                  className="block text-xs font-bold text-slate-800"
+                >
+                  Details of accreditation
+                </label>
+                <textarea
+                  id="edit-program-accreditation"
+                  value={editAccreditationDetails}
+                  onChange={(e) => {
+                    setEditAccreditationDetails(e.target.value);
+                    setEditError(null);
+                  }}
+                  placeholder="Accreditation body, status, validity, etc."
+                  disabled={editing}
+                  rows={3}
+                  className={inputClass}
+                />
+              </div>
+
+              {editError && (
+                <p className="text-sm font-semibold text-red-700" role="alert">
+                  {editError}
+                </p>
+              )}
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={closeEditModal}
+                  disabled={editing}
+                  className="rounded-lg border-2 border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editing}
+                  className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
+                >
+                  {editing ? "Saving…" : "Save changes"}
                 </button>
               </div>
             </form>
