@@ -359,7 +359,6 @@ export function ApplicationForm({
   >({});
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
   const [profileMarkedUploaded, setProfileMarkedUploaded] = useState(false);
-  const draftLoadedRef = useRef(false);
   const [passportPreview, setPassportPreview] = useState<string | null>(null);
   const [passportFileName, setPassportFileName] = useState<string | null>(null);
   const [disadvantagedDocPreview, setDisadvantagedDocPreview] = useState<
@@ -444,6 +443,7 @@ export function ApplicationForm({
   const [previousScholarshipDeclarationFileName, setPreviousScholarshipDeclarationFileName] =
     useState<string | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
+  const draftFormLoadedRef = useRef(false);
   const pendingDocumentUploadsRef = useRef(
     new Map<ApplicationDocumentField, File>()
   );
@@ -577,12 +577,57 @@ export function ApplicationForm({
     []
   );
 
+  const persistDraftToServer = useCallback(
+    async (
+      targetPage: number
+    ): Promise<{
+      application?: ApplicationRecord;
+      error?: string;
+      status?: number;
+    }> => {
+      const email = form.email.trim();
+      if (!email) {
+        return { error: "Enter your email on page 2 to save your progress." };
+      }
+
+      try {
+        const res = await fetch("/api/applications/draft", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            ...buildApplicationPayload(),
+            currentPage: targetPage,
+          }),
+        });
+        const data = (await res.json()) as {
+          application?: ApplicationRecord;
+          error?: string;
+        };
+        if (!res.ok) {
+          return { error: data.error, status: res.status };
+        }
+        if (data.application) {
+          setDraftId(data.application.id);
+          localStorage.setItem(APPLICATION_ID_KEY, data.application.id);
+        }
+        return { application: data.application };
+      } catch {
+        return {
+          error:
+            "Could not save your progress. Check your connection and try again.",
+        };
+      }
+    },
+    [form.email, buildApplicationPayload]
+  );
+
   const ensureApplicationId = useCallback(async (): Promise<string | null> => {
     if (draftId) {
       try {
         const res = await fetch(
           `/api/applications/${encodeURIComponent(draftId)}`,
-          { cache: "no-store" }
+          { cache: "no-store", credentials: "same-origin" }
         );
         if (res.ok) {
           const data = (await res.json()) as { application?: ApplicationRecord };
@@ -602,30 +647,12 @@ export function ApplicationForm({
 
     setSavingDraft(true);
     try {
-      const res = await fetch("/api/applications/draft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...buildApplicationPayload(),
-          currentPage,
-        }),
-      });
-      const data = (await res.json()) as {
-        application?: ApplicationRecord;
-        error?: string;
-      };
-      if (!res.ok || !data.application?.id) {
-        return null;
-      }
-      setDraftId(data.application.id);
-      localStorage.setItem(APPLICATION_ID_KEY, data.application.id);
-      return data.application.id;
-    } catch {
-      return null;
+      const result = await persistDraftToServer(currentPage);
+      return result.application?.id ?? null;
     } finally {
       setSavingDraft(false);
     }
-  }, [draftId, form.email, emailVerified, buildApplicationPayload, currentPage]);
+  }, [draftId, form.email, emailVerified, currentPage, persistDraftToServer]);
 
   const flushPendingDocumentUploads = useCallback(
     async (appId: string): Promise<Partial<ApplicationRecord>> => {
@@ -810,11 +837,14 @@ export function ApplicationForm({
       );
     }
     if (draft.currentPage && draft.currentPage >= 2) {
+      setInstructionsAccepted(true);
+      localStorage.setItem("smecc2e_instructions", "1");
       localStorage.setItem(APPLICATION_PAGE_KEY, String(draft.currentPage));
       if (draft.currentPage <= TOTAL_PAGES) {
         setCurrentPage(draft.currentPage);
       }
     }
+    draftFormLoadedRef.current = true;
   }, []);
 
   const nationalityCountryOptions = useMemo(
@@ -892,7 +922,7 @@ export function ApplicationForm({
       if (pageNum >= 1 && pageNum <= maxPage) {
         setCurrentPage(pageNum);
       }
-    } else {
+    } else if (!portalMode) {
       const storedPage = localStorage.getItem(APPLICATION_PAGE_KEY);
       if (storedPage) {
         const pageNum = parseInt(storedPage, 10);
@@ -909,39 +939,58 @@ export function ApplicationForm({
   }, [searchParams, startOnly, router]);
 
   useEffect(() => {
-    if (!isHydrated || !portalMode) return;
+    if (!portalMode || !isHydrated || draftFormLoadedRef.current) return;
+
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch("/api/auth/applicant/me", { cache: "no-store" });
-        if (!res.ok || cancelled) return;
-        const data = (await res.json()) as {
-          user?: {
-            email: string;
-            application?: { id: string; status: string } | null;
-          };
+        const meRes = await fetch("/api/auth/applicant/me", {
+          cache: "no-store",
+          credentials: "same-origin",
+        });
+        if (!meRes.ok || cancelled) return;
+
+        const meData = (await meRes.json()) as {
+          user?: { email: string };
         };
-        const user = data.user;
-        if (!user?.email) return;
+        const email = meData.user?.email?.trim();
+        if (!email || cancelled) return;
+
         setEmailVerified(true);
         setForm((prev) => ({
           ...prev,
-          email: user.email,
-          personalEmail: prev.personalEmail.trim() ? prev.personalEmail : user.email,
+          email,
+          personalEmail: prev.personalEmail.trim() ? prev.personalEmail : email,
         }));
-        if (user.application?.id && user.application.status === "draft") {
-          setDraftId(user.application.id);
-          localStorage.setItem(APPLICATION_ID_KEY, user.application.id);
+
+        const draftRes = await fetch(
+          `/api/applications/draft?email=${encodeURIComponent(email)}`,
+          { cache: "no-store", credentials: "same-origin" }
+        );
+        if (cancelled) return;
+
+        if (draftRes.ok) {
+          const draftData = (await draftRes.json()) as {
+            application?: ApplicationRecord | null;
+          };
+          if (draftData.application?.status === "draft") {
+            applyDraftToForm(draftData.application);
+            return;
+          }
         }
-        void checkEmailVerified(user.email);
+
+        draftFormLoadedRef.current = true;
       } catch {
-        /* ignore */
+        if (!cancelled) {
+          draftFormLoadedRef.current = true;
+        }
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [isHydrated, portalMode, checkEmailVerified]);
+  }, [portalMode, isHydrated, applyDraftToForm]);
 
   useEffect(() => {
     if (!isHydrated || !form.email.trim()) return;
@@ -961,65 +1010,6 @@ export function ApplicationForm({
     if (!portalMode || !isHydrated || !emailVerified || !form.email.trim() || draftId) return;
     void ensureApplicationId();
   }, [portalMode, isHydrated, emailVerified, form.email, draftId, ensureApplicationId]);
-
-  const loadDraftByEmail = useCallback(
-    async (email: string) => {
-      try {
-        const res = await fetch(
-          `/api/applications/draft?email=${encodeURIComponent(email)}`
-        );
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          application?: ApplicationRecord | null;
-        };
-        if (data.application?.status === "draft") {
-          applyDraftToForm(data.application);
-        }
-      } catch {
-        /* ignore */
-      }
-    },
-    [applyDraftToForm]
-  );
-
-  useEffect(() => {
-    if (!portalMode || !isHydrated || draftLoadedRef.current) return;
-    draftLoadedRef.current = true;
-
-    const loadDraft = async () => {
-      const storedId = localStorage.getItem(APPLICATION_ID_KEY);
-      if (storedId) {
-        try {
-          const res = await fetch(
-            `/api/applications/${encodeURIComponent(storedId)}`,
-            { cache: "no-store" }
-          );
-          if (res.ok) {
-            const data = (await res.json()) as {
-              application?: ApplicationRecord;
-            };
-            if (data.application?.status === "draft") {
-              applyDraftToForm(data.application);
-              return;
-            }
-          }
-        } catch {
-          /* fall through */
-        }
-        localStorage.removeItem(APPLICATION_ID_KEY);
-        setDraftId(null);
-      }
-    };
-
-    void loadDraft();
-  }, [portalMode, isHydrated, applyDraftToForm]);
-
-  useEffect(() => {
-    if (!portalMode || !isHydrated || !emailVerified) return;
-    const email = form.email.trim();
-    if (!email || draftId) return;
-    void loadDraftByEmail(email);
-  }, [portalMode, isHydrated, emailVerified, form.email, draftId, loadDraftByEmail]);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -1207,6 +1197,22 @@ export function ApplicationForm({
 
     if (currentPage === 1) {
       localStorage.setItem(APPLICATION_PAGE_KEY, String(nextPage));
+      if (portalMode && form.email.trim()) {
+        setSavingDraft(true);
+        try {
+          const result = await persistDraftToServer(nextPage);
+          if (result.error) {
+            setSaveError(
+              result.status === 401
+                ? "Your session has expired. Please sign in again at the applicant login page, then return here to continue."
+                : result.error
+            );
+            return false;
+          }
+        } finally {
+          setSavingDraft(false);
+        }
+      }
       setSaveMessage("Progress saved.");
       return true;
     }
@@ -1219,39 +1225,25 @@ export function ApplicationForm({
 
     setSavingDraft(true);
     try {
-      const res = await fetch("/api/applications/draft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({
-          ...buildApplicationPayload(),
-          currentPage: nextPage,
-        }),
-      });
-      const data = (await res.json()) as {
-        application?: ApplicationRecord;
-        error?: string;
-      };
-      if (!res.ok) {
-        if (res.status === 401) {
+      const result = await persistDraftToServer(nextPage);
+      if (result.error) {
+        if (result.status === 401) {
           setSaveError(
             "Your session has expired. Please sign in again at the applicant login page, then return here to continue."
           );
-        } else if (res.status === 403) {
+        } else if (result.status === 403) {
           setSaveError(
-            data.error === "Password change required"
+            result.error === "Password change required"
               ? "Please change your temporary password before continuing your application."
               : "You can only save an application for the email address you signed in with."
           );
         } else {
-          setSaveError(data.error ?? "Could not save your progress. Please try again.");
+          setSaveError(result.error ?? "Could not save your progress. Please try again.");
         }
         return false;
       }
-      if (data.application) {
-        setDraftId(data.application.id);
-        localStorage.setItem(APPLICATION_ID_KEY, data.application.id);
-        await flushPendingDocumentUploads(data.application.id);
+      if (result.application) {
+        await flushPendingDocumentUploads(result.application.id);
       }
       localStorage.setItem(APPLICATION_PAGE_KEY, String(nextPage));
       setSaveMessage("Progress saved.");
@@ -1415,7 +1407,7 @@ export function ApplicationForm({
               setSaveMessage(null);
               setDraftId(null);
               setProfileMarkedUploaded(false);
-              draftLoadedRef.current = false;
+              draftFormLoadedRef.current = false;
               localStorage.removeItem(APPLICATION_ID_KEY);
               localStorage.removeItem(APPLICATION_PAGE_KEY);
               setForm(initialForm);
