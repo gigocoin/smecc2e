@@ -15,7 +15,7 @@ import {
   type RegionRecord,
 } from "@/lib/regions";
 import { AFRICAN_COUNTRY_OPTIONS } from "@/lib/african-countries";
-import { applicantLoginPath, applicantVerifiedLoginPath } from "@/lib/applicant-login-paths";
+import { APPLICANT_LOGIN_PATH, applicantLoginPath, applicantVerifiedLoginPath } from "@/lib/applicant-login-paths";
 import { ApplicantIdleSessionGuard } from "./applicant-idle-session-guard";
 
 const ALREADY_VERIFIED_MESSAGE =
@@ -448,6 +448,7 @@ export function ApplicationForm({
     new Map<ApplicationDocumentField, File>()
   );
   const [savingDraft, setSavingDraft] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -1352,6 +1353,61 @@ export function ApplicationForm({
     if (currentPage > 1) goToPage(currentPage - 1);
   };
 
+  const draftSaveErrorMessage = (result: {
+    error?: string;
+    status?: number;
+  }): string => {
+    if (result.status === 401) {
+      return "Your session has expired. Please sign in again at the applicant login page, then return here to continue.";
+    }
+    if (result.status === 403) {
+      return result.error === "Password change required"
+        ? "Please change your temporary password before continuing your application."
+        : "You can only save an application for the email address you signed in with.";
+    }
+    return result.error ?? "Could not save your progress. Please try again.";
+  };
+
+  const handleSignOutToContinueLater = async () => {
+    setSaveError(null);
+    setSaveMessage(null);
+    setSigningOut(true);
+    try {
+      if (currentPage === 1) {
+        localStorage.setItem(APPLICATION_PAGE_KEY, "1");
+        if (form.email.trim()) {
+          const result = await persistDraftToServer(1);
+          if (result.error) {
+            setSaveError(draftSaveErrorMessage(result));
+            return;
+          }
+        }
+      } else {
+        const result = await persistDraftToServer(currentPage);
+        if (result.error) {
+          setSaveError(draftSaveErrorMessage(result));
+          return;
+        }
+        if (result.application) {
+          await flushPendingDocumentUploads(result.application.id);
+        }
+        localStorage.setItem(APPLICATION_PAGE_KEY, String(currentPage));
+      }
+
+      await fetch("/api/auth/applicant/logout", { method: "POST" });
+      window.location.href = APPLICANT_LOGIN_PATH;
+    } catch {
+      setSaveError("Could not sign out. Check your connection and try again.");
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
+  const showSignOutToContinueLater =
+    portalMode &&
+    currentPage < visiblePageCount &&
+    !(startOnly && currentPage === 2 && emailVerified);
+
   if (submitted) {
     return (
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -1586,6 +1642,7 @@ export function ApplicationForm({
                 onClick={() => void handleNext()}
                 disabled={
                   savingDraft ||
+                  signingOut ||
                   (currentPage === 1 && !instructionsAccepted) ||
                   (currentPage === 2 && !emailVerified)
                 }
@@ -1606,6 +1663,16 @@ export function ApplicationForm({
                 className="rounded-md bg-[#f7be2a] px-8 py-2.5 text-sm font-extrabold text-[#062763] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {submitting ? "Submitting…" : "Submit application"}
+              </button>
+            )}
+            {showSignOutToContinueLater && (
+              <button
+                type="button"
+                onClick={() => void handleSignOutToContinueLater()}
+                disabled={savingDraft || signingOut || submitting}
+                className="rounded-md border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {signingOut ? "Saving & signing out…" : "Sign Out to Continue Later"}
               </button>
             )}
           </div>
