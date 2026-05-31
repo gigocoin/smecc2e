@@ -16,6 +16,7 @@ import {
 } from "@/lib/regions";
 import { AFRICAN_COUNTRY_OPTIONS } from "@/lib/african-countries";
 import { applicantLoginPath, applicantVerifiedLoginPath } from "@/lib/applicant-login-paths";
+import { ApplicantIdleSessionGuard } from "./applicant-idle-session-guard";
 
 const ALREADY_VERIFIED_MESSAGE =
   "The email you entered is already verified, please check your email for login details and proceed to application login.";
@@ -288,6 +289,22 @@ function thematicAreasFromPrograms(programs: ProgramRecord[]): string[] {
   ].sort((a, b) => a.localeCompare(b));
 }
 
+function thematicAreasForHost(
+  thematicAreasByHost: Record<string, string[]>,
+  programsByHost: Record<string, ProgramRecord[]>,
+  host: string
+): string[] {
+  const areas = new Set<string>();
+  for (const area of thematicAreasByHost[host] ?? []) {
+    const trimmed = area.trim();
+    if (trimmed) areas.add(trimmed);
+  }
+  for (const area of thematicAreasFromPrograms(programsByHost[host] ?? [])) {
+    areas.add(area);
+  }
+  return [...areas].sort((a, b) => a.localeCompare(b));
+}
+
 function programmeNamesForThematicArea(
   programs: ProgramRecord[],
   thematicArea: string
@@ -336,6 +353,9 @@ export function ApplicationForm({
   >(null);
   const [programsByHost, setProgramsByHost] = useState<
     Record<string, ProgramRecord[]>
+  >({});
+  const [thematicAreasByHost, setThematicAreasByHost] = useState<
+    Record<string, string[]>
   >({});
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
   const [profileMarkedUploaded, setProfileMarkedUploaded] = useState(false);
@@ -1040,6 +1060,7 @@ export function ApplicationForm({
         universityNames?: string[];
         universities?: {
           name: string;
+          thematicAreas?: string[];
           programs?: ProgramRecord[];
         }[];
         error?: string;
@@ -1053,6 +1074,7 @@ export function ApplicationForm({
       if (!data.universities?.length) {
         setHostInstitutionOptionsList([]);
         setProgramsByHost({});
+        setThematicAreasByHost({});
         setHostInstitutionsError(
           "No host institutions are configured yet. Please try again later."
         );
@@ -1061,11 +1083,14 @@ export function ApplicationForm({
       setHostInstitutionOptionsList(
         data.universityNames ?? data.universities.map((u) => u.name)
       );
-      const map: Record<string, ProgramRecord[]> = {};
+      const programMap: Record<string, ProgramRecord[]> = {};
+      const thematicMap: Record<string, string[]> = {};
       for (const u of data.universities) {
-        map[u.name] = u.programs ?? [];
+        programMap[u.name] = u.programs ?? [];
+        thematicMap[u.name] = u.thematicAreas ?? [];
       }
-      setProgramsByHost(map);
+      setProgramsByHost(programMap);
+      setThematicAreasByHost(thematicMap);
     } catch {
       setHostInstitutionsError("Could not load host institutions.");
     } finally {
@@ -1197,6 +1222,7 @@ export function ApplicationForm({
       const res = await fetch("/api/applications/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
         body: JSON.stringify({
           ...buildApplicationPayload(),
           currentPage: nextPage,
@@ -1207,7 +1233,19 @@ export function ApplicationForm({
         error?: string;
       };
       if (!res.ok) {
-        setSaveError(data.error ?? "Could not save your progress. Please try again.");
+        if (res.status === 401) {
+          setSaveError(
+            "Your session has expired. Please sign in again at the applicant login page, then return here to continue."
+          );
+        } else if (res.status === 403) {
+          setSaveError(
+            data.error === "Password change required"
+              ? "Please change your temporary password before continuing your application."
+              : "You can only save an application for the email address you signed in with."
+          );
+        } else {
+          setSaveError(data.error ?? "Could not save your progress. Please try again.");
+        }
         return false;
       }
       if (data.application) {
@@ -1411,6 +1449,7 @@ export function ApplicationForm({
 
   return (
     <ApplicationUploadContext.Provider value={uploadContextValue}>
+    {portalMode ? <ApplicantIdleSessionGuard email={form.email.trim()} /> : null}
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
       <FormHeader />
 
@@ -1466,6 +1505,7 @@ export function ApplicationForm({
             hostInstitutionsLoading,
             hostInstitutionsError,
             programsByHost,
+            thematicAreasByHost,
             setProfileMarkedUploaded,
             academicCertificatesPreview,
             academicCertificatesFileName,
@@ -1719,6 +1759,7 @@ function renderPageContent({
   hostInstitutionsLoading,
   hostInstitutionsError,
   programsByHost,
+  thematicAreasByHost,
   setProfileMarkedUploaded,
   academicCertificatesPreview,
   academicCertificatesFileName,
@@ -1814,6 +1855,7 @@ function renderPageContent({
   hostInstitutionsLoading: boolean;
   hostInstitutionsError: string | null;
   programsByHost: Record<string, ProgramRecord[]>;
+  thematicAreasByHost: Record<string, string[]>;
   academicCertificatesPreview: string | null;
   academicCertificatesFileName: string | null;
   setAcademicCertificatesPreview: (url: string | null) => void;
@@ -1923,6 +1965,7 @@ function renderPageContent({
           hostInstitutionsLoading={hostInstitutionsLoading}
           hostInstitutionsError={hostInstitutionsError}
           programsByHost={programsByHost}
+          thematicAreasByHost={thematicAreasByHost}
         />
       );
     case 4:
@@ -2291,6 +2334,7 @@ function SectionAMobilityPanel({
   hostInstitutionsLoading,
   hostInstitutionsError,
   programsByHost,
+  thematicAreasByHost,
 }: {
   form: typeof initialForm;
   update: (field: keyof typeof initialForm, value: string | boolean) => void;
@@ -2298,6 +2342,7 @@ function SectionAMobilityPanel({
   hostInstitutionsLoading: boolean;
   hostInstitutionsError: string | null;
   programsByHost: Record<string, ProgramRecord[]>;
+  thematicAreasByHost: Record<string, string[]>;
 }) {
   const { typeOfMobility, preferredHostInstitution, thematicArea } = form;
 
@@ -2318,7 +2363,13 @@ function SectionAMobilityPanel({
     preferredHostInstitution,
     typeOfMobility
   );
-  const thematicAreaOptions = thematicAreasFromPrograms(hostPrograms);
+  const thematicAreaOptions = preferredHostInstitution
+    ? thematicAreasForHost(
+        thematicAreasByHost,
+        programsByHost,
+        preferredHostInstitution
+      )
+    : [];
   const programmeOptions = thematicArea
     ? programmeNamesForThematicArea(hostPrograms, thematicArea)
     : [];
@@ -2398,7 +2449,7 @@ function SectionAMobilityPanel({
           options={thematicAreaOptions}
           placeholder={
             thematicAreaOptions.length === 0
-              ? "No thematic areas in programmes for this institution"
+              ? "No thematic areas configured for this institution"
               : "Select thematic area"
           }
           disabled={thematicAreaOptions.length === 0}

@@ -12,7 +12,29 @@ import {
   findDraftByEmail,
   upsertDraftApplication,
 } from "@/lib/applications-service";
+import {
+  APPLICANT_SESSION_COOKIE,
+  getApplicantSessionFromCookie,
+  refreshedApplicantSessionCookieOptions,
+} from "@/lib/applicant-session";
 import { toUserFacingDatabaseError } from "@/lib/prisma-errors";
+
+async function refreshApplicantSessionCookie(
+  response: NextResponse
+): Promise<NextResponse> {
+  const session = await getApplicantSessionFromCookie();
+  if (!session) return response;
+
+  const opts = await refreshedApplicantSessionCookieOptions(session);
+  response.cookies.set(APPLICANT_SESSION_COOKIE, opts.value, {
+    httpOnly: opts.httpOnly,
+    sameSite: opts.sameSite,
+    secure: opts.secure,
+    path: opts.path,
+    maxAge: opts.maxAge,
+  });
+  return response;
+}
 
 export async function GET(request: Request) {
   try {
@@ -24,7 +46,9 @@ export async function GET(request: Request) {
     assertApplicantEmailMatchesSession(user, email);
 
     const application = await findDraftByEmail(email);
-    return NextResponse.json({ application });
+    return refreshApplicantSessionCookie(
+      NextResponse.json({ application })
+    );
   } catch (err) {
     if (err instanceof ApplicantAuthError) {
       return NextResponse.json(
@@ -62,7 +86,9 @@ export async function POST(request: Request) {
     assertApplicantPayloadMatchesSession(user, payload);
 
     const application = await upsertDraftApplication(payload, currentPage);
-    return NextResponse.json({ application });
+    return refreshApplicantSessionCookie(
+      NextResponse.json({ application })
+    );
   } catch (err) {
     if (err instanceof ApplicantAuthError) {
       return NextResponse.json(
