@@ -126,7 +126,7 @@ const refereeRelationshipOptions = [
   "Others",
 ];
 
-const genderOptions = ["Female", "Male", "Non-binary", "Prefer not to say"];
+const genderOptions = ["Female", "Male", "Prefer not to say"];
 
 const initialForm = {
   email: "",

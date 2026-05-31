@@ -1,19 +1,12 @@
 import Image from "next/image";
-import Link from "next/link";
+import { FooterLoginMenu } from "./footer-login-menu";
 
 type SiteFooterProps = {
   /** Hide the login button (e.g. on auth pages). */
   hideLogin?: boolean;
-  /** Override login link — defaults to staff login at /login. */
-  loginHref?: string;
-  loginLabel?: string;
 };
 
-export function SiteFooter({
-  hideLogin = false,
-  loginHref = "/login",
-  loginLabel = "Login",
-}: SiteFooterProps = {}) {
+export function SiteFooter({ hideLogin = false }: SiteFooterProps = {}) {
   return (
     <footer className="border-t border-white/10 bg-[#062763] px-4 py-8 text-white sm:py-10">
       <div className="mx-auto max-w-6xl">
@@ -32,12 +25,7 @@ export function SiteFooter({
             />
           </div>
           {!hideLogin ? (
-            <Link
-              href={loginHref}
-              className="mx-auto shrink-0 rounded-full border border-white/30 bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white transition hover:border-[#f7be2a]/60 hover:bg-[#f7be2a] hover:text-[#062763] focus:outline-none focus:ring-2 focus:ring-[#f7be2a]/50 sm:ml-auto sm:mr-0 sm:px-5 sm:py-2.5 sm:text-sm sm:tracking-[0.15em]"
-            >
-              {loginLabel}
-            </Link>
+            <FooterLoginMenu />
           ) : (
             <div className="hidden sm:block" aria-hidden />
           )}
