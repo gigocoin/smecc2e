@@ -3205,7 +3205,6 @@ function SectionFAcademicProfilePanel({
   const documentAccept =
     "application/pdf,image/jpeg,image/png,image/webp,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   const publicationsAccept = "application/pdf,.pdf";
-  const motivationWordCount = countWords(form.whyApplyingScholarship);
 
   return (
     <div className="space-y-8">
@@ -3267,7 +3266,7 @@ function SectionFAcademicProfilePanel({
       <Paragraph
         required
         label="Why are you applying for the SMECC2E Scholarship?"
-        description={`Max 500 words (${motivationWordCount} / 500)`}
+        description="Maximum 500 words."
         rows={8}
         maxWords={500}
         value={form.whyApplyingScholarship}
@@ -3295,7 +3294,7 @@ function SectionGMotivationPanel({
       <Paragraph
         required
         label="Explain how your background aligns with the selected thematic area."
-        description={`Max 300 words (${countWords(form.backgroundThematicAlignment)} / 300)`}
+        description="Maximum 300 words."
         rows={6}
         maxWords={300}
         value={form.backgroundThematicAlignment}
@@ -3305,7 +3304,7 @@ function SectionGMotivationPanel({
       <Paragraph
         required
         label="Explain how the scholarship will contribute to your academic/career goals."
-        description={`Max 300 words (${countWords(form.scholarshipCareerGoals)} / 300)`}
+        description="Maximum 300 words."
         rows={6}
         maxWords={300}
         value={form.scholarshipCareerGoals}
@@ -3315,7 +3314,7 @@ function SectionGMotivationPanel({
       <Paragraph
         required
         label="How will you contribute to Africa’s clean energy transition and climate resilience after the mobility?"
-        description={`Max 300 words (${countWords(form.africaCleanEnergyContribution)} / 300)`}
+        description="Maximum 300 words."
         rows={6}
         maxWords={300}
         value={form.africaCleanEnergyContribution}
@@ -3569,7 +3568,7 @@ function SectionJStaffMobilityPanel({
 
       <Paragraph
         label="Proposed Work Plan"
-        description={`Max 500 words (${countWords(form.staffProposedWorkPlan)} / 500)`}
+        description="Maximum 500 words."
         rows={8}
         maxWords={500}
         value={form.staffProposedWorkPlan}
@@ -3579,7 +3578,7 @@ function SectionJStaffMobilityPanel({
       <Paragraph
         required
         label="Expected Benefits to Home Institution and individuals"
-        description={`Max 300 words (${countWords(form.staffExpectedBenefits)} / 300)`}
+        description="Maximum 300 words."
         rows={6}
         maxWords={300}
         value={form.staffExpectedBenefits}
@@ -4905,6 +4904,10 @@ function Paragraph({
   rows?: number;
   maxWords?: number;
 }) {
+  const wordCount = countWords(value);
+  const wordsRemaining =
+    maxWords !== undefined ? Math.max(0, maxWords - wordCount) : null;
+
   return (
     <div>
       <label className="block text-sm font-medium text-slate-800 sm:text-base">
@@ -4925,6 +4928,24 @@ function Paragraph({
         }}
         className={`${fieldInputClass} resize-y`}
       />
+      {wordsRemaining !== null && (
+        <p
+          className={`mt-1.5 text-right text-xs font-semibold sm:text-sm ${
+            wordsRemaining === 0
+              ? "text-red-600"
+              : wordsRemaining <= 20
+                ? "text-amber-700"
+                : "text-slate-500"
+          }`}
+          aria-live="polite"
+        >
+          {wordsRemaining} {wordsRemaining === 1 ? "word" : "words"} remaining
+          <span className="font-medium text-slate-400">
+            {" "}
+            ({wordCount} / {maxWords})
+          </span>
+        </p>
+      )}
     </div>
   );
 }
