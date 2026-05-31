@@ -147,23 +147,3 @@ export async function importPrograms(
 
   return { created, errors };
 }
-
-export async function setProgramActive(
-  programId: string,
-  isActive: boolean
-): Promise<{ universities: UniversityWithPrograms[] }> {
-  const existing = await prisma.program.findUnique({
-    where: { id: programId },
-  });
-  if (!existing) {
-    throw new Error("Program not found");
-  }
-
-  await prisma.program.update({
-    where: { id: programId },
-    data: { isActive },
-  });
-
-  const universities = await listUniversitiesWithPrograms();
-  return { universities };
-}
