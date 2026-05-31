@@ -1,14 +1,10 @@
-import { readFile } from "fs/promises";
-import path from "path";
 import { NextResponse } from "next/server";
 import {
   getStoredDocumentName,
   isApplicationDocumentField,
 } from "@/lib/application-documents";
-import {
-  mimeTypeForFileName,
-  resolveDocumentPath,
-} from "@/lib/application-documents-server";
+import { readApplicationDocument } from "@/lib/application-document-storage";
+import { mimeTypeForFileName } from "@/lib/application-documents-server";
 import { getApplication } from "@/lib/applications-service";
 import { AuthError, requireDashboardSessionUser } from "@/lib/auth-service";
 
@@ -35,8 +31,12 @@ export async function GET(
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
 
-    const filePath = await resolveDocumentPath(application.id, storedName, field);
-    if (!filePath) {
+    const document = await readApplicationDocument(
+      application.id,
+      storedName,
+      field
+    );
+    if (!document) {
       return NextResponse.json(
         {
           error:
@@ -46,13 +46,10 @@ export async function GET(
       );
     }
 
-    const buffer = await readFile(filePath);
-    const fileName = path.basename(filePath);
-
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(document.buffer), {
       headers: {
-        "Content-Type": mimeTypeForFileName(fileName),
-        "Content-Disposition": `inline; filename="${fileName.replace(/"/g, "")}"`,
+        "Content-Type": mimeTypeForFileName(document.fileName),
+        "Content-Disposition": `inline; filename="${document.fileName.replace(/"/g, "")}"`,
         "Cache-Control": "private, max-age=3600",
       },
     });

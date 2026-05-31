@@ -25,6 +25,7 @@
 !/public/uploads/users/
 !/public/uploads/users/.gitkeep
 !/public/uploads/applications/
+/public/uploads/applications/*
 !/public/uploads/applications/.gitkeep
 
 # misc

@@ -1,16 +1,17 @@
-import { mkdir, writeFile } from "fs/promises";
 import { NextResponse } from "next/server";
 import { requireApplicantOwnsApplication } from "@/lib/applicant-application-auth";
 import { ApplicantAuthError } from "@/lib/applicant-auth-service";
+import {
+  blobStorageConfigurationError,
+  isProductionWithoutBlobStorage,
+  saveApplicationDocument,
+} from "@/lib/application-document-storage";
 import {
   buildStoredDocumentName,
   documentDisplayName,
   isApplicationDocumentField,
 } from "@/lib/application-documents";
-import {
-  applicationDocumentsDir,
-  storedDocumentPath,
-} from "@/lib/application-documents-server";
+import { mimeTypeForFileName } from "@/lib/application-documents-server";
 import { getApplication } from "@/lib/applications-service";
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -29,6 +30,13 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    if (isProductionWithoutBlobStorage()) {
+      return NextResponse.json(
+        { error: blobStorageConfigurationError() },
+        { status: 503 }
+      );
+    }
+
     const { id } = await context.params;
     await requireApplicantOwnsApplication(id);
     const application = await getApplication(id);
@@ -70,11 +78,12 @@ export async function POST(
         ? `profile__${buildStoredDocumentName(file.name)}`
         : buildStoredDocumentName(file.name);
 
-    const uploadDir = applicationDocumentsDir(application.id);
-    await mkdir(uploadDir, { recursive: true });
-    await writeFile(
-      storedDocumentPath(application.id, storedName),
-      Buffer.from(await file.arrayBuffer())
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await saveApplicationDocument(
+      application.id,
+      storedName,
+      buffer,
+      file.type || mimeTypeForFileName(file.name)
     );
 
     return NextResponse.json(
@@ -93,6 +102,11 @@ export async function POST(
       );
     }
     console.error("POST /api/applications/[id]/upload", err);
+    const message =
+      err instanceof Error ? err.message : "Failed to upload document";
+    if (message.includes("BLOB_READ_WRITE_TOKEN")) {
+      return NextResponse.json({ error: blobStorageConfigurationError() }, { status: 503 });
+    }
     return NextResponse.json({ error: "Failed to upload document" }, { status: 500 });
   }
 }

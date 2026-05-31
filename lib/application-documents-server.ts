@@ -1,9 +1,9 @@
-import { access, readdir } from "fs/promises";
 import path from "path";
 import {
   documentDisplayName,
   type ApplicationDocumentField,
 } from "./application-documents";
+import { readApplicationDocument } from "./application-document-storage";
 
 export function applicationDocumentsDir(applicationRef: string): string {
   return path.join(
@@ -22,58 +22,17 @@ export function storedDocumentPath(
   return path.join(applicationDocumentsDir(applicationRef), storedName);
 }
 
-async function fileExists(filePath: string): Promise<boolean> {
-  try {
-    await access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function findProfileDocumentPath(
-  applicationRef: string
-): Promise<string | null> {
-  const dir = applicationDocumentsDir(applicationRef);
-  try {
-    const files = await readdir(dir);
-    const match = files.find((file) => file.startsWith("profile"));
-    return match ? path.join(dir, match) : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function resolveDocumentPath(
   applicationRef: string,
   storedName: string,
   field: ApplicationDocumentField
 ): Promise<string | null> {
-  if (field === "profile") {
-    return findProfileDocumentPath(applicationRef);
-  }
-
-  const direct = storedDocumentPath(applicationRef, storedName);
-  if (await fileExists(direct)) {
-    return direct;
-  }
-
-  const dir = applicationDocumentsDir(applicationRef);
-  try {
-    const files = await readdir(dir);
-    const lowerStored = storedName.toLowerCase();
-    const match = files.find(
-      (file) =>
-        file === storedName ||
-        file.toLowerCase() === lowerStored ||
-        file.endsWith(`__${storedName}`) ||
-        documentDisplayName(file) === storedName ||
-        documentDisplayName(file).toLowerCase() === lowerStored
-    );
-    return match ? path.join(dir, match) : null;
-  } catch {
-    return null;
-  }
+  const document = await readApplicationDocument(
+    applicationRef,
+    storedName,
+    field
+  );
+  return document ? document.fileName : null;
 }
 
 export function mimeTypeForFileName(fileName: string): string {
@@ -91,3 +50,5 @@ export function mimeTypeForFileName(fileName: string): string {
   };
   return map[ext] ?? "application/octet-stream";
 }
+
+export { documentDisplayName };
