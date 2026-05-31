@@ -125,67 +125,6 @@ const refereeRelationshipOptions = [
   "Others",
 ];
 
-const hostInstitutionOptions = [
-  "University of Nigeria (UNN)",
-  "University of Rwanda",
-  "University of Cape Coast",
-  "University of Sierra Leone",
-  "Lupane State University",
-  "Moi University",
-];
-
-const programmesByHostInstitution: Record<string, string[]> = {
-  "University of Nigeria (UNN)": [
-    "MSc Sustainable Energy Systems",
-    "MSc Sustainable Materials Engineering",
-    "MSc Energy Policy and Planning",
-    "MSc Climate Change and Adaptation",
-    "MSc Energy Economics and Finance",
-    "MSc Environmental Management",
-    "PhD Sustainable Energy Systems",
-    "PhD Energy Policy",
-    "PhD Climate Change Studies",
-  ],
-  "University of Rwanda": [
-    "MSc Renewable Energy Engineering",
-    "MSc Energy Policy and Governance",
-    "MSc Climate Change Mitigation",
-    "MSc Environmental Science",
-    "PhD Sustainable Energy",
-    "PhD Climate Change and Environment",
-  ],
-  "University of Cape Coast": [
-    "MSc Energy Systems Engineering",
-    "MSc Climate Change and Sustainability",
-    "MSc Environmental and Resource Economics",
-    "MSc Materials Science and Engineering",
-    "PhD Energy Economics",
-    "PhD Environmental Science",
-  ],
-  "University of Sierra Leone": [
-    "MSc Sustainable Energy",
-    "MSc Environmental Management",
-    "MSc Climate Change Studies",
-    "MSc Energy and Mineral Economics",
-    "PhD Environmental Policy",
-  ],
-  "Lupane State University": [
-    "MSc Renewable Energy Technology",
-    "MSc Environmental Management",
-    "MSc Climate Change and Development",
-    "MSc Sustainable Materials",
-    "PhD Energy Studies",
-  ],
-  "Moi University": [
-    "MSc Renewable Energy Systems",
-    "MSc Environmental Science",
-    "MSc Climate Change Adaptation",
-    "MSc Energy Economics",
-    "MSc Sustainable Materials",
-    "PhD Environmental Studies",
-  ],
-};
-
 const genderOptions = ["Female", "Male", "Non-binary", "Prefer not to say"];
 
 const initialForm = {
@@ -390,7 +329,11 @@ export function ApplicationForm({
   const [regionsLoading, setRegionsLoading] = useState(true);
   const [hostInstitutionOptionsList, setHostInstitutionOptionsList] = useState<
     string[]
-  >([...hostInstitutionOptions]);
+  >([]);
+  const [hostInstitutionsLoading, setHostInstitutionsLoading] = useState(true);
+  const [hostInstitutionsError, setHostInstitutionsError] = useState<
+    string | null
+  >(null);
   const [programsByHost, setProgramsByHost] = useState<
     Record<string, ProgramRecord[]>
   >({});
@@ -1088,34 +1031,58 @@ export function ApplicationForm({
     });
   }, [regionsList]);
 
+  const loadHostInstitutions = useCallback(async () => {
+    setHostInstitutionsLoading(true);
+    setHostInstitutionsError(null);
+    try {
+      const res = await fetch("/api/universities", { cache: "no-store" });
+      const data = (await res.json()) as {
+        universityNames?: string[];
+        universities?: {
+          name: string;
+          programs?: ProgramRecord[];
+        }[];
+        error?: string;
+      };
+      if (!res.ok) {
+        setHostInstitutionsError(
+          data.error ?? "Could not load host institutions."
+        );
+        return;
+      }
+      if (!data.universities?.length) {
+        setHostInstitutionOptionsList([]);
+        setProgramsByHost({});
+        setHostInstitutionsError(
+          "No host institutions are configured yet. Please try again later."
+        );
+        return;
+      }
+      setHostInstitutionOptionsList(
+        data.universityNames ?? data.universities.map((u) => u.name)
+      );
+      const map: Record<string, ProgramRecord[]> = {};
+      for (const u of data.universities) {
+        map[u.name] = u.programs ?? [];
+      }
+      setProgramsByHost(map);
+    } catch {
+      setHostInstitutionsError("Could not load host institutions.");
+    } finally {
+      setHostInstitutionsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isHydrated) return;
-    fetch("/api/universities")
-      .then((res) => (res.ok ? res.json() : null))
-      .then(
-        (
-          data: {
-            universityNames?: string[];
-            universities?: {
-              name: string;
-              programs?: ProgramRecord[];
-            }[];
-          } | null
-        ) => {
-          if (!data?.universities?.length) return;
-          setHostInstitutionOptionsList(
-            data.universityNames ??
-              data.universities.map((u) => u.name)
-          );
-          const map: Record<string, ProgramRecord[]> = {};
-          for (const u of data.universities) {
-            map[u.name] = u.programs ?? [];
-          }
-          setProgramsByHost(map);
-        }
-      )
-      .catch(() => {});
-  }, [isHydrated]);
+    void loadHostInstitutions();
+  }, [isHydrated, loadHostInstitutions]);
+
+  useEffect(() => {
+    if (currentPage === 3 && hostInstitutionOptionsList.length === 0) {
+      void loadHostInstitutions();
+    }
+  }, [currentPage, hostInstitutionOptionsList.length, loadHostInstitutions]);
 
   const canAccessPage = (page: number) => {
     if (page === 1) return true;
@@ -1496,6 +1463,8 @@ export function ApplicationForm({
             onCountryOfResidenceChange: handleCountryOfResidenceChange,
             startOnly,
             hostInstitutionOptions: hostInstitutionOptionsList,
+            hostInstitutionsLoading,
+            hostInstitutionsError,
             programsByHost,
             setProfileMarkedUploaded,
             academicCertificatesPreview,
@@ -1747,6 +1716,8 @@ function renderPageContent({
   onCountryOfResidenceChange,
   startOnly,
   hostInstitutionOptions,
+  hostInstitutionsLoading,
+  hostInstitutionsError,
   programsByHost,
   setProfileMarkedUploaded,
   academicCertificatesPreview,
@@ -1840,6 +1811,8 @@ function renderPageContent({
   onCountryOfResidenceChange: (country: string) => void;
   startOnly: boolean;
   hostInstitutionOptions: string[];
+  hostInstitutionsLoading: boolean;
+  hostInstitutionsError: string | null;
   programsByHost: Record<string, ProgramRecord[]>;
   academicCertificatesPreview: string | null;
   academicCertificatesFileName: string | null;
@@ -1947,6 +1920,8 @@ function renderPageContent({
           form={form}
           update={update}
           hostInstitutionOptions={hostInstitutionOptions}
+          hostInstitutionsLoading={hostInstitutionsLoading}
+          hostInstitutionsError={hostInstitutionsError}
           programsByHost={programsByHost}
         />
       );
@@ -2313,14 +2288,30 @@ function SectionAMobilityPanel({
   form,
   update,
   hostInstitutionOptions,
+  hostInstitutionsLoading,
+  hostInstitutionsError,
   programsByHost,
 }: {
   form: typeof initialForm;
   update: (field: keyof typeof initialForm, value: string | boolean) => void;
   hostInstitutionOptions: string[];
+  hostInstitutionsLoading: boolean;
+  hostInstitutionsError: string | null;
   programsByHost: Record<string, ProgramRecord[]>;
 }) {
   const { typeOfMobility, preferredHostInstitution, thematicArea } = form;
+
+  const institutionOptions = useMemo(() => {
+    if (
+      preferredHostInstitution &&
+      !hostInstitutionOptions.includes(preferredHostInstitution)
+    ) {
+      return [...hostInstitutionOptions, preferredHostInstitution].sort((a, b) =>
+        a.localeCompare(b)
+      );
+    }
+    return hostInstitutionOptions;
+  }, [hostInstitutionOptions, preferredHostInstitution]);
 
   const hostPrograms = programsForMobilityAtHost(
     programsByHost,
@@ -2370,14 +2361,31 @@ function SectionAMobilityPanel({
       />
 
       {typeOfMobility && (
-        <SelectField
-          required
-          label="Preferred Host Institution"
-          value={preferredHostInstitution}
-          onChange={handleHostChange}
-          options={hostInstitutionOptions}
-          placeholder="Select host institution"
-        />
+        <>
+          {hostInstitutionsError && (
+            <p
+              className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800"
+              role="alert"
+            >
+              {hostInstitutionsError}
+            </p>
+          )}
+          <SelectField
+            required
+            label="Preferred Host Institution"
+            value={preferredHostInstitution}
+            onChange={handleHostChange}
+            options={institutionOptions}
+            placeholder={
+              hostInstitutionsLoading
+                ? "Loading host institutions…"
+                : institutionOptions.length === 0
+                  ? "No host institutions available"
+                  : "Select host institution"
+            }
+            disabled={hostInstitutionsLoading || institutionOptions.length === 0}
+          />
+        </>
       )}
 
       {isMastersOrPhd(typeOfMobility) && preferredHostInstitution && (
