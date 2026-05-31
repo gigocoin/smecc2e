@@ -443,7 +443,8 @@ export function ApplicationForm({
   const [previousScholarshipDeclarationFileName, setPreviousScholarshipDeclarationFileName] =
     useState<string | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
-  const draftFormLoadedRef = useRef(false);
+  const [draftHydrationDone, setDraftHydrationDone] = useState(!portalMode);
+  const portalDraftLoadStartedRef = useRef(false);
   const pendingDocumentUploadsRef = useRef(
     new Map<ApplicationDocumentField, File>()
   );
@@ -580,7 +581,8 @@ export function ApplicationForm({
 
   const persistDraftToServer = useCallback(
     async (
-      targetPage: number
+      targetPage: number,
+      extraFields?: Partial<ApplicationRecord>
     ): Promise<{
       application?: ApplicationRecord;
       error?: string;
@@ -598,6 +600,7 @@ export function ApplicationForm({
           credentials: "same-origin",
           body: JSON.stringify({
             ...buildApplicationPayload(),
+            ...extraFields,
             currentPage: targetPage,
           }),
         });
@@ -845,7 +848,6 @@ export function ApplicationForm({
         setCurrentPage(draft.currentPage);
       }
     }
-    draftFormLoadedRef.current = true;
   }, []);
 
   const nationalityCountryOptions = useMemo(
@@ -940,7 +942,8 @@ export function ApplicationForm({
   }, [searchParams, startOnly, router]);
 
   useEffect(() => {
-    if (!portalMode || !isHydrated || draftFormLoadedRef.current) return;
+    if (!portalMode || !isHydrated || portalDraftLoadStartedRef.current) return;
+    portalDraftLoadStartedRef.current = true;
 
     let cancelled = false;
     void (async () => {
@@ -957,13 +960,6 @@ export function ApplicationForm({
         const email = meData.user?.email?.trim();
         if (!email || cancelled) return;
 
-        setEmailVerified(true);
-        setForm((prev) => ({
-          ...prev,
-          email,
-          personalEmail: prev.personalEmail.trim() ? prev.personalEmail : email,
-        }));
-
         const draftRes = await fetch(
           `/api/applications/draft?email=${encodeURIComponent(email)}`,
           { cache: "no-store", credentials: "same-origin" }
@@ -976,14 +972,29 @@ export function ApplicationForm({
           };
           if (draftData.application?.status === "draft") {
             applyDraftToForm(draftData.application);
-            return;
+          } else {
+            setForm((prev) => ({
+              ...prev,
+              email,
+              personalEmail: prev.personalEmail.trim() ? prev.personalEmail : email,
+            }));
           }
+        } else {
+          setForm((prev) => ({
+            ...prev,
+            email,
+            personalEmail: prev.personalEmail.trim() ? prev.personalEmail : email,
+          }));
         }
 
-        draftFormLoadedRef.current = true;
-      } catch {
         if (!cancelled) {
-          draftFormLoadedRef.current = true;
+          setEmailVerified(true);
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) {
+          setDraftHydrationDone(true);
         }
       }
     })();
@@ -994,9 +1005,9 @@ export function ApplicationForm({
   }, [portalMode, isHydrated, applyDraftToForm]);
 
   useEffect(() => {
-    if (!isHydrated || !form.email.trim()) return;
+    if (!isHydrated || !form.email.trim() || portalMode) return;
     checkEmailVerified(form.email);
-  }, [form.email, checkEmailVerified, isHydrated]);
+  }, [form.email, checkEmailVerified, isHydrated, portalMode]);
 
   useEffect(() => {
     if (!emailVerified || !form.email.trim()) return;
@@ -1008,9 +1019,26 @@ export function ApplicationForm({
   }, [emailVerified, form.email]);
 
   useEffect(() => {
-    if (!portalMode || !isHydrated || !emailVerified || !form.email.trim() || draftId) return;
+    if (
+      !portalMode ||
+      !isHydrated ||
+      !draftHydrationDone ||
+      !emailVerified ||
+      !form.email.trim() ||
+      draftId
+    ) {
+      return;
+    }
     void ensureApplicationId();
-  }, [portalMode, isHydrated, emailVerified, form.email, draftId, ensureApplicationId]);
+  }, [
+    portalMode,
+    isHydrated,
+    draftHydrationDone,
+    emailVerified,
+    form.email,
+    draftId,
+    ensureApplicationId,
+  ]);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -1244,7 +1272,12 @@ export function ApplicationForm({
         return false;
       }
       if (result.application) {
-        await flushPendingDocumentUploads(result.application.id);
+        const documentOverrides = await flushPendingDocumentUploads(
+          result.application.id
+        );
+        if (Object.keys(documentOverrides).length > 0) {
+          await persistDraftToServer(nextPage, documentOverrides);
+        }
       }
       localStorage.setItem(APPLICATION_PAGE_KEY, String(nextPage));
       setSaveMessage("Progress saved.");
@@ -1389,12 +1422,20 @@ export function ApplicationForm({
           return;
         }
         if (result.application) {
-          await flushPendingDocumentUploads(result.application.id);
+          const documentOverrides = await flushPendingDocumentUploads(
+            result.application.id
+          );
+          if (Object.keys(documentOverrides).length > 0) {
+            await persistDraftToServer(currentPage, documentOverrides);
+          }
         }
         localStorage.setItem(APPLICATION_PAGE_KEY, String(currentPage));
       }
 
-      await fetch("/api/auth/applicant/logout", { method: "POST" });
+      await fetch("/api/auth/applicant/logout", {
+        method: "POST",
+        credentials: "same-origin",
+      });
       window.location.href = APPLICANT_LOGIN_PATH;
     } catch {
       setSaveError("Could not sign out. Check your connection and try again.");
@@ -1463,7 +1504,6 @@ export function ApplicationForm({
               setSaveMessage(null);
               setDraftId(null);
               setProfileMarkedUploaded(false);
-              draftFormLoadedRef.current = false;
               localStorage.removeItem(APPLICATION_ID_KEY);
               localStorage.removeItem(APPLICATION_PAGE_KEY);
               setForm(initialForm);
