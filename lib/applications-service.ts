@@ -163,7 +163,7 @@ export async function submitApplication(
       data: {
         ...fields,
         publicId,
-        status: "pending",
+        status: "under_review",
         currentPage: null,
         submittedAt: now,
         updatedAt: now,
@@ -177,7 +177,7 @@ export async function submitApplication(
     data: {
       ...fields,
       publicId,
-      status: "pending",
+      status: "under_review",
       submittedAt: now,
       currentPage: null,
     },

@@ -10,7 +10,7 @@ import { APPLICANT_LOGIN_PATH } from "@/lib/applicant-login-paths";
 
 function statusTone(status: ApplicationStatus): string {
   if (status === "draft") return "bg-sky-100 text-sky-900";
-  if (status === "pending") return "bg-amber-100 text-amber-900";
+  if (status === "pending" || status === "under_review") return "bg-sky-100 text-sky-900";
   if (status === "approved" || status === "offered") return "bg-emerald-100 text-emerald-900";
   if (status === "rejected") return "bg-red-100 text-red-900";
   return "bg-slate-100 text-slate-800";
@@ -85,10 +85,17 @@ export function ApplicantDashboard() {
       ? `${app.firstName} ${app.surname}`.trim()
       : user.email;
   const isDraft = !app || app.status === "draft";
+  const isSubmitted = app && app.status !== "draft";
   const continuePage = app?.currentPage && app.currentPage > 1 ? app.currentPage : 2;
   const continueHref = isDraft
     ? `/applicant/application?page=${continuePage}`
     : undefined;
+  const statusLabel =
+    app && (app.status === "pending" || app.status === "under_review")
+      ? STATUS_LABELS.under_review
+      : app
+        ? (STATUS_LABELS[app.status] ?? app.status)
+        : "";
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -154,7 +161,7 @@ export function ApplicantDashboard() {
               <span
                 className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${statusTone(app.status)}`}
               >
-                {STATUS_LABELS[app.status] ?? app.status}
+                {statusLabel}
               </span>
             </div>
 
@@ -176,13 +183,22 @@ export function ApplicantDashboard() {
                   </Link>
                 )}
               </>
+            ) : isSubmitted ? (
+              <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-4">
+                <p className="text-base font-semibold text-[#062763]">
+                  Your Application has been received
+                </p>
+                {app.submittedAt && (
+                  <p className="mt-2 text-sm text-slate-700">
+                    Submitted on{" "}
+                    {new Date(app.submittedAt).toLocaleDateString()}. You can sign
+                    in here anytime to check status updates.
+                  </p>
+                )}
+              </div>
             ) : (
               <p className="text-sm text-slate-700">
-                Your application was submitted
-                {app.submittedAt
-                  ? ` on ${new Date(app.submittedAt).toLocaleDateString()}`
-                  : ""}
-                . You can sign in here anytime to check status updates.
+                You can sign in here anytime to check status updates.
               </p>
             )}
           </div>

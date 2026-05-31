@@ -23,7 +23,7 @@ function seedApplications(): ApplicationRecord[] {
   return [
     createRecord({
       id: "APP-2026-0001",
-      status: "pending",
+      status: "under_review",
       submittedAt: daysAgo(2),
       email: "adaobi.okafor@example.com",
       personalEmail: "adaobi.okafor@example.com",
@@ -223,7 +223,7 @@ export function submitApplication(
     const updated: ApplicationRecord = {
       ...draft,
       ...payload,
-      status: "pending",
+      status: "under_review",
       currentPage: undefined,
       updatedAt: now,
     };

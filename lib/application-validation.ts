@@ -66,13 +66,18 @@ export function validateApplicationForSubmit(
   requireField(errors, isNonEmpty(payload.personalEmail) && isValidEmail(payload.personalEmail), "Personal email");
   requireField(errors, isNonEmpty(payload.phoneNumber), "Phone number");
   requireField(errors, isNonEmpty(payload.linkedinUrl), "LinkedIn URL");
-  requireField(errors, isNonEmpty(payload.socialMediaUrl), "Other social media URL");
   requireField(errors, isNonEmpty(payload.passportOrIdNumber), "Passport / National ID number");
   requireField(errors, isNonEmpty(payload.passportFileName), "Passport / ID document upload");
 
   requireField(errors, isNonEmpty(payload.nextOfKinName), "Next of kin name");
   requireField(errors, isNonEmpty(payload.nextOfKinWhatsapp), "Next of kin WhatsApp");
-  requireField(errors, isNonEmpty(payload.nextOfKinEmail) && isValidEmail(payload.nextOfKinEmail), "Next of kin email");
+  if (isNonEmpty(payload.nextOfKinEmail)) {
+    requireField(
+      errors,
+      isValidEmail(payload.nextOfKinEmail ?? ""),
+      "Next of kin email must be a valid email address"
+    );
+  }
   requireField(errors, isNonEmpty(payload.nextOfKinRelationship), "Next of kin relationship");
 
   requireField(errors, isNonEmpty(payload.belongsToDisadvantagedGroup), "Disadvantaged group question");
@@ -200,14 +205,25 @@ export function validateApplicationForSubmit(
   requireField(errors, isNonEmpty(payload.referee1Relationship), "Referee 1 relationship");
   requireField(errors, isNonEmpty(payload.referee1Position), "Referee 1 position");
   requireField(errors, isNonEmpty(payload.referee1Institution), "Referee 1 institution");
-  requireField(errors, isNonEmpty(payload.referee1Email) && isValidEmail(payload.referee1Email ?? ""), "Referee 1 email");
+  if (isNonEmpty(payload.referee1Email)) {
+    requireField(
+      errors,
+      isValidEmail(payload.referee1Email ?? ""),
+      "Referee 1 email must be a valid email address"
+    );
+  }
   requireField(errors, isNonEmpty(payload.referee1Phone), "Referee 1 phone");
 
   requireField(errors, isNonEmpty(payload.referee2Name), "Referee 2 name");
-  requireField(errors, isNonEmpty(payload.referee2Relationship), "Referee 2 relationship");
   requireField(errors, isNonEmpty(payload.referee2Position), "Referee 2 position");
   requireField(errors, isNonEmpty(payload.referee2Institution), "Referee 2 institution");
-  requireField(errors, isNonEmpty(payload.referee2Email) && isValidEmail(payload.referee2Email ?? ""), "Referee 2 email");
+  if (isNonEmpty(payload.referee2Email)) {
+    requireField(
+      errors,
+      isValidEmail(payload.referee2Email ?? ""),
+      "Referee 2 email must be a valid email address"
+    );
+  }
   requireField(errors, isNonEmpty(payload.referee2Phone), "Referee 2 phone");
 
   requireField(errors, isNonEmpty(payload.referenceLettersFileName), "Reference letters");

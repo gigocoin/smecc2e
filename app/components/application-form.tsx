@@ -6,7 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, createContext } from "react";
 import { GuidelinesPdfViewer } from "./guidelines-pdf-viewer";
 import type { ApplicationRecord } from "@/lib/application-types";
-import type { ApplicationDocumentField } from "@/lib/application-documents";
+import {
+  applicationDocumentUrl,
+  type ApplicationDocumentField,
+} from "@/lib/application-documents";
 import { validateApplicationForSubmit } from "@/lib/application-validation";
 import type { ProgramRecord, ProgramTypeLabel } from "@/lib/academic-program";
 import {
@@ -692,9 +695,18 @@ export function ApplicationForm({
       const storedName = await uploadApplicationDocumentFile(appId, field, file);
       pendingDocumentUploadsRef.current.delete(field);
       applyStoredDocumentName(field, storedName);
+      if (field === "profile" && portalMode) {
+        void persistDraftToServer(currentPage);
+      }
       return storedName;
     },
-    [ensureApplicationId, applyStoredDocumentName]
+    [
+      ensureApplicationId,
+      applyStoredDocumentName,
+      portalMode,
+      persistDraftToServer,
+      currentPage,
+    ]
   );
 
   const uploadContextValue = useMemo(
@@ -784,8 +796,9 @@ export function ApplicationForm({
       dataProtectionConsent: draft.dataProtectionConsent ?? false,
       applicantSignature: draft.applicantSignature ?? "",
     });
-    if (draft.profileUploaded) {
+    if (draft.profileUploaded && draft.id) {
       setProfileMarkedUploaded(true);
+      setProfilePreview(applicationDocumentUrl(draft.id, "profile"));
     }
     if (draft.passportFileName) {
       setPassportFileName(draft.passportFileName);
@@ -2365,6 +2378,7 @@ function RegistrationPanel({
             continue to Section A.
           </p>
           <ProfilePictureUpload
+            required
             preview={profilePreview}
             onFileSelect={(_file, previewUrl) => {
               if (profilePreview?.startsWith("blob:")) {
@@ -2394,6 +2408,7 @@ function RegistrationPanel({
             description="Countries are loaded from SMECC2E regional groupings."
           />
           <SelectField
+            required
             label="Country of Residence"
             value={form.countryOfResidence}
             onChange={onCountryOfResidenceChange}
@@ -2402,6 +2417,7 @@ function RegistrationPanel({
             description="All African countries."
           />
           <SelectField
+            required
             label="Region"
             value={form.region}
             onChange={() => {}}
@@ -2626,6 +2642,7 @@ function SectionBPersonalInfoPanel({
       </div>
 
       <ShortAnswer
+        required
         label="Middle Name"
         value={form.middleName}
         onChange={(v) => update("middleName", v)}
@@ -2682,6 +2699,7 @@ function SectionBPersonalInfoPanel({
       />
 
       <ShortAnswer
+        required
         label="Social Media Account URL (LinkedIn)"
         type="url"
         value={form.linkedinUrl}
@@ -2703,6 +2721,7 @@ function SectionBPersonalInfoPanel({
       />
 
       <DocumentUpload
+        required
         label="Upload Passport Bio-data Page or National ID"
         description="Upload 1 supported file: PDF or image. Max 1 MB."
         accept="image/jpeg,image/png,image/webp,application/pdf"
@@ -2728,11 +2747,13 @@ function SectionBPersonalInfoPanel({
         </h4>
         <div className="space-y-8">
           <ShortAnswer
+            required
             label="Names of Next of Kin"
             value={form.nextOfKinName}
             onChange={(v) => update("nextOfKinName", v)}
           />
           <ShortAnswer
+            required
             label="Whatsapp Phone number of Next of Kin"
             type="tel"
             value={form.nextOfKinWhatsapp}
@@ -2745,6 +2766,7 @@ function SectionBPersonalInfoPanel({
             onChange={(v) => update("nextOfKinEmail", v)}
           />
           <ShortAnswer
+            required
             label="Relationship with next of kin"
             value={form.nextOfKinRelationship}
             onChange={(v) => update("nextOfKinRelationship", v)}
@@ -2844,6 +2866,7 @@ function SectionCDisabilityPanel({
           <fieldset>
             <legend className="text-sm font-medium text-slate-800 sm:text-base">
               If yes, specify:
+              <RequiredMark required />
             </legend>
             <div className={fieldOptionsBoxClass}>
               {disadvantagedCategoryFields.map(({ key, label }) => (
@@ -2862,6 +2885,7 @@ function SectionCDisabilityPanel({
 
           {form.disadvantagedOther && (
             <ShortAnswer
+              required
               label="Other (specify)"
               value={form.disadvantagedOtherSpecify}
               onChange={(v) => update("disadvantagedOtherSpecify", v)}
@@ -2869,6 +2893,7 @@ function SectionCDisabilityPanel({
           )}
 
           <DocumentUpload
+            required
             label="Upload supporting documents"
             description="Please merge all valid documents that identify you as a disadvantaged applicant into one PDF file. Upload 1 supported file: PDF, document, or image. Max 1 MB."
             accept="application/pdf,image/jpeg,image/png,image/webp,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -3537,6 +3562,7 @@ function SectionJStaffMobilityPanel({
       </div>
 
       <Paragraph
+        required
         label="Name of the Organizations you worked with."
         rows={4}
         value={form.staffOrganizationsWorkedWith}
@@ -3567,6 +3593,7 @@ function SectionJStaffMobilityPanel({
       />
 
       <Paragraph
+        required
         label="Proposed Work Plan"
         description="Maximum 500 words."
         rows={8}
@@ -3700,6 +3727,7 @@ function SectionLReferencesPanel({
         </h4>
         <div className="space-y-6">
           <ShortAnswer
+            required
             label="Name of Referee 1"
             value={form.referee1Name}
             onChange={(v) => update("referee1Name", v)}
@@ -3713,6 +3741,7 @@ function SectionLReferencesPanel({
             placeholder="Select relationship"
           />
           <ShortAnswer
+            required
             label="Position of Referee 1"
             value={form.referee1Position}
             onChange={(v) => update("referee1Position", v)}
@@ -3724,7 +3753,6 @@ function SectionLReferencesPanel({
             onChange={(v) => update("referee1Institution", v)}
           />
           <ShortAnswer
-            required
             label="Official Email Address of Referee 1"
             type="email"
             value={form.referee1Email}
@@ -3746,6 +3774,7 @@ function SectionLReferencesPanel({
         </h4>
         <div className="space-y-6">
           <ShortAnswer
+            required
             label="Name of Referee 2"
             value={form.referee2Name}
             onChange={(v) => update("referee2Name", v)}
@@ -3758,6 +3787,7 @@ function SectionLReferencesPanel({
             placeholder="Select relationship"
           />
           <ShortAnswer
+            required
             label="Position of Referee 2"
             value={form.referee2Position}
             onChange={(v) => update("referee2Position", v)}
@@ -3769,7 +3799,6 @@ function SectionLReferencesPanel({
             onChange={(v) => update("referee2Institution", v)}
           />
           <ShortAnswer
-            required
             label="Official Email Address of Referee 2"
             type="email"
             value={form.referee2Email}
@@ -4686,7 +4715,7 @@ function FormHeader() {
         priority
       />
       <p className="px-6 py-2 text-center text-xs text-blue-50/80 sm:text-sm">
-        <span className="text-red-300">*</span> Indicates required question
+        <span className="text-red-600">*</span> Indicates required question
       </p>
     </div>
   );
@@ -5067,10 +5096,12 @@ function ProfilePictureUpload({
   preview,
   onFileSelect,
   onClear,
+  required,
 }: {
   preview: string | null;
   onFileSelect: ApplicationFileSelectHandler;
   onClear: () => void;
+  required?: boolean;
 }) {
   const uploadContext = useContext(ApplicationUploadContext);
 
@@ -5078,6 +5109,7 @@ function ProfilePictureUpload({
     <div>
       <p className="text-sm font-medium text-slate-800 sm:text-base">
         Upload a profile picture
+        <RequiredMark required={required} />
       </p>
       <div className={`${fieldUploadZoneClass} flex flex-wrap items-center gap-4`}>
         {preview ? (

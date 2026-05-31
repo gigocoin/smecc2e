@@ -52,7 +52,11 @@ function ProgramStatusBadge({ isActive }: { isActive: boolean }) {
   );
 }
 
-export function CoordinatorPrograms() {
+export function CoordinatorPrograms({
+  hideEditDelete = false,
+}: {
+  hideEditDelete?: boolean;
+} = {}) {
   const [universities, setUniversities] = useState<UniversityWithPrograms[]>(
     []
   );
@@ -772,16 +776,18 @@ export function CoordinatorPrograms() {
                         </td>
                         <td className="px-5 py-3">
                           <div className="flex flex-wrap items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => openEdit(program)}
-                              disabled={tableBusy}
-                              className={`${actionIconBtnClass} border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
-                              aria-label={`Edit ${program.name}`}
-                              title="Edit program"
-                            >
-                              <EditIcon />
-                            </button>
+                            {!hideEditDelete && (
+                              <button
+                                type="button"
+                                onClick={() => openEdit(program)}
+                                disabled={tableBusy}
+                                className={`${actionIconBtnClass} border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
+                                aria-label={`Edit ${program.name}`}
+                                title="Edit program"
+                              >
+                                <EditIcon />
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() =>
@@ -1010,7 +1016,7 @@ export function CoordinatorPrograms() {
         </div>
       )}
 
-      {editingProgram && (
+      {!hideEditDelete && editingProgram && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           role="dialog"

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { requireApplicantOwnsApplication } from "@/lib/applicant-application-auth";
+import { ApplicantAuthError } from "@/lib/applicant-auth-service";
 import {
   getStoredDocumentName,
   isApplicationDocumentField,
@@ -8,12 +10,21 @@ import { mimeTypeForFileName } from "@/lib/application-documents-server";
 import { getApplication } from "@/lib/applications-service";
 import { AuthError, requireDashboardSessionUser } from "@/lib/auth-service";
 
+async function authorizeDocumentAccess(application: NonNullable<
+  Awaited<ReturnType<typeof getApplication>>
+>): Promise<void> {
+  if (application.status === "draft") {
+    await requireApplicantOwnsApplication(application.id);
+    return;
+  }
+  await requireDashboardSessionUser();
+}
+
 export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireDashboardSessionUser();
     const { id } = await context.params;
     const field = new URL(request.url).searchParams.get("field")?.trim() ?? "";
 
@@ -25,6 +36,8 @@ export async function GET(
     if (!application) {
       return NextResponse.json({ error: "Application not found" }, { status: 404 });
     }
+
+    await authorizeDocumentAccess(application);
 
     const storedName = getStoredDocumentName(application, field);
     if (!storedName) {
@@ -54,6 +67,12 @@ export async function GET(
       },
     });
   } catch (err) {
+    if (err instanceof ApplicantAuthError) {
+      return NextResponse.json(
+        { error: err.status === 403 ? "Forbidden" : "Unauthorized" },
+        { status: err.status }
+      );
+    }
     if (err instanceof AuthError) {
       return NextResponse.json(
         { error: err.status === 403 ? "Forbidden" : "Unauthorized" },

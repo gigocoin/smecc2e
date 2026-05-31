@@ -48,7 +48,11 @@ function DeleteIcon() {
   );
 }
 
-export function CoordinatorRegions() {
+export function CoordinatorRegions({
+  hideEditDelete = false,
+}: {
+  hideEditDelete?: boolean;
+} = {}) {
   const [regions, setRegions] = useState<RegionRecord[]>([]);
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -395,14 +399,16 @@ export function CoordinatorRegions() {
                     <th className="px-5 py-3">Pending</th>
                     <th className="px-5 py-3">Under review</th>
                     <th className="px-5 py-3">Approved</th>
-                    <th className="px-5 py-3 text-right">Actions</th>
+                    {!hideEditDelete && (
+                      <th className="px-5 py-3 text-right">Actions</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {regionStats.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={7}
+                        colSpan={hideEditDelete ? 6 : 7}
                         className="px-5 py-10 text-center font-semibold text-slate-900"
                       >
                         No regions yet. Create one to get started.
@@ -430,33 +436,35 @@ export function CoordinatorRegions() {
                           <td className="px-5 py-3 font-medium text-emerald-800">
                             {approved}
                           </td>
-                          <td className="px-5 py-3 text-right">
-                            <div className="flex justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => openEdit(region)}
-                                disabled={tableBusy}
-                                className={`${actionIconBtnClass} border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
-                                aria-label={`Edit ${region.name}`}
-                                title="Edit region"
-                              >
-                                <EditIcon />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDeletingRegion(region);
-                                  setDeleteError(null);
-                                }}
-                                disabled={tableBusy}
-                                className={`${actionIconBtnClass} border-red-200 text-red-700 hover:bg-red-50`}
-                                aria-label={`Delete ${region.name}`}
-                                title="Delete region"
-                              >
-                                <DeleteIcon />
-                              </button>
-                            </div>
-                          </td>
+                          {!hideEditDelete && (
+                            <td className="px-5 py-3 text-right">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openEdit(region)}
+                                  disabled={tableBusy}
+                                  className={`${actionIconBtnClass} border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
+                                  aria-label={`Edit ${region.name}`}
+                                  title="Edit region"
+                                >
+                                  <EditIcon />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setDeletingRegion(region);
+                                    setDeleteError(null);
+                                  }}
+                                  disabled={tableBusy}
+                                  className={`${actionIconBtnClass} border-red-200 text-red-700 hover:bg-red-50`}
+                                  aria-label={`Delete ${region.name}`}
+                                  title="Delete region"
+                                >
+                                  <DeleteIcon />
+                                </button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       )
                     )
@@ -611,7 +619,7 @@ export function CoordinatorRegions() {
         </div>
       )}
 
-      {editingRegion && (
+      {!hideEditDelete && editingRegion && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           role="dialog"
@@ -753,7 +761,7 @@ export function CoordinatorRegions() {
         </div>
       )}
 
-      {deletingRegion && (
+      {!hideEditDelete && deletingRegion && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           role="dialog"
