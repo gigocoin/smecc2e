@@ -44,7 +44,6 @@ export async function POST(request: Request) {
           `Resend is not configured. Use the verification link below to continue.`,
       sent: mailResult.sent,
       devLink: mailResult.devLink,
-      devTempPassword: tempPassword ?? undefined,
     });
   } catch (err) {
     console.error("POST /api/verify-email/send", err);

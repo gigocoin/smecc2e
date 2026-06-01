@@ -1207,18 +1207,13 @@ export function ApplicationForm({
         message?: string;
         error?: string;
         devLink?: string;
-        devTempPassword?: string;
         sent?: boolean;
       };
       if (!res.ok) {
         setVerifyError(data.error ?? "Could not send verification email.");
         return;
       }
-      setVerifyMessage(
-        data.devTempPassword
-          ? `${data.message ?? "Verification email sent."} Temporary password (dev): ${data.devTempPassword}`
-          : data.message ?? "Verification email sent."
-      );
+      setVerifyMessage(data.message ?? "Verification email sent.");
       if (data.devLink) setVerifyDevLink(data.devLink);
     } catch {
       setVerifyError("Network error. Please try again.");
