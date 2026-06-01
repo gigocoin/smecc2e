@@ -14,7 +14,7 @@ export function useBlobStorage(): boolean {
 }
 
 export function isProductionWithoutBlobStorage(): boolean {
-  return process.env.VERCEL === "1" && !useBlobStorage();
+  return process.env.NODE_ENV === "production" && !useBlobStorage();
 }
 
 export function blobStorageConfigurationError(): string {
@@ -83,13 +83,47 @@ function matchesStoredDocument(
 ): boolean {
   const lowerStored = storedName.toLowerCase();
   const lowerCandidate = candidateName.toLowerCase();
+  const storedDisplay = documentDisplayName(storedName).toLowerCase();
+  const candidateDisplay = documentDisplayName(candidateName).toLowerCase();
   return (
     candidateName === storedName ||
     lowerCandidate === lowerStored ||
     candidateName.endsWith(`__${storedName}`) ||
+    candidateDisplay === storedDisplay ||
     documentDisplayName(candidateName) === storedName ||
     documentDisplayName(candidateName).toLowerCase() === lowerStored
   );
+}
+
+async function listAllBlobsWithPrefix(prefix: string) {
+  const blobs = [];
+  let cursor: string | undefined;
+  do {
+    const page = await list({ prefix, cursor });
+    blobs.push(...page.blobs);
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+  return blobs;
+}
+
+async function getBlobBuffer(pathname: string): Promise<Buffer | null> {
+  const candidates = [pathname];
+  const encoded = pathname
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  if (encoded !== pathname) {
+    candidates.push(encoded);
+  }
+
+  for (const candidate of candidates) {
+    const result = await get(candidate, { access: BLOB_ACCESS });
+    if (result?.stream) {
+      return streamToBuffer(result.stream);
+    }
+  }
+
+  return null;
 }
 
 async function resolveLocalDocumentPath(
@@ -127,12 +161,12 @@ async function resolveBlobPathname(
   field: ApplicationDocumentField
 ): Promise<string | null> {
   const direct = blobPathname(applicationRef, storedName);
-  const directBlob = await get(direct, { access: BLOB_ACCESS });
-  if (directBlob) {
+  const directBuffer = await getBlobBuffer(direct);
+  if (directBuffer) {
     return direct;
   }
 
-  const { blobs } = await list({ prefix: blobPrefix(applicationRef) });
+  const blobs = await listAllBlobsWithPrefix(blobPrefix(applicationRef));
   if (field === "profile") {
     const profileBlob = blobs.find((blob) =>
       blob.pathname.split("/").pop()?.startsWith("profile")
@@ -179,7 +213,7 @@ async function resolveBlobPathnameGlobal(
   skipRefs: string[]
 ): Promise<string | null> {
   const skip = new Set(skipRefs);
-  const { blobs } = await list({ prefix: "applications/" });
+  const blobs = await listAllBlobsWithPrefix("applications/");
 
   if (field === "profile") {
     const profileBlob = blobs.find((blob) => {
@@ -237,11 +271,11 @@ export async function readApplicationDocument(
     );
     if (!pathname) return null;
 
-    const result = await get(pathname, { access: BLOB_ACCESS });
-    if (!result?.stream) return null;
+    const buffer = await getBlobBuffer(pathname);
+    if (!buffer) return null;
 
     return {
-      buffer: await streamToBuffer(result.stream),
+      buffer,
       fileName: pathname.split("/").pop() ?? storedName,
     };
   }
@@ -262,13 +296,24 @@ export async function readApplicationDocument(
 export async function readApplicationDocumentWithRefs(
   refs: string[],
   storedName: string,
-  field: ApplicationDocumentField
+  field: ApplicationDocumentField,
+  options?: { migrateToRef?: string }
 ): Promise<{ buffer: Buffer; fileName: string } | null> {
   const uniqueRefs = [...new Set(refs.filter(Boolean))];
+  const migrateToRef = options?.migrateToRef?.trim();
 
   for (const ref of uniqueRefs) {
     const document = await readApplicationDocument(ref, storedName, field);
-    if (document) return document;
+    if (document) {
+      if (migrateToRef && ref !== migrateToRef) {
+        try {
+          await migrateApplicationDocumentStorage(ref, migrateToRef);
+        } catch (err) {
+          console.error("readApplicationDocumentWithRefs migrate", err);
+        }
+      }
+      return document;
+    }
   }
 
   if (useBlobStorage()) {
@@ -279,11 +324,20 @@ export async function readApplicationDocumentWithRefs(
     );
     if (!pathname) return null;
 
-    const result = await get(pathname, { access: BLOB_ACCESS });
-    if (!result?.stream) return null;
+    const buffer = await getBlobBuffer(pathname);
+    if (!buffer) return null;
+
+    const foundRef = pathname.split("/")[1];
+    if (migrateToRef && foundRef && foundRef !== migrateToRef) {
+      try {
+        await migrateApplicationDocumentStorage(foundRef, migrateToRef);
+      } catch (err) {
+        console.error("readApplicationDocumentWithRefs global migrate", err);
+      }
+    }
 
     return {
-      buffer: await streamToBuffer(result.stream),
+      buffer,
       fileName: pathname.split("/").pop() ?? storedName,
     };
   }
@@ -308,7 +362,7 @@ export async function migrateApplicationDocumentStorage(
   if (!fromRef || !toRef || fromRef === toRef) return;
 
   if (useBlobStorage()) {
-    const { blobs } = await list({ prefix: blobPrefix(fromRef) });
+    const blobs = await listAllBlobsWithPrefix(blobPrefix(fromRef));
     for (const blob of blobs) {
       const fileName = blob.pathname.split("/").pop();
       if (!fileName) continue;
@@ -373,7 +427,7 @@ export async function deleteAllApplicationDocuments(
   applicationRef: string
 ): Promise<void> {
   if (useBlobStorage()) {
-    const { blobs } = await list({ prefix: blobPrefix(applicationRef) });
+    const blobs = await listAllBlobsWithPrefix(blobPrefix(applicationRef));
     await Promise.all(blobs.map((blob) => del(blob.pathname)));
     return;
   }

@@ -5,7 +5,11 @@ import {
   getStoredDocumentName,
   isApplicationDocumentField,
 } from "@/lib/application-documents";
-import { readApplicationDocumentWithRefs } from "@/lib/application-document-storage";
+import {
+  primaryApplicationDocumentRef,
+  readApplicationDocumentWithRefs,
+  useBlobStorage,
+} from "@/lib/application-document-storage";
 import { mimeTypeForFileName } from "@/lib/application-documents-server";
 import {
   getApplication,
@@ -52,17 +56,23 @@ export async function GET(
       return NextResponse.json({ error: "Application not found" }, { status: 404 });
     }
 
+    const migrateToRef = primaryApplicationDocumentRef(
+      application.id,
+      storageRefs[storageRefs.length - 1] ?? application.id
+    );
+
     const document = await readApplicationDocumentWithRefs(
       storageRefs,
       storedName,
-      field
+      field,
+      { migrateToRef }
     );
     if (!document) {
+      const missingMessage = useBlobStorage()
+        ? "Document file missing on the server. Ask the applicant to re-upload the file by opening their draft application, or submit a new application with documents attached."
+        : "Document storage is not configured for production. Connect a Vercel Blob store and set BLOB_READ_WRITE_TOKEN, then ask the applicant to re-upload their documents.";
       return NextResponse.json(
-        {
-          error:
-            "Document file missing on the server. Ask the applicant to re-upload the file by opening their draft application, or submit a new application with documents attached.",
-        },
+        { error: missingMessage },
         { status: 404 }
       );
     }
