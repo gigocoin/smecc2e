@@ -9,7 +9,9 @@ import {
 export async function POST() {
   const jar = await cookies();
   const token = jar.get(APPLICANT_SESSION_COOKIE)?.value;
-  const session = await verifyApplicantSessionToken(token);
+  const session = await verifyApplicantSessionToken(token, {
+    enforceIdle: false,
+  });
 
   if (!session) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });

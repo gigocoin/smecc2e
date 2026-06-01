@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { SESSION_IDLE_TIMEOUT_MS } from "./session-constants";
+import { APPLICANT_SESSION_IDLE_TIMEOUT_MS } from "./session-constants";
 
 export const APPLICANT_SESSION_COOKIE = "smecc2e_applicant_auth";
 
@@ -110,8 +110,10 @@ export async function signApplicantSessionToken(
 }
 
 export async function verifyApplicantSessionToken(
-  token: string | undefined
+  token: string | undefined,
+  options?: { enforceIdle?: boolean }
 ): Promise<ApplicantSessionClaims | null> {
+  const enforceIdle = options?.enforceIdle !== false;
   if (!token) return null;
   const lastDot = token.lastIndexOf(".");
   if (lastDot <= 0) return null;
@@ -130,10 +132,8 @@ export async function verifyApplicantSessionToken(
   if (!email || !Number.isFinite(exp) || Date.now() > exp) return null;
 
   const iat = parseInt(parts[4] ?? "", 10);
-  if (
-    !Number.isFinite(iat) ||
-    Date.now() - iat > SESSION_IDLE_TIMEOUT_MS
-  ) {
+  if (!Number.isFinite(iat)) return null;
+  if (enforceIdle && Date.now() - iat > APPLICANT_SESSION_IDLE_TIMEOUT_MS) {
     return null;
   }
 

@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import {
-  SESSION_HEARTBEAT_INTERVAL_MS,
-  SESSION_IDLE_TIMEOUT_MS,
+  APPLICANT_SESSION_HEARTBEAT_INTERVAL_MS,
+  APPLICANT_SESSION_IDLE_TIMEOUT_MS,
 } from "@/lib/session-constants";
 import { applicantVerifiedLoginPath } from "@/lib/applicant-login-paths";
 
 const ACTIVITY_EVENTS = [
   "mousedown",
   "keydown",
+  "input",
   "touchstart",
   "scroll",
 ] as const;
@@ -34,12 +35,12 @@ export function ApplicantIdleSessionGuard({ email }: { email?: string }) {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     idleTimerRef.current = setTimeout(() => {
       void signOutIdle(email);
-    }, SESSION_IDLE_TIMEOUT_MS);
+    }, APPLICANT_SESSION_IDLE_TIMEOUT_MS);
   }, [email]);
 
   const maybeHeartbeat = useCallback(() => {
     const now = Date.now();
-    if (now - lastHeartbeatRef.current < SESSION_HEARTBEAT_INTERVAL_MS) {
+    if (now - lastHeartbeatRef.current < APPLICANT_SESSION_HEARTBEAT_INTERVAL_MS) {
       return;
     }
     lastHeartbeatRef.current = now;
@@ -71,14 +72,21 @@ export function ApplicantIdleSessionGuard({ email }: { email?: string }) {
     resetIdleTimer();
 
     for (const event of ACTIVITY_EVENTS) {
-      window.addEventListener(event, onActivity, { passive: true });
+      const target = event === "scroll" ? window : document;
+      const useCapture = event === "input" || event === "keydown";
+      target.addEventListener(event, onActivity, {
+        passive: true,
+        capture: useCapture,
+      });
     }
     document.addEventListener("visibilitychange", checkSessionOnVisible);
 
     return () => {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       for (const event of ACTIVITY_EVENTS) {
-        window.removeEventListener(event, onActivity);
+        const target = event === "scroll" ? window : document;
+        const useCapture = event === "input" || event === "keydown";
+        target.removeEventListener(event, onActivity, useCapture);
       }
       document.removeEventListener("visibilitychange", checkSessionOnVisible);
     };
