@@ -88,7 +88,9 @@ function DetailRow({
           <ApplicationDocumentPreview
             applicationId={applicationId}
             field={row.documentField!}
-            fileName={row.value}
+            fileName={
+              row.documentField === "profile" ? "profile.jpg" : row.value
+            }
           />
         ) : (
           row.value || "—"

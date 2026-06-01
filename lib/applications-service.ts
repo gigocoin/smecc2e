@@ -4,7 +4,11 @@ import {
   mapPrismaApplicant,
   payloadToApplicantFields,
 } from "./application-mappers";
-import { deleteAllApplicationDocuments } from "./application-document-storage";
+import {
+  applicationDocumentStorageRefs,
+  deleteAllApplicationDocumentsForRefs,
+  migrateApplicationDocumentStorage,
+} from "./application-document-storage";
 import { validateApplicationForSubmit } from "./application-validation";
 import { isApplicantEmailVerifiedForSubmit } from "./email-verification-store";
 import { prisma } from "./prisma";
@@ -138,6 +142,17 @@ export async function getApplication(
   return row ? mapPrismaApplicant(row) : null;
 }
 
+export async function getApplicationDocumentStorageRefs(
+  id: string
+): Promise<string[] | null> {
+  const row = await prisma.applicant.findFirst({
+    where: applicantWhereByRef(id),
+    select: { id: true, publicId: true },
+  });
+  if (!row) return null;
+  return applicationDocumentStorageRefs(row.publicId, row.id);
+}
+
 export async function upsertDraftApplication(
   payload: ApplicationPayload,
   currentPage: number
@@ -157,10 +172,16 @@ export async function upsertDraftApplication(
       payload.passportOrIdNumber,
       existing.id
     );
+    let publicId = existing.publicId;
+    if (!publicId) {
+      publicId = await nextApplicationPublicId();
+      await migrateApplicationDocumentStorage(existing.id, publicId);
+    }
     const updated = await prisma.applicant.update({
       where: { id: existing.id },
       data: {
         ...fields,
+        publicId,
         status: "draft",
         currentPage,
         updatedAt: now,
@@ -236,7 +257,11 @@ export async function submitApplication(
   );
 
   if (existing?.status === "draft") {
+    const hadPublicId = Boolean(existing.publicId);
     const publicId = existing.publicId ?? (await nextApplicationPublicId());
+    if (!hadPublicId) {
+      await migrateApplicationDocumentStorage(existing.id, publicId);
+    }
     const updated = await prisma.applicant.update({
       where: { id: existing.id },
       data: {
@@ -287,7 +312,9 @@ export async function deleteApplication(id: string): Promise<boolean> {
   if (!existing) return false;
 
   try {
-    await deleteAllApplicationDocuments(existing.id);
+    await deleteAllApplicationDocumentsForRefs(
+      applicationDocumentStorageRefs(existing.publicId, existing.id)
+    );
   } catch (err) {
     console.error("deleteApplication documents", err);
   }

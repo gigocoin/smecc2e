@@ -3,6 +3,7 @@ import path from "path";
 import { del, get, list, put } from "@vercel/blob";
 import {
   documentDisplayName,
+  mimeTypeFromFileName,
   type ApplicationDocumentField,
 } from "./application-documents";
 
@@ -40,6 +41,25 @@ function blobPathname(applicationRef: string, storedName: string): string {
 
 function blobPrefix(applicationRef: string): string {
   return `applications/${applicationRef}/`;
+}
+
+/** Storage folder keys to try when resolving uploaded files (public id first). */
+export function applicationDocumentStorageRefs(
+  publicId: string | null | undefined,
+  internalId: string
+): string[] {
+  const refs: string[] = [];
+  const pub = publicId?.trim();
+  if (pub) refs.push(pub);
+  if (internalId && internalId !== pub) refs.push(internalId);
+  return refs.length > 0 ? refs : [internalId];
+}
+
+export function primaryApplicationDocumentRef(
+  publicId: string | null | undefined,
+  internalId: string
+): string {
+  return publicId?.trim() || internalId;
 }
 
 async function localFileExists(filePath: string): Promise<boolean> {
@@ -127,6 +147,58 @@ async function resolveBlobPathname(
   return match?.pathname ?? null;
 }
 
+async function resolveLocalDocumentPathGlobal(
+  storedName: string,
+  field: ApplicationDocumentField,
+  skipRefs: string[]
+): Promise<string | null> {
+  const skip = new Set(skipRefs);
+  const baseDir = path.join(process.cwd(), "public", "uploads", "applications");
+
+  try {
+    const entries = await readdir(baseDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory() || skip.has(entry.name)) continue;
+      const found = await resolveLocalDocumentPath(
+        entry.name,
+        storedName,
+        field
+      );
+      if (found) return found;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+async function resolveBlobPathnameGlobal(
+  storedName: string,
+  field: ApplicationDocumentField,
+  skipRefs: string[]
+): Promise<string | null> {
+  const skip = new Set(skipRefs);
+  const { blobs } = await list({ prefix: "applications/" });
+
+  if (field === "profile") {
+    const profileBlob = blobs.find((blob) => {
+      const parts = blob.pathname.split("/");
+      if (parts.length < 3 || skip.has(parts[1] ?? "")) return false;
+      return parts[parts.length - 1]?.startsWith("profile");
+    });
+    return profileBlob?.pathname ?? null;
+  }
+
+  const match = blobs.find((blob) => {
+    const parts = blob.pathname.split("/");
+    if (parts.length < 3 || skip.has(parts[1] ?? "")) return false;
+    const fileName = parts[parts.length - 1] ?? "";
+    return matchesStoredDocument(fileName, storedName);
+  });
+  return match?.pathname ?? null;
+}
+
 export async function saveApplicationDocument(
   applicationRef: string,
   storedName: string,
@@ -187,6 +259,93 @@ export async function readApplicationDocument(
   };
 }
 
+export async function readApplicationDocumentWithRefs(
+  refs: string[],
+  storedName: string,
+  field: ApplicationDocumentField
+): Promise<{ buffer: Buffer; fileName: string } | null> {
+  const uniqueRefs = [...new Set(refs.filter(Boolean))];
+
+  for (const ref of uniqueRefs) {
+    const document = await readApplicationDocument(ref, storedName, field);
+    if (document) return document;
+  }
+
+  if (useBlobStorage()) {
+    const pathname = await resolveBlobPathnameGlobal(
+      storedName,
+      field,
+      uniqueRefs
+    );
+    if (!pathname) return null;
+
+    const result = await get(pathname, { access: BLOB_ACCESS });
+    if (!result?.stream) return null;
+
+    return {
+      buffer: await streamToBuffer(result.stream),
+      fileName: pathname.split("/").pop() ?? storedName,
+    };
+  }
+
+  const filePath = await resolveLocalDocumentPathGlobal(
+    storedName,
+    field,
+    uniqueRefs
+  );
+  if (!filePath) return null;
+
+  return {
+    buffer: await readFile(filePath),
+    fileName: path.basename(filePath),
+  };
+}
+
+export async function migrateApplicationDocumentStorage(
+  fromRef: string,
+  toRef: string
+): Promise<void> {
+  if (!fromRef || !toRef || fromRef === toRef) return;
+
+  if (useBlobStorage()) {
+    const { blobs } = await list({ prefix: blobPrefix(fromRef) });
+    for (const blob of blobs) {
+      const fileName = blob.pathname.split("/").pop();
+      if (!fileName) continue;
+
+      const result = await get(blob.pathname, { access: BLOB_ACCESS });
+      if (!result?.stream) continue;
+
+      const buffer = await streamToBuffer(result.stream);
+      const contentType =
+        result.headers.get("content-type") ??
+        mimeTypeFromFileName(fileName);
+      await saveApplicationDocument(
+        toRef,
+        fileName,
+        buffer,
+        contentType
+      );
+    }
+    await deleteAllApplicationDocuments(fromRef);
+    return;
+  }
+
+  const fromDir = localDocumentsDir(fromRef);
+  try {
+    const files = await readdir(fromDir);
+    if (files.length === 0) return;
+
+    for (const file of files) {
+      const buffer = await readFile(localDocumentPath(fromRef, file));
+      await saveApplicationDocument(toRef, file, buffer, "application/octet-stream");
+    }
+    await deleteAllApplicationDocuments(fromRef);
+  } catch {
+    /* source directory may not exist */
+  }
+}
+
 export async function deleteApplicationDocument(
   applicationRef: string,
   storedName: string
@@ -201,6 +360,13 @@ export async function deleteApplicationDocument(
     const { unlink } = await import("fs/promises");
     await unlink(filePath);
   }
+}
+
+export async function deleteAllApplicationDocumentsForRefs(
+  refs: string[]
+): Promise<void> {
+  const uniqueRefs = [...new Set(refs.filter(Boolean))];
+  await Promise.all(uniqueRefs.map((ref) => deleteAllApplicationDocuments(ref)));
 }
 
 export async function deleteAllApplicationDocuments(

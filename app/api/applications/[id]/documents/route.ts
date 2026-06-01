@@ -5,9 +5,12 @@ import {
   getStoredDocumentName,
   isApplicationDocumentField,
 } from "@/lib/application-documents";
-import { readApplicationDocument } from "@/lib/application-document-storage";
+import { readApplicationDocumentWithRefs } from "@/lib/application-document-storage";
 import { mimeTypeForFileName } from "@/lib/application-documents-server";
-import { getApplication } from "@/lib/applications-service";
+import {
+  getApplication,
+  getApplicationDocumentStorageRefs,
+} from "@/lib/applications-service";
 import { AuthError, requireDashboardSessionUser } from "@/lib/auth-service";
 
 async function authorizeDocumentAccess(application: NonNullable<
@@ -44,8 +47,13 @@ export async function GET(
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
 
-    const document = await readApplicationDocument(
-      application.id,
+    const storageRefs = await getApplicationDocumentStorageRefs(id);
+    if (!storageRefs) {
+      return NextResponse.json({ error: "Application not found" }, { status: 404 });
+    }
+
+    const document = await readApplicationDocumentWithRefs(
+      storageRefs,
       storedName,
       field
     );
