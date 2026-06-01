@@ -10,6 +10,7 @@ import { ApplicantAuthError } from "@/lib/applicant-auth-service";
 import {
   getApplication,
   updateApplicationStatus,
+  deleteApplication,
 } from "@/lib/applications-service";
 import { toUserFacingDatabaseError } from "@/lib/prisma-errors";
 
@@ -82,6 +83,34 @@ export async function PATCH(request: Request, context: RouteContext) {
       {
         error:
           connectionError ?? "Failed to update application status",
+      },
+      { status: connectionError ? 503 : 500 }
+    );
+  }
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  try {
+    await requireDashboardSessionUser();
+    const { id } = await context.params;
+    const deleted = await deleteApplication(id);
+    if (!deleted) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return NextResponse.json(
+        { error: err.status === 403 ? "Forbidden" : "Unauthorized" },
+        { status: err.status }
+      );
+    }
+    console.error("DELETE /api/applications/[id]", err);
+    const connectionError = toUserFacingDatabaseError(err);
+    return NextResponse.json(
+      {
+        error:
+          connectionError ?? "Failed to delete application",
       },
       { status: connectionError ? 503 : 500 }
     );

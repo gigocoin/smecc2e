@@ -17,7 +17,7 @@ export default function ApplicantApplicationPage() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="relative h-9 w-9 shrink-0 rounded-lg bg-white p-1">
-              <Image src="/images/logo1.png" alt="SMECC2E" fill className="object-contain p-0.5" unoptimized />
+              <Image src="/images/logo1.png" alt="SMECC2E" fill className="object-contain p-0.5" sizes="36px" unoptimized />
             </div>
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-[#f7be2a]">Applicant portal</p>

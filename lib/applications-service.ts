@@ -4,9 +4,24 @@ import {
   mapPrismaApplicant,
   payloadToApplicantFields,
 } from "./application-mappers";
+import { deleteAllApplicationDocuments } from "./application-document-storage";
 import { validateApplicationForSubmit } from "./application-validation";
 import { isApplicantEmailVerifiedForSubmit } from "./email-verification-store";
 import { prisma } from "./prisma";
+
+export class DuplicateApplicationError extends Error {
+  field: "email" | "nin";
+
+  constructor(field: "email" | "nin") {
+    super(
+      field === "email"
+        ? "An application has already been submitted with this email address."
+        : "An application has already been submitted with this passport or national ID number."
+    );
+    this.name = "DuplicateApplicationError";
+    this.field = field;
+  }
+}
 
 function applicantWhereByRef(ref: string) {
   return {
@@ -59,6 +74,50 @@ export async function findDraftByEmail(
   return row ? mapPrismaApplicant(row) : null;
 }
 
+async function assertNoDuplicateSubmittedApplication(
+  email: string,
+  passportOrIdNumber: string,
+  excludeApplicantId?: string
+): Promise<void> {
+  const normEmail = email.trim().toLowerCase();
+  const normNin = passportOrIdNumber.trim();
+  const excludeId = excludeApplicantId?.trim();
+
+  const submittedOnly = {
+    status: { not: "draft" as const },
+    ...(excludeId ? { NOT: { id: excludeId } } : {}),
+  };
+
+  if (normEmail) {
+    const byEmail = await prisma.applicant.findFirst({
+      where: {
+        ...submittedOnly,
+        OR: [
+          { email: { equals: normEmail, mode: "insensitive" } },
+          { personalEmail: { equals: normEmail, mode: "insensitive" } },
+        ],
+      },
+      select: { id: true },
+    });
+    if (byEmail) {
+      throw new DuplicateApplicationError("email");
+    }
+  }
+
+  if (normNin) {
+    const byNin = await prisma.applicant.findFirst({
+      where: {
+        ...submittedOnly,
+        passportOrIdNumber: { equals: normNin, mode: "insensitive" },
+      },
+      select: { id: true },
+    });
+    if (byNin) {
+      throw new DuplicateApplicationError("nin");
+    }
+  }
+}
+
 export async function listApplications(options?: {
   includeDrafts?: boolean;
 }): Promise<ApplicationRecord[]> {
@@ -93,6 +152,11 @@ export async function upsertDraftApplication(
   const now = new Date();
 
   if (existing) {
+    await assertNoDuplicateSubmittedApplication(
+      email,
+      payload.passportOrIdNumber,
+      existing.id
+    );
     const updated = await prisma.applicant.update({
       where: { id: existing.id },
       data: {
@@ -104,6 +168,11 @@ export async function upsertDraftApplication(
     });
     return mapPrismaApplicant(updated);
   }
+
+  await assertNoDuplicateSubmittedApplication(
+    email,
+    payload.passportOrIdNumber
+  );
 
   const publicId = await nextApplicationPublicId();
   const created = await prisma.applicant.create({
@@ -156,6 +225,16 @@ export async function submitApplication(
     existing = await findDraftRowByEmail(email);
   }
 
+  if (existing && existing.status !== "draft") {
+    throw new DuplicateApplicationError("email");
+  }
+
+  await assertNoDuplicateSubmittedApplication(
+    email,
+    payload.passportOrIdNumber,
+    existing?.id
+  );
+
   if (existing?.status === "draft") {
     const publicId = existing.publicId ?? (await nextApplicationPublicId());
     const updated = await prisma.applicant.update({
@@ -199,4 +278,20 @@ export async function updateApplicationStatus(
     data: { status, updatedAt: new Date() },
   });
   return mapPrismaApplicant(updated);
+}
+
+export async function deleteApplication(id: string): Promise<boolean> {
+  const existing = await prisma.applicant.findFirst({
+    where: applicantWhereByRef(id),
+  });
+  if (!existing) return false;
+
+  try {
+    await deleteAllApplicationDocuments(existing.id);
+  } catch (err) {
+    console.error("deleteApplication documents", err);
+  }
+
+  await prisma.applicant.delete({ where: { id: existing.id } });
+  return true;
 }

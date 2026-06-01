@@ -69,6 +69,7 @@ function LoginFormContent() {
                 alt="SMECC2E"
                 fill
                 className="object-contain"
+                sizes="64px"
                 priority
               />
             </div>

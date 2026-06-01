@@ -8,6 +8,10 @@ import { GuidelinesPdfViewer } from "./guidelines-pdf-viewer";
 import type { ApplicationRecord } from "@/lib/application-types";
 import {
   applicationDocumentUrl,
+  isJpgOrPngFile,
+  isPdfFile,
+  JPG_PNG_ACCEPT,
+  PDF_ACCEPT,
   type ApplicationDocumentField,
 } from "@/lib/application-documents";
 import { validateApplicationForSubmit } from "@/lib/application-validation";
@@ -1468,10 +1472,11 @@ export function ApplicationForm({
         <FormHeader />
         <div className="px-6 py-8 text-center sm:px-8">
           <h2 className="text-2xl font-bold text-[#062763]">
-            Application submitted
+            Application successfully submitted
           </h2>
           <p className="mt-3 text-sm text-slate-600">
-            Thank you. Your application has been received.
+            Thank you. Your application has been received and recorded in our
+            system.
             {submittedApplicationId && (
               <>
                 {" "}
@@ -1481,13 +1486,12 @@ export function ApplicationForm({
                 </span>
                 .
               </>
-            )}{" "}
-            The coordination office will contact you regarding the next steps.
+            )}
           </p>
           {confirmationEmailSent === true && (
             <p className="mt-2 text-sm text-emerald-700">
-              A confirmation email with your full application review (stage 18
-              summary) has been sent to your inbox.
+              A confirmation email with next steps and important notices has
+              been sent to your inbox.
             </p>
           )}
           {confirmationEmailSent === false && (
@@ -2723,9 +2727,11 @@ function SectionBPersonalInfoPanel({
       <DocumentUpload
         required
         label="Upload Passport Bio-data Page or National ID"
-        description="Upload 1 supported file: PDF or image. Max 1 MB."
-        accept="image/jpeg,image/png,image/webp,application/pdf"
+        description="Upload 1 supported file: JPG or PNG image. Max 1 MB."
+        accept={JPG_PNG_ACCEPT}
         maxSizeMb={1}
+        jpgPngOnly
+        jpgPngOnlyErrorMessage="Passport or national ID upload must be a JPG or PNG image."
         preview={passportPreview}
         fileName={passportFileName}
         documentField="passport"
@@ -3033,10 +3039,12 @@ function SectionDEducationPanel({
 
       <DocumentUpload
         label="Upload All Academic Certificates (merged as one PDF file)"
-        description="Upload 1 supported file: PDF, document, or image. Max 10 MB."
-        accept={documentAccept}
+        description="Upload 1 PDF file. Max 10 MB."
+        accept={PDF_ACCEPT}
         maxSizeMb={10}
         required
+        pdfOnly
+        pdfOnlyErrorMessage="Academic certificates upload must be a PDF file."
         preview={academicCertificatesPreview}
         fileName={academicCertificatesFileName}
         documentField="academicCertificates"
@@ -3058,10 +3066,12 @@ function SectionDEducationPanel({
 
       <DocumentUpload
         label="Upload All Academic Transcripts (merged as one PDF file)"
-        description="Upload 1 supported file: PDF, document, or image. Max 10 MB."
-        accept={documentAccept}
+        description="Upload 1 PDF file. Max 10 MB."
+        accept={PDF_ACCEPT}
         maxSizeMb={10}
         required
+        pdfOnly
+        pdfOnlyErrorMessage="Academic transcripts upload must be a PDF file."
         preview={academicTranscriptsPreview}
         fileName={academicTranscriptsFileName}
         documentField="academicTranscripts"
@@ -3227,10 +3237,6 @@ function SectionFAcademicProfilePanel({
   setPublicationsPreview: (url: string | null) => void;
   setPublicationsFileName: (name: string | null) => void;
 }) {
-  const documentAccept =
-    "application/pdf,image/jpeg,image/png,image/webp,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-  const publicationsAccept = "application/pdf,.pdf";
-
   return (
     <div className="space-y-8">
       <div>
@@ -3242,9 +3248,11 @@ function SectionFAcademicProfilePanel({
       <DocumentUpload
         required
         label="Curriculum Vitae Upload (Maximum 2 pages)"
-        description="Please include your relevant academic/research experience. Upload 1 supported file: PDF, document, or image. Max 10 MB."
-        accept={documentAccept}
+        description="Please include your relevant academic/research experience. Upload 1 PDF file. Max 10 MB."
+        accept={PDF_ACCEPT}
         maxSizeMb={10}
+        pdfOnly
+        pdfOnlyErrorMessage="Curriculum vitae upload must be a PDF file."
         preview={cvPreview}
         fileName={cvFileName}
         documentField="cv"
@@ -3266,9 +3274,11 @@ function SectionFAcademicProfilePanel({
 
       <DocumentUpload
         label="Publications (if any)"
-        description="At most three most recent publications — merged together as one publication. Upload 1 supported file: PDF. Max 10 MB."
-        accept={publicationsAccept}
+        description="At most three most recent publications — merged together as one publication. Upload 1 PDF file. Max 10 MB."
+        accept={PDF_ACCEPT}
         maxSizeMb={10}
+        pdfOnly
+        pdfOnlyErrorMessage="Publications upload must be a PDF file."
         preview={publicationsPreview}
         fileName={publicationsFileName}
         documentField="publications"
@@ -3375,8 +3385,6 @@ function SectionHResearchPanel({
 
   const studyPlanAccept =
     "application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-  const researchProposalAccept =
-    "application/pdf,image/jpeg,image/png,image/webp,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
   if (!creditSeeking && !degreeSeeking) {
     return (
@@ -3432,9 +3440,11 @@ function SectionHResearchPanel({
         <DocumentUpload
           required
           label="Upload Research Proposal (MSc/PhD Degree Seeking)"
-          description="A 2 paged research proposal (in PDF) that contains title, problem statement, objectives, proposed methodology, and expected impact. Upload 1 supported file: PDF, document, or image. Max 1 MB."
-          accept={researchProposalAccept}
+          description="A 2 paged research proposal (in PDF) that contains title, problem statement, objectives, proposed methodology, and expected impact. Upload 1 PDF file. Max 1 MB."
+          accept={PDF_ACCEPT}
           maxSizeMb={1}
+          pdfOnly
+          pdfOnlyErrorMessage="Research proposal upload must be a PDF file."
           preview={researchProposalPreview}
           fileName={researchProposalFileName}
           documentField="researchProposal"
@@ -3631,8 +3641,6 @@ function SectionKLanguagePanel({
   setLanguageCertificateFileName: (name: string | null) => void;
 }) {
   const hasCertificate = form.hasLanguageProficiencyCertificate === "Yes";
-  const documentAccept =
-    "application/pdf,image/jpeg,image/png,image/webp,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
   const clearLanguageCertificate = () => {
     if (languageCertificatePreview) {
@@ -3675,9 +3683,11 @@ function SectionKLanguagePanel({
         <DocumentUpload
           required
           label="Upload Language Certificate"
-          description="Upload 1 supported file: PDF, document, or image. Max 10 MB."
-          accept={documentAccept}
+          description="Upload 1 PDF file. Max 10 MB."
+          accept={PDF_ACCEPT}
           maxSizeMb={10}
+          pdfOnly
+          pdfOnlyErrorMessage="Language certificate upload must be a PDF file."
           preview={languageCertificatePreview}
           fileName={languageCertificateFileName}
           documentField="languageCertificate"
@@ -3710,9 +3720,6 @@ function SectionLReferencesPanel({
   setReferenceLettersPreview: (url: string | null) => void;
   setReferenceLettersFileName: (name: string | null) => void;
 }) {
-  const referenceLettersAccept =
-    "application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-
   return (
     <div className="space-y-10">
       <div>
@@ -3817,9 +3824,11 @@ function SectionLReferencesPanel({
       <DocumentUpload
         required
         label="Upload Reference Letters"
-        description="Merge both letters as one PDF. Upload 1 supported file: PDF or document. Max 10 MB."
-        accept={referenceLettersAccept}
+        description="Merge both letters as one PDF. Upload 1 PDF file. Max 10 MB."
+        accept={PDF_ACCEPT}
         maxSizeMb={10}
+        pdfOnly
+        pdfOnlyErrorMessage="Reference letters upload must be a PDF file."
         preview={referenceLettersPreview}
         fileName={referenceLettersFileName}
         documentField="referenceLetters"
@@ -3896,9 +3905,11 @@ function SectionMAdditionalDocumentsPanel({
         <DocumentUpload
           required
           label="Upload valid proof of application for admission to relevant graduate Programme at SMECC2E partner institution outside your country"
-          description="For Masters and PhD degree seeking applicants only. Upload 1 supported file: PDF, document, or image. Max 1 MB."
-          accept={documentAccept}
+          description="For Masters and PhD degree seeking applicants only. Upload 1 PDF file. Max 1 MB."
+          accept={PDF_ACCEPT}
           maxSizeMb={1}
+          pdfOnly
+          pdfOnlyErrorMessage="Graduate admission proof upload must be a PDF file."
           preview={graduateAdmissionProofPreview}
           fileName={graduateAdmissionProofFileName}
           documentField="graduateAdmissionProof"
@@ -3976,9 +3987,11 @@ function SectionMAdditionalDocumentsPanel({
       <DocumentUpload
         required
         label="Upload the Declaration of Medical Fitness"
-        description="Upload 1 supported file: PDF, document, or image. Max 10 MB."
-        accept={documentAccept}
+        description="Upload 1 PDF file. Max 10 MB."
+        accept={PDF_ACCEPT}
         maxSizeMb={10}
+        pdfOnly
+        pdfOnlyErrorMessage="Medical fitness declaration upload must be a PDF file."
         preview={medicalFitnessPreview}
         fileName={medicalFitnessDeclarationFileName}
         documentField="medicalFitnessDeclaration"
@@ -4990,6 +5003,10 @@ function DocumentUpload({
   onClear,
   required,
   documentField,
+  jpgPngOnly = false,
+  jpgPngOnlyErrorMessage = "This file must be a JPG or PNG image.",
+  pdfOnly = false,
+  pdfOnlyErrorMessage = "This file must be a PDF.",
 }: {
   label: string;
   description?: string;
@@ -5001,8 +5018,13 @@ function DocumentUpload({
   onClear: () => void;
   required?: boolean;
   documentField?: ApplicationDocumentField;
+  jpgPngOnly?: boolean;
+  jpgPngOnlyErrorMessage?: string;
+  pdfOnly?: boolean;
+  pdfOnlyErrorMessage?: string;
 }) {
   const uploadContext = useContext(ApplicationUploadContext);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const isImage =
     preview &&
     fileName &&
@@ -5025,6 +5047,7 @@ function DocumentUpload({
               alt="Document preview"
               fill
               className="object-cover"
+              sizes="160px"
               unoptimized
             />
           </div>
@@ -5047,8 +5070,20 @@ function DocumentUpload({
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
+                setUploadError(null);
+
+                if (jpgPngOnly && !isJpgOrPngFile(file)) {
+                  setUploadError(jpgPngOnlyErrorMessage);
+                  e.target.value = "";
+                  return;
+                }
+                if (pdfOnly && !isPdfFile(file)) {
+                  setUploadError(pdfOnlyErrorMessage);
+                  e.target.value = "";
+                  return;
+                }
                 if (file.size > maxSizeMb * 1024 * 1024) {
-                  alert(`File must be ${maxSizeMb} MB or smaller.`);
+                  setUploadError(`File must be ${maxSizeMb} MB or smaller.`);
                   e.target.value = "";
                   return;
                 }
@@ -5063,7 +5098,7 @@ function DocumentUpload({
                       file
                     );
                   } catch (err) {
-                    alert(
+                    setUploadError(
                       err instanceof Error
                         ? err.message
                         : "Could not upload file. Save your progress and try again."
@@ -5080,7 +5115,10 @@ function DocumentUpload({
           {fileName && (
             <button
               type="button"
-              onClick={onClear}
+              onClick={() => {
+                setUploadError(null);
+                onClear();
+              }}
               className="text-left text-xs font-medium text-red-600 hover:underline"
             >
               Remove file
@@ -5088,6 +5126,14 @@ function DocumentUpload({
           )}
         </div>
       </div>
+      {uploadError && (
+        <p
+          className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800"
+          role="alert"
+        >
+          {uploadError}
+        </p>
+      )}
     </div>
   );
 }
@@ -5104,6 +5150,7 @@ function ProfilePictureUpload({
   required?: boolean;
 }) {
   const uploadContext = useContext(ApplicationUploadContext);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   return (
     <div>
@@ -5132,11 +5179,19 @@ function ProfilePictureUpload({
             Choose file
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept={JPG_PNG_ACCEPT}
               className="sr-only"
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
+                setUploadError(null);
+
+                if (!isJpgOrPngFile(file)) {
+                  setUploadError("Profile picture must be a JPG or PNG image.");
+                  e.target.value = "";
+                  return;
+                }
+
                 const previewUrl = URL.createObjectURL(file);
                 let storedName: string | undefined;
                 if (uploadContext) {
@@ -5147,7 +5202,7 @@ function ProfilePictureUpload({
                     );
                   } catch (err) {
                     URL.revokeObjectURL(previewUrl);
-                    alert(
+                    setUploadError(
                       err instanceof Error
                         ? err.message
                         : "Could not upload profile picture. Save your progress and try again."
@@ -5164,7 +5219,10 @@ function ProfilePictureUpload({
           {preview && (
             <button
               type="button"
-              onClick={onClear}
+              onClick={() => {
+                setUploadError(null);
+                onClear();
+              }}
               className="text-left text-xs font-medium text-red-600 hover:underline"
             >
               Remove photo
@@ -5172,8 +5230,16 @@ function ProfilePictureUpload({
           )}
         </div>
       </div>
+      {uploadError && (
+        <p
+          className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800"
+          role="alert"
+        >
+          {uploadError}
+        </p>
+      )}
       <p className="mt-2 text-xs text-slate-500">
-        Accepted formats: JPG, PNG, WEBP (max. 5MB recommended)
+        Accepted formats: JPG, PNG (max. 5MB recommended)
       </p>
     </div>
   );

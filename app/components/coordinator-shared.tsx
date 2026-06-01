@@ -9,7 +9,7 @@ import {
   buildApplicantDetailSections,
   type ApplicantDetailRow,
 } from "@/lib/application-applicant-details";
-import { applicationDocumentUrl } from "@/lib/application-documents";
+import { ApplicationDocumentPreview } from "./application-document-preview";
 
 export function formatDisadvantaged(app: ApplicationRecord): string {
   const disadvantagedLabels: Record<string, string> = {
@@ -71,10 +71,8 @@ function DetailRow({
     row.isDocument &&
     (row.value === "Not uploaded" || row.value === "Not provided");
 
-  const documentUrl =
-    row.isDocument && !isMissing && row.documentField
-      ? applicationDocumentUrl(applicationId, row.documentField)
-      : null;
+  const hasDocument =
+    row.isDocument && !isMissing && row.documentField && row.value;
 
   return (
     <div className="grid gap-1 border-b border-slate-100 py-3 sm:grid-cols-3">
@@ -86,31 +84,12 @@ function DetailRow({
           row.isLongText ? "whitespace-pre-wrap leading-relaxed" : ""
         } ${isMissing ? "text-red-700" : "text-slate-950"}`}
       >
-        {documentUrl ? (
-          <a
-            href={documentUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-emerald-950 transition hover:border-emerald-300 hover:bg-emerald-100"
-          >
-            <svg
-              className="h-4 w-4 shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            <span className="break-all underline decoration-emerald-400/70 underline-offset-2">
-              {row.value}
-            </span>
-          </a>
+        {hasDocument ? (
+          <ApplicationDocumentPreview
+            applicationId={applicationId}
+            field={row.documentField!}
+            fileName={row.value}
+          />
         ) : (
           row.value || "—"
         )}
@@ -121,14 +100,16 @@ function DetailRow({
 
 export function ApplicationDetailPanel({
   selected,
-  updatingStatus,
+  updatingStatus = false,
   onStatusChange,
+  showStatusUpdate = true,
   collapsibleSections = false,
   embedded = false,
 }: {
   selected: ApplicationRecord;
-  updatingStatus: boolean;
-  onStatusChange: (id: string, status: ApplicationStatus) => void;
+  updatingStatus?: boolean;
+  onStatusChange?: (id: string, status: ApplicationStatus) => void;
+  showStatusUpdate?: boolean;
   /** Collapse each detail block (registration, documents, etc.) in an accordion. */
   collapsibleSections?: boolean;
   /** Inline accordion row (no max-height scroll container). */
@@ -156,25 +137,27 @@ export function ApplicationDetailPanel({
         <StatusBadge status={selected.status} />
       </div>
 
-      <div className="mt-4">
-        <label className="block text-xs font-bold text-slate-800">
-          Update status
-        </label>
-        <select
-          value={selected.status}
-          disabled={updatingStatus}
-          onChange={(e) =>
-            onStatusChange(selected.id, e.target.value as ApplicationStatus)
-          }
-          className="mt-1 w-full rounded-lg border-2 border-[#062763]/30 bg-white px-3 py-2 text-sm font-semibold text-[#062763] outline-none focus:border-[#062763] focus:ring-2 focus:ring-[#062763]/15 disabled:opacity-50"
-        >
-          {COORDINATOR_APPLICATION_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {STATUS_LABELS[s]}
-            </option>
-          ))}
-        </select>
-      </div>
+      {showStatusUpdate && onStatusChange && (
+        <div className="mt-4">
+          <label className="block text-xs font-bold text-slate-800">
+            Update status
+          </label>
+          <select
+            value={selected.status}
+            disabled={updatingStatus}
+            onChange={(e) =>
+              onStatusChange(selected.id, e.target.value as ApplicationStatus)
+            }
+            className="mt-1 w-full rounded-lg border-2 border-[#062763]/30 bg-white px-3 py-2 text-sm font-semibold text-[#062763] outline-none focus:border-[#062763] focus:ring-2 focus:ring-[#062763]/15 disabled:opacity-50"
+          >
+            {COORDINATOR_APPLICATION_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <p className="mt-4 text-xs font-semibold text-slate-900">
         Submitted {formatDate(selected.submittedAt)} · Updated{" "}

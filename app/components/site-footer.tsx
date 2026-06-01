@@ -20,7 +20,8 @@ export function SiteFooter({ hideLogin = false }: SiteFooterProps = {}) {
               alt="Partner brands"
               width={380}
               height={80}
-              className="h-auto w-auto max-h-16 object-contain sm:max-h-20"
+              sizes="(max-width: 640px) 280px, 380px"
+              className="max-h-16 object-contain sm:max-h-20"
               style={{ width: "auto", height: "auto" }}
             />
           </div>

@@ -9,6 +9,7 @@ import {
   requireApplicantPasswordChanged,
 } from "@/lib/applicant-auth-service";
 import {
+  DuplicateApplicationError,
   findDraftByEmail,
   upsertDraftApplication,
 } from "@/lib/applications-service";
@@ -95,6 +96,9 @@ export async function POST(request: Request) {
         { error: err.status === 403 ? "Forbidden" : "Unauthorized" },
         { status: err.status }
       );
+    }
+    if (err instanceof DuplicateApplicationError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
     }
     console.error("POST /api/applications/draft", err);
     const connectionError = toUserFacingDatabaseError(err);

@@ -697,6 +697,7 @@ export function CoordinatorSidebar({
               alt="SMECC2E"
               fill
               className="object-contain p-0.5"
+              sizes="40px"
               unoptimized
             />
           </div>

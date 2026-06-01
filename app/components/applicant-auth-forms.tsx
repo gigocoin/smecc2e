@@ -73,6 +73,7 @@ function ApplicantLoginFormContent() {
                 alt="SMECC2E"
                 fill
                 className="object-contain"
+                sizes="64px"
                 priority
               />
             </div>

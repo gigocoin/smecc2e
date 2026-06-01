@@ -1,6 +1,7 @@
 import path from "path";
 import {
   documentDisplayName,
+  mimeTypeFromFileName,
   type ApplicationDocumentField,
 } from "./application-documents";
 import { readApplicationDocument } from "./application-document-storage";
@@ -36,19 +37,7 @@ export async function resolveDocumentPath(
 }
 
 export function mimeTypeForFileName(fileName: string): string {
-  const ext = path.extname(fileName).toLowerCase();
-  const map: Record<string, string> = {
-    ".pdf": "application/pdf",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".webp": "image/webp",
-    ".gif": "image/gif",
-    ".doc": "application/msword",
-    ".docx":
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  };
-  return map[ext] ?? "application/octet-stream";
+  return mimeTypeFromFileName(fileName);
 }
 
 export { documentDisplayName };

@@ -10,11 +10,50 @@ import {
   buildStoredDocumentName,
   documentDisplayName,
   isApplicationDocumentField,
+  isJpgOrPngMimeType,
+  isPdfMimeType,
 } from "@/lib/application-documents";
 import { mimeTypeForFileName } from "@/lib/application-documents-server";
 import { getApplication } from "@/lib/applications-service";
 
 const MAX_BYTES = 5 * 1024 * 1024;
+const JPG_PNG_ONLY_FIELDS = new Set(["profile", "passport"]);
+const PDF_ONLY_FIELDS = new Set([
+  "academicCertificates",
+  "academicTranscripts",
+  "cv",
+  "publications",
+  "researchProposal",
+  "languageCertificate",
+  "referenceLetters",
+  "graduateAdmissionProof",
+  "medicalFitnessDeclaration",
+]);
+
+function pdfOnlyErrorMessage(field: string): string {
+  switch (field) {
+    case "academicCertificates":
+      return "Academic certificates upload must be a PDF file.";
+    case "academicTranscripts":
+      return "Academic transcripts upload must be a PDF file.";
+    case "cv":
+      return "Curriculum vitae upload must be a PDF file.";
+    case "publications":
+      return "Publications upload must be a PDF file.";
+    case "researchProposal":
+      return "Research proposal upload must be a PDF file.";
+    case "languageCertificate":
+      return "Language certificate upload must be a PDF file.";
+    case "referenceLetters":
+      return "Reference letters upload must be a PDF file.";
+    case "graduateAdmissionProof":
+      return "Graduate admission proof upload must be a PDF file.";
+    case "medicalFitnessDeclaration":
+      return "Medical fitness declaration upload must be a PDF file.";
+    default:
+      return "This file must be a PDF.";
+  }
+}
 const ALLOWED_TYPES = new Set([
   "application/pdf",
   "image/jpeg",
@@ -60,7 +99,24 @@ export async function POST(
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
-    if (!ALLOWED_TYPES.has(file.type)) {
+
+    const resolvedMime = file.type || mimeTypeForFileName(file.name);
+    if (JPG_PNG_ONLY_FIELDS.has(fieldRaw)) {
+      if (!isJpgOrPngMimeType(resolvedMime)) {
+        const errorMessage =
+          fieldRaw === "profile"
+            ? "Profile picture must be a JPG or PNG image."
+            : "Passport or national ID upload must be a JPG or PNG image.";
+        return NextResponse.json({ error: errorMessage }, { status: 400 });
+      }
+    } else if (PDF_ONLY_FIELDS.has(fieldRaw)) {
+      if (!isPdfMimeType(resolvedMime)) {
+        return NextResponse.json(
+          { error: pdfOnlyErrorMessage(fieldRaw) },
+          { status: 400 }
+        );
+      }
+    } else if (!ALLOWED_TYPES.has(resolvedMime)) {
       return NextResponse.json(
         { error: "Use PDF, Word, or image files" },
         { status: 400 }

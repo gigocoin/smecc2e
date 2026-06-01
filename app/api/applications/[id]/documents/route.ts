@@ -62,8 +62,9 @@ export async function GET(
     return new NextResponse(new Uint8Array(document.buffer), {
       headers: {
         "Content-Type": mimeTypeForFileName(document.fileName),
-        "Content-Disposition": `inline; filename="${document.fileName.replace(/"/g, "")}"`,
-        "Cache-Control": "private, max-age=3600",
+        "Content-Disposition": "inline",
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (err) {

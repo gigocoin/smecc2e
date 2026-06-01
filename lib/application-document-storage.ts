@@ -202,3 +202,23 @@ export async function deleteApplicationDocument(
     await unlink(filePath);
   }
 }
+
+export async function deleteAllApplicationDocuments(
+  applicationRef: string
+): Promise<void> {
+  if (useBlobStorage()) {
+    const { blobs } = await list({ prefix: blobPrefix(applicationRef) });
+    await Promise.all(blobs.map((blob) => del(blob.pathname)));
+    return;
+  }
+
+  const dir = localDocumentsDir(applicationRef);
+  try {
+    const files = await readdir(dir);
+    const { unlink, rmdir } = await import("fs/promises");
+    await Promise.all(files.map((file) => unlink(path.join(dir, file))));
+    await rmdir(dir);
+  } catch {
+    /* upload directory may not exist */
+  }
+}

@@ -21,6 +21,9 @@ import {
   StatusBadge,
 } from "./coordinator-shared";
 
+const actionBtnClass =
+  "rounded-lg border-2 px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50";
+
 function applicantsPageTitle(
   statusFilter: ApplicationStatus | "all",
   managementNav: ApplicantsManagementNavItem[]
@@ -43,7 +46,10 @@ export function CoordinatorApplicants({
 }: {
   statusFromUrl?: string | null;
 }) {
-  const { basePath } = useDashboardPortal();
+  const { basePath, portalKey } = useDashboardPortal();
+  const showStatusUpdate = portalKey !== "administrator";
+  const canDeleteApplications = portalKey !== "administrator";
+  const tableColSpan = canDeleteApplications ? 7 : 6;
   const managementNav = useMemo(
     () => buildApplicantsManagementNav(basePath),
     [basePath]
@@ -58,6 +64,12 @@ export function CoordinatorApplicants({
   );
   const [mobilityFilter, setMobilityFilter] = useState("all");
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [deletingApplication, setDeletingApplication] =
+    useState<ApplicationRecord | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const tableBusy = updatingStatus || deleting;
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -124,6 +136,40 @@ export function CoordinatorApplicants({
       );
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const closeDeleteModal = () => {
+    if (deleting) return;
+    setDeletingApplication(null);
+    setDeleteError(null);
+  };
+
+  const handleDeleteApplication = async () => {
+    if (!deletingApplication) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(
+        `/api/applications/${encodeURIComponent(deletingApplication.id)}`,
+        { method: "DELETE" }
+      );
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setDeleteError(data.error ?? "Could not delete application.");
+        return;
+      }
+      setApplications((prev) =>
+        prev.filter((a) => a.id !== deletingApplication.id)
+      );
+      if (expandedId === deletingApplication.id) {
+        setExpandedId(null);
+      }
+      closeDeleteModal();
+    } catch {
+      setDeleteError("Could not delete application.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -219,13 +265,16 @@ export function CoordinatorApplicants({
                   <th className="px-4 py-3">Host / Programme</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Submitted</th>
+                  {canDeleteApplications && (
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredApplicants.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={tableColSpan}
                       className="px-4 py-10 text-center font-semibold text-slate-900"
                     >
                       No applications match your filters.
@@ -292,10 +341,26 @@ export function CoordinatorApplicants({
                           <td className="px-4 py-3 font-semibold text-slate-900">
                             {formatDate(app.submittedAt)}
                           </td>
+                          {canDeleteApplications && (
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeletingApplication(app);
+                                  setDeleteError(null);
+                                }}
+                                disabled={tableBusy}
+                                className={`${actionBtnClass} border-red-200 text-red-700 hover:bg-red-50`}
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          )}
                         </tr>
                         {isExpanded && (
                           <tr className="bg-slate-50/80">
-                            <td colSpan={6} className="p-0">
+                            <td colSpan={tableColSpan} className="p-0">
                               <div
                                 className="border-t border-slate-200"
                                 onClick={(e) => e.stopPropagation()}
@@ -303,7 +368,12 @@ export function CoordinatorApplicants({
                                 <ApplicationDetailPanel
                                   selected={app}
                                   updatingStatus={updatingStatus}
-                                  onStatusChange={handleStatusChange}
+                                  onStatusChange={
+                                    showStatusUpdate
+                                      ? handleStatusChange
+                                      : undefined
+                                  }
+                                  showStatusUpdate={showStatusUpdate}
                                   collapsibleSections
                                   embedded
                                 />
@@ -320,6 +390,63 @@ export function CoordinatorApplicants({
           </div>
         </div>
       </main>
+
+      {canDeleteApplications && deletingApplication && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-application-title"
+          onClick={closeDeleteModal}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2
+              id="delete-application-title"
+              className="text-lg font-bold text-red-800"
+            >
+              Delete application
+            </h2>
+            <p className="mt-2 text-sm font-semibold text-slate-900">
+              Remove the application for{" "}
+              <strong>
+                {applicantDisplayName(deletingApplication) ||
+                  deletingApplication.id}
+              </strong>{" "}
+              ({deletingApplication.id})? Uploaded documents will also be
+              removed. This cannot be undone.
+            </p>
+            {deleteError && (
+              <p
+                className="mt-2 text-sm font-semibold text-red-700"
+                role="alert"
+              >
+                {deleteError}
+              </p>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeDeleteModal}
+                disabled={deleting}
+                className="rounded-lg border-2 border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteApplication}
+                disabled={deleting}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
