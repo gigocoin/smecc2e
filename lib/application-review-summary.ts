@@ -2,6 +2,7 @@ import type { ApplicationPayload } from "./application-types";
 import {
   countWords,
   isCreditSeeking,
+  isCurrentlyEnrolledInDegree,
   isDegreeSeeking,
   isMastersOrPhd,
   isStaffMobilityApplicant,
@@ -157,17 +158,23 @@ export function buildApplicationReviewRows(
   );
 
   if (isCreditSeeking(mobility)) {
-    rows.push(
-      {
-        label: "Currently enrolled in degree programme",
-        value: display(payload.currentlyEnrolledInDegree),
-      },
-      { label: "Registration number", value: display(payload.registrationNumber) },
-      {
-        label: "Proof of registration",
-        value: display(payload.proofOfRegistrationFileName, "Not uploaded"),
-      }
-    );
+    rows.push({
+      label: "Currently enrolled in degree programme",
+      value: display(payload.currentlyEnrolledInDegree),
+    });
+    if (isCurrentlyEnrolledInDegree(payload.currentlyEnrolledInDegree)) {
+      rows.push(
+        { label: "Registration number", value: display(payload.registrationNumber) },
+        {
+          label: "Proof of registration",
+          value: display(payload.proofOfRegistrationFileName, "Not uploaded"),
+        },
+        {
+          label: "Proof of coursework completion",
+          value: display(payload.proofOfCourseworkFileName, "Not uploaded"),
+        }
+      );
+    }
   }
 
   rows.push(

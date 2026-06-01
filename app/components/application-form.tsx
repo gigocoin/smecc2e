@@ -251,6 +251,10 @@ function isCreditSeeking(type: string) {
   );
 }
 
+function isCurrentlyEnrolledInDegree(answer: string | undefined | null) {
+  return answer?.trim().toLowerCase() === "yes";
+}
+
 function isDegreeSeeking(type: string) {
   return (
     type.includes("MSc Degree-Seeking") || type.includes("PhD Degree-Seeking")
@@ -3147,64 +3151,83 @@ function SectionERegistrationPanel({
         name="currentlyEnrolledInDegree"
         options={["Yes", "No"]}
         value={form.currentlyEnrolledInDegree}
-        onChange={(v) => update("currentlyEnrolledInDegree", v)}
-      />
-
-      <ShortAnswer
-        required
-        label="Registration Number"
-        value={form.registrationNumber}
-        onChange={(v) => update("registrationNumber", v)}
-      />
-
-      <DocumentUpload
-        required
-        label="Upload Proof of Registration"
-        description="Upload Admission letter, evidence of fees paid for the session, and Programme registration information as one PDF. Upload 1 supported file: PDF, document, or image. Max 1 MB."
-        accept={registrationDocAccept}
-        maxSizeMb={1}
-        preview={proofOfRegistrationPreview}
-        fileName={proofOfRegistrationFileName}
-        documentField="proofOfRegistration"
-        onFileSelect={(file, previewUrl, storedName) => {
-          if (proofOfRegistrationPreview) {
-            URL.revokeObjectURL(proofOfRegistrationPreview);
+        onChange={(v) => {
+          update("currentlyEnrolledInDegree", v);
+          if (!isCurrentlyEnrolledInDegree(v)) {
+            update("registrationNumber", "");
+            if (proofOfRegistrationPreview) {
+              URL.revokeObjectURL(proofOfRegistrationPreview);
+            }
+            setProofOfRegistrationPreview(null);
+            setProofOfRegistrationFileName(null);
+            if (proofOfCourseworkPreview) {
+              URL.revokeObjectURL(proofOfCourseworkPreview);
+            }
+            setProofOfCourseworkPreview(null);
+            setProofOfCourseworkFileName(null);
           }
-          setProofOfRegistrationPreview(previewUrl);
-          setProofOfRegistrationFileName(storedName ?? file.name);
-        }}
-        onClear={() => {
-          if (proofOfRegistrationPreview) {
-            URL.revokeObjectURL(proofOfRegistrationPreview);
-          }
-          setProofOfRegistrationPreview(null);
-          setProofOfRegistrationFileName(null);
         }}
       />
 
-      <DocumentUpload
-        label="Upload Proof of Coursework completion"
-        description="Upload 1 supported file: PDF. Max 10 MB."
-        accept={courseworkAccept}
-        maxSizeMb={10}
-        preview={proofOfCourseworkPreview}
-        fileName={proofOfCourseworkFileName}
-        documentField="proofOfCoursework"
-        onFileSelect={(file, previewUrl, storedName) => {
-          if (proofOfCourseworkPreview) {
-            URL.revokeObjectURL(proofOfCourseworkPreview);
-          }
-          setProofOfCourseworkPreview(previewUrl);
-          setProofOfCourseworkFileName(storedName ?? file.name);
-        }}
-        onClear={() => {
-          if (proofOfCourseworkPreview) {
-            URL.revokeObjectURL(proofOfCourseworkPreview);
-          }
-          setProofOfCourseworkPreview(null);
-          setProofOfCourseworkFileName(null);
-        }}
-      />
+      {isCurrentlyEnrolledInDegree(form.currentlyEnrolledInDegree) && (
+        <>
+          <ShortAnswer
+            required
+            label="Registration Number"
+            value={form.registrationNumber}
+            onChange={(v) => update("registrationNumber", v)}
+          />
+
+          <DocumentUpload
+            required
+            label="Upload Proof of Registration"
+            description="Upload Admission letter, evidence of fees paid for the session, and Programme registration information as one PDF. Upload 1 supported file: PDF, document, or image. Max 1 MB."
+            accept={registrationDocAccept}
+            maxSizeMb={1}
+            preview={proofOfRegistrationPreview}
+            fileName={proofOfRegistrationFileName}
+            documentField="proofOfRegistration"
+            onFileSelect={(file, previewUrl, storedName) => {
+              if (proofOfRegistrationPreview) {
+                URL.revokeObjectURL(proofOfRegistrationPreview);
+              }
+              setProofOfRegistrationPreview(previewUrl);
+              setProofOfRegistrationFileName(storedName ?? file.name);
+            }}
+            onClear={() => {
+              if (proofOfRegistrationPreview) {
+                URL.revokeObjectURL(proofOfRegistrationPreview);
+              }
+              setProofOfRegistrationPreview(null);
+              setProofOfRegistrationFileName(null);
+            }}
+          />
+
+          <DocumentUpload
+            label="Upload Proof of Coursework completion"
+            description="Upload 1 supported file: PDF. Max 10 MB."
+            accept={courseworkAccept}
+            maxSizeMb={10}
+            preview={proofOfCourseworkPreview}
+            fileName={proofOfCourseworkFileName}
+            documentField="proofOfCoursework"
+            onFileSelect={(file, previewUrl, storedName) => {
+              if (proofOfCourseworkPreview) {
+                URL.revokeObjectURL(proofOfCourseworkPreview);
+              }
+              setProofOfCourseworkPreview(previewUrl);
+              setProofOfCourseworkFileName(storedName ?? file.name);
+            }}
+            onClear={() => {
+              if (proofOfCourseworkPreview) {
+                URL.revokeObjectURL(proofOfCourseworkPreview);
+              }
+              setProofOfCourseworkPreview(null);
+              setProofOfCourseworkFileName(null);
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }
@@ -4318,18 +4341,22 @@ function ReviewPanel({
               label="Currently enrolled in degree programme"
               value={form.currentlyEnrolledInDegree}
             />
-            <ReviewRow
-              label="Registration number"
-              value={form.registrationNumber}
-            />
-            <ReviewRow
-              label="Proof of registration"
-              value={proofOfRegistrationFileName ?? "Not uploaded"}
-            />
-            <ReviewRow
-              label="Proof of coursework completion"
-              value={proofOfCourseworkFileName ?? "Not uploaded"}
-            />
+            {isCurrentlyEnrolledInDegree(form.currentlyEnrolledInDegree) && (
+              <>
+                <ReviewRow
+                  label="Registration number"
+                  value={form.registrationNumber}
+                />
+                <ReviewRow
+                  label="Proof of registration"
+                  value={proofOfRegistrationFileName ?? "Not uploaded"}
+                />
+                <ReviewRow
+                  label="Proof of coursework completion"
+                  value={proofOfCourseworkFileName ?? "Not uploaded"}
+                />
+              </>
+            )}
           </>
         )}
         <ReviewRow

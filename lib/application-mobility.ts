@@ -13,6 +13,10 @@ export function isCreditSeeking(type: string) {
   );
 }
 
+export function isCurrentlyEnrolledInDegree(answer: string | undefined | null) {
+  return answer?.trim().toLowerCase() === "yes";
+}
+
 export function isDegreeSeeking(type: string) {
   return (
     type.includes("MSc Degree-Seeking") || type.includes("PhD Degree-Seeking")

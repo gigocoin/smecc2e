@@ -4,6 +4,7 @@ import { documentDisplayName } from "./application-documents";
 import {
   countWords,
   isCreditSeeking,
+  isCurrentlyEnrolledInDegree,
   isDegreeSeeking,
   isMastersOrPhd,
   isStaffMobilityApplicant,
@@ -185,14 +186,23 @@ export function buildApplicantDetailSections(
   sections.push({ title: "Section D — Educational Background", rows: sectionD });
 
   if (isCreditSeeking(mobility)) {
-    sections.push({
-      title: "Section E — Current Registration Status",
-      rows: [
-        textRow("Currently enrolled in degree programme", payload.currentlyEnrolledInDegree),
+    const sectionE: ApplicantDetailRow[] = [
+      textRow("Currently enrolled in degree programme", payload.currentlyEnrolledInDegree),
+    ];
+    if (isCurrentlyEnrolledInDegree(payload.currentlyEnrolledInDegree)) {
+      sectionE.push(
         textRow("Registration number", payload.registrationNumber),
         docRow("Proof of registration", payload.proofOfRegistrationFileName, "proofOfRegistration"),
-        docRow("Proof of coursework completion", payload.proofOfCourseworkFileName, "proofOfCoursework"),
-      ],
+        docRow(
+          "Proof of coursework completion",
+          payload.proofOfCourseworkFileName,
+          "proofOfCoursework"
+        )
+      );
+    }
+    sections.push({
+      title: "Section E — Current Registration Status",
+      rows: sectionE,
     });
   }
 

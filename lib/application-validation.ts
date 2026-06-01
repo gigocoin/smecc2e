@@ -2,6 +2,7 @@ import type { ApplicationPayload } from "./application-types";
 import {
   countWords,
   isCreditSeeking,
+  isCurrentlyEnrolledInDegree,
   isDegreeSeeking,
   isMastersOrPhd,
   isStaffMobilityApplicant,
@@ -123,8 +124,10 @@ export function validateApplicationForSubmit(
 
   if (isCreditSeeking(mobility)) {
     requireField(errors, isNonEmpty(payload.currentlyEnrolledInDegree), "Currently enrolled in degree programme");
-    requireField(errors, isNonEmpty(payload.registrationNumber), "Registration number");
-    requireField(errors, isNonEmpty(payload.proofOfRegistrationFileName), "Proof of registration");
+    if (isCurrentlyEnrolledInDegree(payload.currentlyEnrolledInDegree)) {
+      requireField(errors, isNonEmpty(payload.registrationNumber), "Registration number");
+      requireField(errors, isNonEmpty(payload.proofOfRegistrationFileName), "Proof of registration");
+    }
     requireField(errors, isNonEmpty(payload.studyResearchPlanFileName), "Study/research plan");
   }
 
