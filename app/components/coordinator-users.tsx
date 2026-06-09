@@ -11,7 +11,7 @@ import {
 
 const USER_ROLES: DashboardUser["role"][] = [
   "Coordinator",
-  "Reviewer",
+  "Evaluator",
   "Administrator",
 ];
 
@@ -277,10 +277,12 @@ export function CoordinatorUsers({
 }) {
   const { portalKey } = useDashboardPortal();
   const defaultCreateRole: DashboardUser["role"] =
-    portalKey === "administrator" ? "Reviewer" : "Coordinator";
+    portalKey === "administrator" ? "Evaluator" : "Coordinator";
   const createUserRoles: DashboardUser["role"][] =
-    portalKey === "administrator" ? ["Reviewer"] : USER_ROLES;
-  const canManageExistingUsers = portalKey !== "administrator";
+    portalKey === "administrator" ? ["Evaluator"] : USER_ROLES;
+  const canManageExistingUsers = portalKey === "coordinator";
+  const canCreateUsers =
+    portalKey === "coordinator" || portalKey === "administrator";
 
   const [users, setUsers] = useState<DashboardUser[]>(initialUsers);
   const [loading, setLoading] = useState(false);
@@ -623,21 +625,23 @@ export function CoordinatorUsers({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6 lg:pl-6">
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-6 lg:pl-6">
         <div className="pl-12 lg:pl-0">
-          <h1 className="text-lg font-bold text-[#062763] sm:text-xl">Users</h1>
-          <p className="text-sm font-semibold text-slate-800">
+          <h1 className="text-base font-bold text-[#062763] sm:text-lg">Users</h1>
+          <p className="text-xs font-medium text-slate-600 sm:text-sm">
             SMECC2E mobility & scholarship coordination
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setCreateOpen(true)}
-            className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90"
-          >
-            Create user
-          </button>
+          {canCreateUsers && (
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90"
+            >
+              Create user
+            </button>
+          )}
           <button
             type="button"
             onClick={loadUsers}
@@ -771,7 +775,7 @@ export function CoordinatorUsers({
           >
             <h2
               id="create-user-title"
-              className="text-lg font-bold text-[#062763]"
+              className="text-base font-bold text-[#062763]"
             >
               Create user
             </h2>
@@ -1008,7 +1012,7 @@ export function CoordinatorUsers({
           >
             <h2
               id="edit-user-title"
-              className="text-lg font-bold text-[#062763]"
+              className="text-base font-bold text-[#062763]"
             >
               Edit user
             </h2>
@@ -1250,7 +1254,7 @@ export function CoordinatorUsers({
           >
             <h2
               id="delete-user-title"
-              className="text-lg font-bold text-red-800"
+              className="text-base font-bold text-red-800"
             >
               Delete user
             </h2>

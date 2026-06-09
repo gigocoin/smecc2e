@@ -1,4 +1,10 @@
-import type { ApplicationPayload, ApplicationRecord, ApplicationStatus } from "./application-types";
+import type {
+  ApplicationPayload,
+  ApplicationRecord,
+  ApplicationStatus,
+  EvaluatorReviewAction,
+  EvaluatorReviewStatus,
+} from "./application-types";
 import {
   applicantEmailFromPayload,
   mapPrismaApplicant,
@@ -11,6 +17,16 @@ import {
 } from "./application-document-storage";
 import { validateApplicationForSubmit } from "./application-validation";
 import { isApplicantEmailVerifiedForSubmit } from "./email-verification-store";
+import {
+  getActiveEvaluationRubric,
+  rubricCriterionIds,
+} from "./evaluation-rubric-service";
+import {
+  ASSESSOR_SCORE_MAX,
+  computeCategoryTotal,
+} from "./evaluator-evaluation-rubric";
+import type { EvaluatorEvaluationSubmission } from "./evaluator-evaluation-types";
+import { parseEvaluatorEvaluationSubmission } from "./evaluator-evaluation-types";
 import { prisma } from "./prisma";
 
 export class DuplicateApplicationError extends Error {
@@ -122,15 +138,142 @@ async function assertNoDuplicateSubmittedApplication(
   }
 }
 
+function applicantIncludeEvaluators() {
+  const evaluatorSelect = {
+    select: { id: true, publicId: true, name: true, email: true },
+  } as const;
+  return {
+    evaluator1: evaluatorSelect,
+    evaluator2: evaluatorSelect,
+  } as const;
+}
+
+function myEvaluatorReviewStatusForRow(
+  row: {
+    evaluator1Id: string | null;
+    evaluator2Id: string | null;
+    evaluator1ReviewStatus: EvaluatorReviewStatus;
+    evaluator2ReviewStatus: EvaluatorReviewStatus;
+  },
+  evaluatorInternalId: string
+): EvaluatorReviewStatus | null {
+  if (row.evaluator1Id === evaluatorInternalId) {
+    return row.evaluator1ReviewStatus;
+  }
+  if (row.evaluator2Id === evaluatorInternalId) {
+    return row.evaluator2ReviewStatus;
+  }
+  return null;
+}
+
+function myEvaluatorEvaluationDataForRow(
+  row: {
+    evaluator1Id: string | null;
+    evaluator2Id: string | null;
+    evaluator1EvaluationData: unknown;
+    evaluator2EvaluationData: unknown;
+  },
+  evaluatorInternalId: string
+): EvaluatorEvaluationSubmission | null {
+  if (row.evaluator1Id === evaluatorInternalId) {
+    return parseEvaluatorEvaluationSubmission(row.evaluator1EvaluationData);
+  }
+  if (row.evaluator2Id === evaluatorInternalId) {
+    return parseEvaluatorEvaluationSubmission(row.evaluator2EvaluationData);
+  }
+  return null;
+}
+
+function enrichApplicationForEvaluator(
+  application: ApplicationRecord,
+  row: {
+    evaluator1Id: string | null;
+    evaluator2Id: string | null;
+    evaluator1ReviewStatus: EvaluatorReviewStatus;
+    evaluator2ReviewStatus: EvaluatorReviewStatus;
+    evaluator1EvaluationData: unknown;
+    evaluator2EvaluationData: unknown;
+  },
+  evaluatorInternalId: string
+): ApplicationRecord {
+  return {
+    ...application,
+    myEvaluatorReviewStatus: myEvaluatorReviewStatusForRow(
+      row,
+      evaluatorInternalId
+    ),
+    myEvaluatorEvaluationData: myEvaluatorEvaluationDataForRow(
+      row,
+      evaluatorInternalId
+    ),
+  };
+}
+
+async function resolveUserInternalId(
+  userPublicId: string
+): Promise<string | null> {
+  const row = await prisma.user.findUnique({
+    where: { publicId: userPublicId },
+    select: { id: true },
+  });
+  return row?.id ?? null;
+}
+
+export async function isApplicationAssignedToEvaluator(
+  applicationRef: string,
+  evaluatorPublicId: string
+): Promise<boolean> {
+  const evaluatorId = await resolveUserInternalId(evaluatorPublicId);
+  if (!evaluatorId) return false;
+
+  const row = await prisma.applicant.findFirst({
+    where: {
+      ...applicantWhereByRef(applicationRef),
+      OR: [{ evaluator1Id: evaluatorId }, { evaluator2Id: evaluatorId }],
+    },
+    select: { id: true },
+  });
+  return Boolean(row);
+}
+
 export async function listApplications(options?: {
   includeDrafts?: boolean;
+  /** When set, only applications assigned to this evaluator (public id) are returned. */
+  assignedToEvaluatorPublicId?: string;
 }): Promise<ApplicationRecord[]> {
   const includeDrafts = options?.includeDrafts ?? false;
+  let assignedFilter:
+    | { OR: Array<{ evaluator1Id: string } | { evaluator2Id: string }> }
+    | undefined;
+
+  if (options?.assignedToEvaluatorPublicId) {
+    const evaluatorId = await resolveUserInternalId(
+      options.assignedToEvaluatorPublicId
+    );
+    if (!evaluatorId) return [];
+    assignedFilter = {
+      OR: [{ evaluator1Id: evaluatorId }, { evaluator2Id: evaluatorId }],
+    };
+  }
+
   const rows = await prisma.applicant.findMany({
-    where: includeDrafts ? undefined : { status: { not: "draft" } },
+    where: {
+      ...(includeDrafts ? {} : { status: { not: "draft" } }),
+      ...(assignedFilter ?? {}),
+    },
     orderBy: [{ submittedAt: "desc" }, { updatedAt: "desc" }],
+    include: applicantIncludeEvaluators(),
   });
-  return rows.map(mapPrismaApplicant);
+
+  const evaluatorInternalId = options?.assignedToEvaluatorPublicId
+    ? await resolveUserInternalId(options.assignedToEvaluatorPublicId)
+    : null;
+
+  return rows.map((row) => {
+    const application = mapPrismaApplicant(row);
+    if (!evaluatorInternalId) return application;
+    return enrichApplicationForEvaluator(application, row, evaluatorInternalId);
+  });
 }
 
 export async function getApplication(
@@ -138,6 +281,7 @@ export async function getApplication(
 ): Promise<ApplicationRecord | null> {
   const row = await prisma.applicant.findFirst({
     where: applicantWhereByRef(id),
+    include: applicantIncludeEvaluators(),
   });
   return row ? mapPrismaApplicant(row) : null;
 }
@@ -301,8 +445,195 @@ export async function updateApplicationStatus(
   const updated = await prisma.applicant.update({
     where: { id: existing.id },
     data: { status, updatedAt: new Date() },
+    include: applicantIncludeEvaluators(),
   });
   return mapPrismaApplicant(updated);
+}
+
+export async function assignApplicationEvaluator(
+  id: string,
+  slot: 1 | 2,
+  evaluatorRef: string | null
+): Promise<ApplicationRecord | null> {
+  const existing = await prisma.applicant.findFirst({
+    where: applicantWhereByRef(id),
+  });
+  if (!existing) return null;
+
+  let evaluatorId: string | null = null;
+  if (evaluatorRef) {
+    const evaluator = await prisma.user.findFirst({
+      where: {
+        OR: [{ id: evaluatorRef }, { publicId: evaluatorRef }],
+        role: "EVALUATOR",
+        status: "ACTIVE",
+      },
+      select: { id: true },
+    });
+    if (!evaluator) {
+      throw new Error("Invalid or inactive evaluator");
+    }
+    evaluatorId = evaluator.id;
+
+    const otherSlotEvaluatorId =
+      slot === 1 ? existing.evaluator2Id : existing.evaluator1Id;
+    if (otherSlotEvaluatorId && otherSlotEvaluatorId === evaluatorId) {
+      throw new Error(
+        "This evaluator is already assigned to this applicant"
+      );
+    }
+  }
+
+  const data =
+    slot === 1
+      ? {
+          evaluator1Id: evaluatorId,
+          evaluator1ReviewStatus: "pending" as const,
+          updatedAt: new Date(),
+        }
+      : {
+          evaluator2Id: evaluatorId,
+          evaluator2ReviewStatus: "pending" as const,
+          updatedAt: new Date(),
+        };
+
+  const updated = await prisma.applicant.update({
+    where: { id: existing.id },
+    data,
+    include: applicantIncludeEvaluators(),
+  });
+  return mapPrismaApplicant(updated);
+}
+
+function validateEvaluationSubmission(
+  evaluation: EvaluatorEvaluationSubmission,
+  rubric: Awaited<ReturnType<typeof getActiveEvaluationRubric>>
+): EvaluatorEvaluationSubmission {
+  const requiredIds = rubricCriterionIds(rubric);
+  for (const id of requiredIds) {
+    const score = evaluation.assessorScores[id];
+    if (
+      score === undefined ||
+      !Number.isFinite(score) ||
+      score < 0 ||
+      score > ASSESSOR_SCORE_MAX
+    ) {
+      throw new Error("Complete all criterion scores (0–5) before submitting");
+    }
+  }
+
+  const categoryTotals: Record<string, number> = {};
+  for (const category of rubric) {
+    categoryTotals[category.id] = computeCategoryTotal(
+      category,
+      evaluation.assessorScores
+    );
+  }
+  const grandTotal = rubric.reduce(
+    (sum, category) =>
+      sum + computeCategoryTotal(category, evaluation.assessorScores),
+    0
+  );
+
+  return {
+    assessorScores: evaluation.assessorScores,
+    categoryTotals,
+    grandTotal,
+    submittedAt: evaluation.submittedAt || new Date().toISOString(),
+  };
+}
+
+export async function updateEvaluatorReview(
+  applicationRef: string,
+  evaluatorPublicId: string,
+  action: EvaluatorReviewAction,
+  evaluation?: EvaluatorEvaluationSubmission
+): Promise<ApplicationRecord | null> {
+  const evaluatorInternalId = await resolveUserInternalId(evaluatorPublicId);
+  if (!evaluatorInternalId) {
+    throw new Error("Invalid evaluator");
+  }
+
+  const existing = await prisma.applicant.findFirst({
+    where: applicantWhereByRef(applicationRef),
+    include: applicantIncludeEvaluators(),
+  });
+  if (!existing) return null;
+
+  let slot: 1 | 2 | null = null;
+  if (existing.evaluator1Id === evaluatorInternalId) slot = 1;
+  else if (existing.evaluator2Id === evaluatorInternalId) slot = 2;
+  if (!slot) {
+    throw new Error("You are not assigned to evaluate this application");
+  }
+
+  const currentStatus =
+    slot === 1
+      ? existing.evaluator1ReviewStatus
+      : existing.evaluator2ReviewStatus;
+
+  let nextStatus: EvaluatorReviewStatus;
+  if (action === "accept") {
+    if (currentStatus === "evaluated") {
+      throw new Error("Review already completed");
+    }
+    nextStatus = "accepted";
+  } else if (action === "reject") {
+    if (currentStatus === "evaluated") {
+      throw new Error("Review already completed");
+    }
+    nextStatus = "rejected";
+  } else if (action === "reset") {
+    if (currentStatus !== "rejected") {
+      throw new Error("Only rejected reviews can be reset");
+    }
+    nextStatus = "pending";
+  } else {
+    if (currentStatus !== "accepted") {
+      throw new Error("Applicant must be accepted before evaluation");
+    }
+    if (!evaluation) {
+      throw new Error("Evaluation scores are required");
+    }
+    nextStatus = "evaluated";
+  }
+
+  const validatedEvaluation =
+    action === "evaluate"
+      ? validateEvaluationSubmission(
+          evaluation!,
+          await getActiveEvaluationRubric(existing.typeOfMobility)
+        )
+      : null;
+
+  const data =
+    slot === 1
+      ? {
+          evaluator1ReviewStatus: nextStatus,
+          ...(validatedEvaluation
+            ? { evaluator1EvaluationData: validatedEvaluation }
+            : {}),
+          updatedAt: new Date(),
+        }
+      : {
+          evaluator2ReviewStatus: nextStatus,
+          ...(validatedEvaluation
+            ? { evaluator2EvaluationData: validatedEvaluation }
+            : {}),
+          updatedAt: new Date(),
+        };
+
+  const updated = await prisma.applicant.update({
+    where: { id: existing.id },
+    data,
+    include: applicantIncludeEvaluators(),
+  });
+  const application = mapPrismaApplicant(updated);
+  return enrichApplicationForEvaluator(
+    application,
+    updated,
+    evaluatorInternalId
+  );
 }
 
 export async function deleteApplication(id: string): Promise<boolean> {

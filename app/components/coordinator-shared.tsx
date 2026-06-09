@@ -10,6 +10,7 @@ import {
   type ApplicantDetailRow,
 } from "@/lib/application-applicant-details";
 import { ApplicationDocumentPreview } from "./application-document-preview";
+import { AssignEvaluatorSection } from "./assign-evaluator-section";
 
 export function formatDisadvantaged(app: ApplicationRecord): string {
   const disadvantagedLabels: Record<string, string> = {
@@ -105,6 +106,9 @@ export function ApplicationDetailPanel({
   updatingStatus = false,
   onStatusChange,
   showStatusUpdate = true,
+  showAssignEvaluator = false,
+  assigningEvaluatorSlot = null,
+  onAssignEvaluator,
   collapsibleSections = false,
   embedded = false,
 }: {
@@ -112,6 +116,13 @@ export function ApplicationDetailPanel({
   updatingStatus?: boolean;
   onStatusChange?: (id: string, status: ApplicationStatus) => void;
   showStatusUpdate?: boolean;
+  showAssignEvaluator?: boolean;
+  assigningEvaluatorSlot?: 1 | 2 | null;
+  onAssignEvaluator?: (
+    id: string,
+    slot: 1 | 2,
+    evaluatorId: string | null
+  ) => void | Promise<boolean>;
   /** Collapse each detail block (registration, documents, etc.) in an accordion. */
   collapsibleSections?: boolean;
   /** Inline accordion row (no max-height scroll container). */
@@ -131,7 +142,7 @@ export function ApplicationDetailPanel({
     >
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
         <div>
-          <h2 className="text-lg font-bold text-[#062763]">
+          <h2 className="text-base font-bold text-[#062763]">
             {applicantDisplayName(selected) || "—"}
           </h2>
           <p className="text-sm font-semibold text-slate-900">{selected.id}</p>
@@ -159,6 +170,14 @@ export function ApplicationDetailPanel({
             ))}
           </select>
         </div>
+      )}
+
+      {showAssignEvaluator && onAssignEvaluator && (
+        <AssignEvaluatorSection
+          application={selected}
+          assigningSlot={assigningEvaluatorSlot}
+          onAssign={onAssignEvaluator}
+        />
       )}
 
       <p className="mt-4 text-xs font-semibold text-slate-900">

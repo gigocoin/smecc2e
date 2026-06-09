@@ -5,7 +5,7 @@ export type DashboardUser = {
   phoneNumber: string;
   institution: string;
   profileImageUrl: string | null;
-  role: "Coordinator" | "Reviewer" | "Administrator";
+  role: "Coordinator" | "Evaluator" | "Administrator";
   status: "Active" | "Inactive";
 };
 

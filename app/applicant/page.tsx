@@ -19,7 +19,7 @@ export default function ApplicantHomePage() {
           </div>
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-[#f7be2a]">SMECC2E</p>
-            <p className="text-sm font-semibold text-white">Scholarship application portal</p>
+            <p className="text-xs font-semibold text-white sm:text-sm">Scholarship application portal</p>
           </div>
         </div>
       </header>

@@ -7,8 +7,11 @@ const PRISMA_CONNECTION_CODES = new Set(["P1001", "P1002", "P1017"]);
 export function isPrismaConnectionError(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
 
-  const prismaErr = err as { code?: string; message?: string };
+  const prismaErr = err as { code?: string; message?: string; name?: string };
   if (prismaErr.code && PRISMA_CONNECTION_CODES.has(prismaErr.code)) {
+    return true;
+  }
+  if (prismaErr.name === "PrismaClientInitializationError") {
     return true;
   }
 

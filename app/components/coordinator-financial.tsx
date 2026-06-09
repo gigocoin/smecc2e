@@ -14,12 +14,12 @@ export function CoordinatorFinancial() {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6 lg:pl-6">
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-6 lg:pl-6">
         <div className="pl-12 lg:pl-0">
-          <h1 className="text-lg font-bold text-[#062763] sm:text-xl">
+          <h1 className="text-base font-bold text-[#062763] sm:text-lg">
             {pageTitle}
           </h1>
-          <p className="text-sm font-semibold text-slate-800">
+          <p className="text-xs font-medium text-slate-600 sm:text-sm">
             Financial management · SMECC2E coordination
           </p>
         </div>

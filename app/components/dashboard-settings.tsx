@@ -352,8 +352,8 @@ export function DashboardSettings() {
   return (
     <div className="p-6 lg:p-10">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[#062763]">Settings</h1>
-        <p className="mt-1 text-sm text-slate-600">
+        <h1 className="text-xl font-bold text-[#062763]">Settings</h1>
+        <p className="mt-1 text-xs text-slate-600 sm:text-sm">
           Update your profile photo and password.
         </p>
       </div>
@@ -382,7 +382,7 @@ export function DashboardSettings() {
                   />
                 ) : (
                   <span
-                    className="text-4xl font-light leading-none text-[#062763]"
+                    className="text-3xl font-light leading-none text-[#062763]"
                     aria-hidden
                   >
                     +

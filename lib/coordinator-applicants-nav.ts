@@ -5,6 +5,7 @@ export type ApplicantsManagementNavId =
   | "institutions"
   | "regions"
   | "applicants"
+  | "criterion_weights"
   | "evaluation"
   | "interview"
   | "final_evaluation"
@@ -21,11 +22,22 @@ export type ApplicantsManagementNavItem = {
   statusFilter?: ApplicationStatus;
 };
 
+/** Hidden from evaluator Applicants management flyout. */
+export const EVALUATOR_APPLICANTS_MANAGEMENT_HIDDEN_IDS: ApplicantsManagementNavId[] =
+  [
+    "programs",
+    "institutions",
+    "regions",
+    "applicants",
+    "criterion_weights",
+  ];
+
 export function buildApplicantsManagementNav(
-  basePath: string
+  basePath: string,
+  options?: { hideIds?: ApplicantsManagementNavId[] }
 ): ApplicantsManagementNavItem[] {
   const root = basePath.replace(/\/$/, "");
-  return [
+  const items: ApplicantsManagementNavItem[] = [
     { id: "programs", label: "Programs", href: `${root}/programs` },
     {
       id: "institutions",
@@ -34,6 +46,11 @@ export function buildApplicantsManagementNav(
     },
     { id: "regions", label: "Regions", href: `${root}/regions` },
     { id: "applicants", label: "Applicants", href: `${root}/applicants` },
+    {
+      id: "criterion_weights",
+      label: "Manage Criterion Weight",
+      href: `${root}/criterion-weights`,
+    },
     {
       id: "evaluation",
       label: "Evaluation",
@@ -77,6 +94,10 @@ export function buildApplicantsManagementNav(
       statusFilter: "pre_departure",
     },
   ];
+
+  const hideIds = options?.hideIds;
+  if (!hideIds?.length) return items;
+  return items.filter((item) => !hideIds.includes(item.id));
 }
 
 export function isApplicantsManagementSubActive(
@@ -91,6 +112,9 @@ export function isApplicantsManagementSubActive(
   if (item.id === "regions") return pathname === `${root}/regions`;
   if (item.id === "applicants") {
     return pathname === `${root}/applicants` && !statusParam;
+  }
+  if (item.id === "criterion_weights") {
+    return pathname === `${root}/criterion-weights`;
   }
   if (item.statusFilter) {
     return (

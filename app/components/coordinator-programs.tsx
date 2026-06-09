@@ -518,10 +518,10 @@ export function CoordinatorPrograms({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6 lg:pl-6">
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-6 lg:pl-6">
         <div className="pl-12 lg:pl-0">
-          <h1 className="text-lg font-bold text-[#062763] sm:text-xl">Programs</h1>
-          <p className="text-sm font-semibold text-slate-800">
+          <h1 className="text-base font-bold text-[#062763] sm:text-lg">Programs</h1>
+          <p className="text-xs font-medium text-slate-600 sm:text-sm">
             Academic programmes by SMECC2E partner institution
           </p>
         </div>
@@ -565,7 +565,7 @@ export function CoordinatorPrograms({
             <p className="text-xs font-bold uppercase tracking-wide text-slate-700">
               Partner institutions
             </p>
-            <p className="mt-2 text-3xl font-bold text-[#062763] tabular-nums">
+            <p className="mt-2 text-xl font-bold text-[#062763] tabular-nums">
               {universities.length}
             </p>
           </div>
@@ -573,7 +573,7 @@ export function CoordinatorPrograms({
             <p className="text-xs font-bold uppercase tracking-wide text-slate-700">
               Listed programmes
             </p>
-            <p className="mt-2 text-3xl font-bold text-[#062763] tabular-nums">
+            <p className="mt-2 text-xl font-bold text-[#062763] tabular-nums">
               {allPrograms.length}
             </p>
           </div>
@@ -835,7 +835,7 @@ export function CoordinatorPrograms({
           >
             <h2
               id="create-program-title"
-              className="text-lg font-bold text-[#062763]"
+              className="text-base font-bold text-[#062763]"
             >
               Create program
             </h2>
@@ -1030,7 +1030,7 @@ export function CoordinatorPrograms({
           >
             <h2
               id="edit-program-title"
-              className="text-lg font-bold text-[#062763]"
+              className="text-base font-bold text-[#062763]"
             >
               Edit program
             </h2>
@@ -1225,7 +1225,7 @@ export function CoordinatorPrograms({
           >
             <h2
               id="upload-programs-title"
-              className="text-lg font-bold text-[#062763]"
+              className="text-base font-bold text-[#062763]"
             >
               Upload programs (CSV)
             </h2>

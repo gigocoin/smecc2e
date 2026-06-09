@@ -31,6 +31,9 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const sessionUser = await requireDashboardSessionUser();
+    if (sessionUser.role === "Evaluator") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const body = (await request.json()) as {
       name?: string;
       email?: string;
@@ -44,19 +47,19 @@ export async function POST(request: Request) {
 
     const role =
       body.role ??
-      (sessionUser.role === "Administrator" ? "Reviewer" : "Coordinator");
+      (sessionUser.role === "Administrator" ? "Evaluator" : "Coordinator");
     const status = body.status ?? "Active";
 
-    if (sessionUser.role === "Administrator" && role !== "Reviewer") {
+    if (sessionUser.role === "Administrator" && role !== "Evaluator") {
       return NextResponse.json(
-        { error: "Administrators can only create reviewer accounts." },
+        { error: "Administrators can only create evaluator accounts." },
         { status: 403 }
       );
     }
 
     if (
       role !== "Coordinator" &&
-      role !== "Reviewer" &&
+      role !== "Evaluator" &&
       role !== "Administrator"
     ) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });

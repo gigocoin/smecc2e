@@ -101,7 +101,7 @@ function ThematicAreasFieldset({
 
 export function CoordinatorInstitutions() {
   const { portalKey } = useDashboardPortal();
-  const canManageExistingInstitutions = portalKey !== "administrator";
+  const canManageExistingInstitutions = portalKey === "coordinator";
   const [universities, setUniversities] = useState<UniversityRecord[]>([]);
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -339,12 +339,12 @@ export function CoordinatorInstitutions() {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6 lg:pl-6">
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-6 lg:pl-6">
         <div className="pl-12 lg:pl-0">
-          <h1 className="text-lg font-bold text-[#062763] sm:text-xl">
+          <h1 className="text-base font-bold text-[#062763] sm:text-lg">
             Institutions
           </h1>
-          <p className="text-sm font-semibold text-slate-800">
+          <p className="text-xs font-medium text-slate-600 sm:text-sm">
             SMECC2E host institutions and mobility programmes
           </p>
         </div>
@@ -383,7 +383,7 @@ export function CoordinatorInstitutions() {
               <p className="text-xs font-bold uppercase tracking-wide text-slate-700">
                 Host institutions
               </p>
-              <p className="mt-2 text-3xl font-bold text-[#062763] tabular-nums">
+              <p className="mt-2 text-xl font-bold text-[#062763] tabular-nums">
                 {universities.length}
               </p>
             </div>
@@ -394,7 +394,7 @@ export function CoordinatorInstitutions() {
               <p className="text-xs font-bold uppercase tracking-wide text-slate-700">
                 Academic programmes
               </p>
-              <p className="mt-2 text-3xl font-bold text-[#062763] tabular-nums">
+              <p className="mt-2 text-xl font-bold text-[#062763] tabular-nums">
                 {totalProgrammes}
               </p>
             </div>
@@ -405,7 +405,7 @@ export function CoordinatorInstitutions() {
               <p className="text-xs font-bold uppercase tracking-wide text-slate-700">
                 Applicants (all hosts)
               </p>
-              <p className="mt-2 text-3xl font-bold text-[#062763] tabular-nums">
+              <p className="mt-2 text-xl font-bold text-[#062763] tabular-nums">
                 {loading ? "—" : applications.length}
               </p>
             </div>
@@ -416,7 +416,7 @@ export function CoordinatorInstitutions() {
               <p className="text-xs font-bold uppercase tracking-wide text-slate-700">
                 Approved scholars
               </p>
-              <p className="mt-2 text-3xl font-bold text-[#062763] tabular-nums">
+              <p className="mt-2 text-xl font-bold text-[#062763] tabular-nums">
                 {loading
                   ? "—"
                   : applications.filter((a) => a.status === "approved").length}
@@ -488,7 +488,7 @@ export function CoordinatorInstitutions() {
                       {programmeCount} programme
                       {programmeCount === 1 ? "" : "s"}
                     </p>
-                    <p className="mt-3 text-3xl font-bold text-[#062763] tabular-nums">
+                    <p className="mt-3 text-xl font-bold text-[#062763] tabular-nums">
                       {loading ? "—" : applicants}
                     </p>
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
@@ -542,7 +542,7 @@ export function CoordinatorInstitutions() {
           >
             <h2
               id="create-institution-title"
-              className="text-lg font-bold text-[#062763]"
+              className="text-base font-bold text-[#062763]"
             >
               Create institution
             </h2>
@@ -620,7 +620,7 @@ export function CoordinatorInstitutions() {
           >
             <h2
               id="edit-institution-title"
-              className="text-lg font-bold text-[#062763]"
+              className="text-base font-bold text-[#062763]"
             >
               Edit institution
             </h2>
@@ -697,7 +697,7 @@ export function CoordinatorInstitutions() {
           >
             <h2
               id="delete-institution-title"
-              className="text-lg font-bold text-red-800"
+              className="text-base font-bold text-red-800"
             >
               Delete institution
             </h2>

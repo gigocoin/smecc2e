@@ -14,6 +14,7 @@ import { mimeTypeForFileName } from "@/lib/application-documents-server";
 import {
   getApplication,
   getApplicationDocumentStorageRefs,
+  isApplicationAssignedToEvaluator,
 } from "@/lib/applications-service";
 import { AuthError, requireDashboardSessionUser } from "@/lib/auth-service";
 
@@ -24,7 +25,16 @@ async function authorizeDocumentAccess(application: NonNullable<
     await requireApplicantOwnsApplication(application.id);
     return;
   }
-  await requireDashboardSessionUser();
+  const user = await requireDashboardSessionUser();
+  if (user.role === "Evaluator") {
+    const assigned = await isApplicationAssignedToEvaluator(
+      application.id,
+      user.id
+    );
+    if (!assigned) {
+      throw new AuthError("Forbidden", 403);
+    }
+  }
 }
 
 export async function GET(

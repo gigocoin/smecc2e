@@ -8,7 +8,10 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    await requireDashboardSessionUser();
+    const sessionUser = await requireDashboardSessionUser();
+    if (sessionUser.role === "Evaluator") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const { id } = await context.params;
     const body = (await request.json()) as {
       name?: string;
@@ -26,7 +29,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (
       role !== "Coordinator" &&
-      role !== "Reviewer" &&
+      role !== "Evaluator" &&
       role !== "Administrator"
     ) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
@@ -73,7 +76,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 
 export async function DELETE(_request: Request, context: RouteContext) {
   try {
-    await requireDashboardSessionUser();
+    const sessionUser = await requireDashboardSessionUser();
+    if (sessionUser.role === "Evaluator") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const { id } = await context.params;
     const { users } = await deleteUser(id);
     return NextResponse.json({ users });

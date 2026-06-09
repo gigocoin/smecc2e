@@ -14,7 +14,7 @@ import type { UniversityRecord } from "./universities";
 
 const userRoleLabels: Record<UserRole, DashboardUser["role"]> = {
   COORDINATOR: "Coordinator",
-  REVIEWER: "Reviewer",
+  EVALUATOR: "Evaluator",
   ADMINISTRATOR: "Administrator",
 };
 
@@ -75,7 +75,7 @@ export function parseUserRole(
 ): UserRole {
   const map: Record<DashboardUser["role"], UserRole> = {
     Coordinator: "COORDINATOR",
-    Reviewer: "REVIEWER",
+    Evaluator: "EVALUATOR",
     Administrator: "ADMINISTRATOR",
   };
   return map[role];

@@ -163,6 +163,7 @@ export const config = {
   matcher: [
     "/coordinator/:path*",
     "/administrator/:path*",
+    "/evaluator/:path*",
     "/login",
     "/application",
     "/application/:path*",

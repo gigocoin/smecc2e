@@ -38,13 +38,13 @@ function StatCard({
       <p className="text-xs font-bold uppercase tracking-wide text-slate-900">
         {label}
       </p>
-      <p className="mt-2 text-3xl font-bold text-[#062763]">{value}</p>
+      <p className="mt-2 text-xl font-bold text-[#062763]">{value}</p>
     </div>
   );
 }
 
 export function CoordinatorDashboard() {
-  const { basePath } = useDashboardPortal();
+  const { basePath, portalKey } = useDashboardPortal();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isHydrated, setIsHydrated] = useState(false);
@@ -137,13 +137,18 @@ export function CoordinatorDashboard() {
     };
   }, [applications]);
 
+  const dashboardSubtitle =
+    portalKey === "evaluator"
+      ? "Review assigned scholarship applications"
+      : "SMECC2E mobility & scholarship coordination";
+
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6 lg:pl-6">
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-6 lg:pl-6">
         <div className="pl-12 lg:pl-0">
-          <h1 className="text-lg font-bold text-[#062763] sm:text-xl">Overview</h1>
-          <p className="text-sm font-semibold text-slate-800">
-            SMECC2E mobility & scholarship coordination
+          <h1 className="text-base font-bold text-[#062763] sm:text-lg">Overview</h1>
+          <p className="text-xs font-medium text-slate-600 sm:text-sm">
+            {dashboardSubtitle}
           </p>
         </div>
         <button
@@ -159,9 +164,20 @@ export function CoordinatorDashboard() {
       <main className="flex-1 overflow-auto bg-slate-50 p-4 sm:p-6">
         <div className="space-y-6">
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <StatCard label="Total applicants" value={stats.total} />
                 <StatCard
-                  label="Scholars (approved)"
+                  label={
+                    portalKey === "evaluator"
+                      ? "Assigned applicants"
+                      : "Total applicants"
+                  }
+                  value={stats.total}
+                />
+                <StatCard
+                  label={
+                    portalKey === "evaluator"
+                      ? "Assigned scholars"
+                      : "Scholars (approved)"
+                  }
                   value={stats.byStatus.approved ?? 0}
                   accent="emerald"
                 />
@@ -216,7 +232,9 @@ export function CoordinatorDashboard() {
                 <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="flex items-center justify-between">
                     <h2 className="text-base font-bold text-[#062763]">
-                      Recent applicants
+                      {portalKey === "evaluator"
+                        ? "Recent assigned applicants"
+                        : "Recent applicants"}
                     </h2>
                     <Link
                       href={`${basePath}/applicants`}
@@ -244,7 +262,9 @@ export function CoordinatorDashboard() {
                     ))}
                     {applications.length === 0 && (
                       <li className="py-6 text-center text-sm font-semibold text-slate-900">
-                        No applications yet.
+                        {portalKey === "evaluator"
+                          ? "No applications assigned to you yet."
+                          : "No applications yet."}
                       </li>
                     )}
                   </ul>
@@ -256,7 +276,7 @@ export function CoordinatorDashboard() {
                   href={`${basePath}/users`}
                   className="rounded-xl border border-slate-200 bg-white p-5 text-left transition hover:border-[#062763]/30 hover:shadow-sm"
                 >
-                  <p className="text-2xl font-bold text-[#062763]">
+                  <p className="text-xl font-bold text-[#062763]">
                     {userCount}
                   </p>
                   <p className="mt-1 text-sm font-bold text-slate-900">
@@ -267,7 +287,7 @@ export function CoordinatorDashboard() {
                   href={`${basePath}/programs`}
                   className="rounded-xl border border-slate-200 bg-white p-5 text-left transition hover:border-[#062763]/30 hover:shadow-sm"
                 >
-                  <p className="text-2xl font-bold text-[#062763]">
+                  <p className="text-xl font-bold text-[#062763]">
                     {hostInstitutions.length}
                   </p>
                   <p className="mt-1 text-sm font-bold text-slate-900">
@@ -281,7 +301,7 @@ export function CoordinatorDashboard() {
                   href={`${basePath}/scholars`}
                   className="rounded-xl border border-slate-200 bg-white p-5 text-left transition hover:border-[#062763]/30 hover:shadow-sm"
                 >
-                  <p className="text-2xl font-bold text-emerald-700">
+                  <p className="text-xl font-bold text-emerald-700">
                     {scholarsCount}
                   </p>
                   <p className="mt-1 text-sm font-bold text-slate-900">

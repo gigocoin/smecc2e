@@ -27,6 +27,8 @@ export const COORDINATOR_NAV = buildDashboardNav("/coordinator");
 
 export const ADMINISTRATOR_NAV = buildDashboardNav("/administrator");
 
+export const EVALUATOR_NAV = buildDashboardNav("/evaluator");
+
 export function isDashboardNavActive(
   itemId: CoordinatorNavId,
   pathname: string,

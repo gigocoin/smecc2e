@@ -104,7 +104,7 @@ export function ApplicantDashboard() {
           <p className="text-xs font-bold uppercase tracking-wide text-[#f7be2a]">
             Applicant portal
           </p>
-          <h1 className="mt-1 text-2xl font-bold text-white">
+          <h1 className="mt-1 text-xl font-bold text-white">
             Welcome{displayName !== user.email ? `, ${displayName}` : ""}
           </h1>
           <p className="mt-1 text-sm text-slate-300">{user.email}</p>
@@ -135,7 +135,7 @@ export function ApplicantDashboard() {
       />
 
       <section className="rounded-2xl border border-white/10 bg-white p-6 shadow-lg">
-        <h2 className="text-lg font-bold text-[#062763]">Your application</h2>
+        <h2 className="text-base font-bold text-[#062763]">Your application</h2>
 
         {!app ? (
           <div className="mt-4 space-y-4">
@@ -185,7 +185,7 @@ export function ApplicantDashboard() {
               </>
             ) : isSubmitted ? (
               <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-4">
-                <p className="text-base font-semibold text-[#062763]">
+                <p className="text-sm font-semibold text-[#062763]">
                   Your Application has been received
                 </p>
                 {app.submittedAt && (

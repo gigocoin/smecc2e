@@ -7,8 +7,10 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { isDashboardNavActive, type CoordinatorNavId } from "@/lib/coordinator-nav";
 import {
   buildApplicantsManagementNav,
+  EVALUATOR_APPLICANTS_MANAGEMENT_HIDDEN_IDS,
   isApplicantsManagementGroupActive,
   isApplicantsManagementSubActive,
+  type ApplicantsManagementNavId,
 } from "@/lib/coordinator-applicants-nav";
 import {
   buildFinancialManagementNav,
@@ -168,7 +170,7 @@ function SidebarFlyoutSubmenu({
         onClick={onToggle}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
+        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition sm:text-sm ${
           groupActive
             ? "bg-[#f7be2a] text-[#062763]"
             : "text-white hover:bg-white/15"
@@ -184,7 +186,7 @@ function SidebarFlyoutSubmenu({
           role="menu"
           aria-label={label}
           style={{ top: panelPos.top, left: panelPos.left }}
-          className="fixed z-[70] w-56 max-h-[min(70vh,28rem)] overflow-y-auto rounded-lg border border-white/15 bg-[#062763] py-2 shadow-2xl"
+          className="fixed z-[70] w-56 max-h-[min(70vh,28rem)] overflow-x-hidden overflow-y-auto rounded-lg border border-white/15 bg-[#062763] py-2 shadow-2xl"
         >
           {children}
         </div>
@@ -209,7 +211,7 @@ function FlyoutSubmenuLink({
       href={href}
       role="menuitem"
       onClick={onNavigate}
-      className={`block px-4 py-2 text-sm font-semibold transition ${
+      className={`block px-4 py-2 text-xs font-semibold transition sm:text-sm ${
         active
           ? "bg-[#f7be2a] text-[#062763]"
           : "text-white hover:bg-white/15"
@@ -243,13 +245,15 @@ function ApplicantsManagementNav({
   pathname,
   statusParam,
   onNavigate,
+  hideIds,
 }: {
   basePath: string;
   pathname: string;
   statusParam: string | null;
   onNavigate: () => void;
+  hideIds?: ApplicantsManagementNavId[];
 }) {
-  const items = buildApplicantsManagementNav(basePath);
+  const items = buildApplicantsManagementNav(basePath, { hideIds });
   const groupActive = isApplicantsManagementGroupActive(
     items,
     pathname,
@@ -610,7 +614,7 @@ export function CoordinatorSidebar({
 }: {
   onNavigate?: () => void;
 }) {
-  const { basePath, label, nav } = useDashboardPortal();
+  const { basePath, label, nav, portalKey } = useDashboardPortal();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isHydrated, setIsHydrated] = useState(false);
@@ -705,7 +709,7 @@ export function CoordinatorSidebar({
             <p className="text-xs font-semibold uppercase tracking-wider text-[#f7be2a]">
               SMECC2E
             </p>
-            <p className="text-sm font-bold leading-tight text-white">{label}</p>
+            <p className="text-xs font-bold leading-tight text-white sm:text-sm">{label}</p>
           </div>
         </div>
 
@@ -714,6 +718,26 @@ export function CoordinatorSidebar({
           aria-label="Dashboard"
         >
           {nav.map((item) => {
+            if (portalKey === "evaluator" && item.id === "users") {
+              return (
+                <div key={item.id} className="space-y-1">
+                  <ApplicantsManagementNav
+                    basePath={basePath}
+                    pathname={pathname}
+                    statusParam={statusParam}
+                    onNavigate={close}
+                    hideIds={EVALUATOR_APPLICANTS_MANAGEMENT_HIDDEN_IDS}
+                  />
+                  <CommunicationKnowledgeNav
+                    basePath={basePath}
+                    pathname={pathname}
+                    sectionParam={communicationSectionParam}
+                    onNavigate={close}
+                  />
+                </div>
+              );
+            }
+
             const active = isDashboardNavActive(
               item.id,
               pathname,
@@ -725,7 +749,7 @@ export function CoordinatorSidebar({
                 <Link
                   href={item.href}
                   onClick={close}
-                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
+                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-semibold transition sm:text-sm ${
                     active
                       ? "bg-[#f7be2a] text-[#062763]"
                       : "text-white hover:bg-white/15"
@@ -742,24 +766,28 @@ export function CoordinatorSidebar({
                       statusParam={statusParam}
                       onNavigate={close}
                     />
-                    <ScholarsManagementNav
-                      basePath={basePath}
-                      pathname={pathname}
-                      sectionParam={scholarsSectionParam}
-                      onNavigate={close}
-                    />
-                    <FinancialManagementNav
-                      basePath={basePath}
-                      pathname={pathname}
-                      sectionParam={financeSectionParam}
-                      onNavigate={close}
-                    />
-                    <ProjectManagementNav
-                      basePath={basePath}
-                      pathname={pathname}
-                      sectionParam={projectSectionParam}
-                      onNavigate={close}
-                    />
+                    {portalKey !== "evaluator" && (
+                      <>
+                        <ScholarsManagementNav
+                          basePath={basePath}
+                          pathname={pathname}
+                          sectionParam={scholarsSectionParam}
+                          onNavigate={close}
+                        />
+                        <FinancialManagementNav
+                          basePath={basePath}
+                          pathname={pathname}
+                          sectionParam={financeSectionParam}
+                          onNavigate={close}
+                        />
+                        <ProjectManagementNav
+                          basePath={basePath}
+                          pathname={pathname}
+                          sectionParam={projectSectionParam}
+                          onNavigate={close}
+                        />
+                      </>
+                    )}
                     <CommunicationKnowledgeNav
                       basePath={basePath}
                       pathname={pathname}
@@ -776,7 +804,7 @@ export function CoordinatorSidebar({
         <div className="shrink-0 space-y-2 mb-8 border-t border-white/10 px-4 py-4">
           {sessionUser && (
             <div className="rounded-lg bg-white/10 px-3 py-2.5">
-              <p className="truncate text-sm font-semibold text-white">
+              <p className="truncate text-xs font-semibold text-white sm:text-sm">
                 {sessionUser.name}
               </p>
               <p className="text-xs text-[#f7be2a]">{sessionUser.role}</p>

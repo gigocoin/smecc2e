@@ -1,3 +1,5 @@
+import type { EvaluatorEvaluationSubmission } from "./evaluator-evaluation-types";
+
 export type ApplicationStatus =
   | "draft"
   | "pending"
@@ -10,6 +12,14 @@ export type ApplicationStatus =
   | "approved"
   | "rejected"
   | "pre_departure";
+
+export type EvaluatorReviewStatus =
+  | "pending"
+  | "accepted"
+  | "rejected"
+  | "evaluated";
+
+export type EvaluatorReviewAction = "accept" | "reject" | "evaluate" | "reset";
 
 export type ApplicationPayload = {
   email: string;
@@ -113,6 +123,20 @@ export type ApplicationRecord = ApplicationPayload & {
   updatedAt: string;
   /** Last completed step when status is draft */
   currentPage?: number;
+  /** Assigned evaluator 1 public id (e.g. USR-001), if any */
+  evaluator1Id?: string | null;
+  evaluator1Name?: string | null;
+  evaluator1Email?: string | null;
+  /** Assigned evaluator 2 public id, if any */
+  evaluator2Id?: string | null;
+  evaluator2Name?: string | null;
+  evaluator2Email?: string | null;
+  evaluator1ReviewStatus?: EvaluatorReviewStatus;
+  evaluator2ReviewStatus?: EvaluatorReviewStatus;
+  /** Populated for evaluator sessions: this user's review on the application */
+  myEvaluatorReviewStatus?: EvaluatorReviewStatus | null;
+  /** Populated for evaluator sessions: this user's submitted evaluation scores */
+  myEvaluatorEvaluationData?: EvaluatorEvaluationSubmission | null;
 };
 
 export const APPLICATION_STATUSES: ApplicationStatus[] = [

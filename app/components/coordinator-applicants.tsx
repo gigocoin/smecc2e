@@ -41,14 +41,31 @@ function statusFilterFromParam(
     : "all";
 }
 
+function hasAssignedEvaluators(app: ApplicationRecord): boolean {
+  return Boolean(app.evaluator1Id || app.evaluator2Id);
+}
+
+function applicantRowBackground(
+  app: ApplicationRecord,
+  isExpanded: boolean
+): string {
+  if (isExpanded) return "bg-[#062763]/8";
+  if (hasAssignedEvaluators(app)) return "bg-emerald-50/80";
+  return "";
+}
+
 export function CoordinatorApplicants({
   statusFromUrl = null,
 }: {
   statusFromUrl?: string | null;
 }) {
   const { basePath, portalKey } = useDashboardPortal();
-  const showStatusUpdate = portalKey !== "administrator";
-  const canDeleteApplications = portalKey !== "administrator";
+  const showAssignEvaluator = portalKey === "coordinator";
+  const canDeleteApplications = portalKey === "coordinator";
+  const pageSubtitle =
+    portalKey === "evaluator"
+      ? "Review assigned scholarship applications"
+      : "SMECC2E mobility & scholarship coordination";
   const tableColSpan = canDeleteApplications ? 7 : 6;
   const managementNav = useMemo(
     () => buildApplicantsManagementNav(basePath),
@@ -63,13 +80,15 @@ export function CoordinatorApplicants({
     () => statusFilterFromParam(statusFromUrl)
   );
   const [mobilityFilter, setMobilityFilter] = useState("all");
-  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [assigningEvaluatorSlot, setAssigningEvaluatorSlot] = useState<
+    1 | 2 | null
+  >(null);
   const [deletingApplication, setDeletingApplication] =
     useState<ApplicationRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const tableBusy = updatingStatus || deleting;
+  const tableBusy = assigningEvaluatorSlot !== null || deleting;
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -121,21 +140,28 @@ export function CoordinatorApplicants({
     });
   }, [applications, search, statusFilter, mobilityFilter]);
 
-  const handleStatusChange = async (id: string, status: ApplicationStatus) => {
-    setUpdatingStatus(true);
+  const handleAssignEvaluator = async (
+    id: string,
+    slot: 1 | 2,
+    evaluatorId: string | null
+  ): Promise<boolean> => {
+    setAssigningEvaluatorSlot(slot);
     try {
+      const body =
+        slot === 1 ? { evaluator1Id: evaluatorId } : { evaluator2Id: evaluatorId };
       const res = await fetch(`/api/applications/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(body),
       });
-      if (!res.ok) return;
+      if (!res.ok) return false;
       const data = (await res.json()) as { application: ApplicationRecord };
       setApplications((prev) =>
         prev.map((a) => (a.id === id ? data.application : a))
       );
+      return true;
     } finally {
-      setUpdatingStatus(false);
+      setAssigningEvaluatorSlot(null);
     }
   };
 
@@ -175,13 +201,13 @@ export function CoordinatorApplicants({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6 lg:pl-6">
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-6 lg:pl-6">
         <div className="pl-12 lg:pl-0">
-          <h1 className="text-lg font-bold text-[#062763] sm:text-xl">
+          <h1 className="text-base font-bold text-[#062763] sm:text-lg">
             {pageTitle}
           </h1>
-          <p className="text-sm font-semibold text-slate-800">
-            SMECC2E mobility & scholarship coordination
+          <p className="text-xs font-medium text-slate-600 sm:text-sm">
+            {pageSubtitle}
           </p>
         </div>
         <button
@@ -252,7 +278,8 @@ export function CoordinatorApplicants({
               Applications ({filteredApplicants.length})
             </h2>
             <p className="mt-1 text-xs font-semibold text-slate-700">
-              Click an applicant to expand details.
+              Click an applicant to expand details. Rows with a green background
+              have evaluators assigned.
             </p>
           </div>
           <div className="overflow-x-auto">
@@ -283,15 +310,14 @@ export function CoordinatorApplicants({
                 ) : (
                   filteredApplicants.map((app) => {
                     const isExpanded = expandedId === app.id;
+                    const rowBg = applicantRowBackground(app, isExpanded);
                     return (
                       <Fragment key={app.id}>
                         <tr
                           onClick={() =>
                             setExpandedId(isExpanded ? null : app.id)
                           }
-                          className={`cursor-pointer transition hover:bg-[#062763]/5 ${
-                            isExpanded ? "bg-[#062763]/8" : ""
-                          }`}
+                          className={`cursor-pointer transition hover:bg-[#062763]/5 ${rowBg}`}
                         >
                           <td className="px-2 py-3 text-center">
                             <svg
@@ -359,7 +385,7 @@ export function CoordinatorApplicants({
                           )}
                         </tr>
                         {isExpanded && (
-                          <tr className="bg-slate-50/80">
+                          <tr className={`${rowBg || "bg-slate-50/80"}`}>
                             <td colSpan={tableColSpan} className="p-0">
                               <div
                                 className="border-t border-slate-200"
@@ -367,13 +393,14 @@ export function CoordinatorApplicants({
                               >
                                 <ApplicationDetailPanel
                                   selected={app}
-                                  updatingStatus={updatingStatus}
-                                  onStatusChange={
-                                    showStatusUpdate
-                                      ? handleStatusChange
+                                  showStatusUpdate={false}
+                                  showAssignEvaluator={showAssignEvaluator}
+                                  assigningEvaluatorSlot={assigningEvaluatorSlot}
+                                  onAssignEvaluator={
+                                    showAssignEvaluator
+                                      ? handleAssignEvaluator
                                       : undefined
                                   }
-                                  showStatusUpdate={showStatusUpdate}
                                   collapsibleSections
                                   embedded
                                 />
@@ -405,7 +432,7 @@ export function CoordinatorApplicants({
           >
             <h2
               id="delete-application-title"
-              className="text-lg font-bold text-red-800"
+              className="text-base font-bold text-red-800"
             >
               Delete application
             </h2>

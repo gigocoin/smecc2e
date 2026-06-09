@@ -38,7 +38,7 @@ function LoginFormContent() {
         ok?: boolean;
         error?: string;
         redirectTo?: string;
-        user?: { role: "Coordinator" | "Reviewer" | "Administrator" };
+        user?: { role: "Coordinator" | "Evaluator" | "Administrator" };
       };
 
       if (!res.ok) {

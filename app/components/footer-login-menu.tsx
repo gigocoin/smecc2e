@@ -10,7 +10,7 @@ const triggerClass =
 const menuItemClass =
   "block px-4 py-2.5 text-sm font-semibold text-[#062763] transition hover:bg-[#f7be2a]/20";
 
-export function FooterLoginMenu() {
+export function FooterLoginMenu({ compact = false }: { compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -42,7 +42,11 @@ export function FooterLoginMenu() {
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label="Login options"
-        className={triggerClass}
+        className={
+          compact
+            ? "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/30 bg-white/10 px-3 py-1.5 text-[0.58rem] font-bold uppercase tracking-[0.1em] text-white transition hover:border-[#f7be2a]/60 hover:bg-[#f7be2a] hover:text-[#062763] focus:outline-none focus:ring-2 focus:ring-[#f7be2a]/50 sm:px-3.5 sm:py-1.5 sm:text-[0.65rem]"
+            : triggerClass
+        }
       >
         Login
         <svg

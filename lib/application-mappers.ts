@@ -1,8 +1,9 @@
-import type { Applicant, Prisma } from "@prisma/client";
+import type { Applicant, Prisma, User } from "@prisma/client";
 import type {
   ApplicationPayload,
   ApplicationRecord,
   ApplicationStatus,
+  EvaluatorReviewStatus,
 } from "./application-types";
 import { applicantPrimaryEmail } from "./application-types";
 
@@ -120,7 +121,12 @@ export function payloadToApplicantFields(
   };
 }
 
-export function mapPrismaApplicant(row: Applicant): ApplicationRecord {
+export function mapPrismaApplicant(
+  row: Applicant & {
+    evaluator1?: Pick<User, "id" | "publicId" | "name" | "email"> | null;
+    evaluator2?: Pick<User, "id" | "publicId" | "name" | "email"> | null;
+  }
+): ApplicationRecord {
   const submittedAt = row.submittedAt ?? row.createdAt;
   return {
     id: row.publicId ?? row.id,
@@ -128,6 +134,14 @@ export function mapPrismaApplicant(row: Applicant): ApplicationRecord {
     submittedAt: submittedAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     currentPage: row.currentPage ?? undefined,
+    evaluator1Id: row.evaluator1?.publicId ?? null,
+    evaluator1Name: row.evaluator1?.name ?? null,
+    evaluator1Email: row.evaluator1?.email ?? null,
+    evaluator2Id: row.evaluator2?.publicId ?? null,
+    evaluator2Name: row.evaluator2?.name ?? null,
+    evaluator2Email: row.evaluator2?.email ?? null,
+    evaluator1ReviewStatus: row.evaluator1ReviewStatus as EvaluatorReviewStatus,
+    evaluator2ReviewStatus: row.evaluator2ReviewStatus as EvaluatorReviewStatus,
     email: row.email,
     nationality: row.nationality,
     countryOfResidence: row.countryOfResidence,

@@ -16,8 +16,11 @@ import { sendApplicationConfirmationEmail } from "@/lib/send-application-confirm
 
 export async function GET() {
   try {
-    await requireDashboardSessionUser();
-    const applications = await listApplications();
+    const user = await requireDashboardSessionUser();
+    const applications = await listApplications({
+      assignedToEvaluatorPublicId:
+        user.role === "Evaluator" ? user.id : undefined,
+    });
     return NextResponse.json({ applications });
   } catch (err) {
     if (err instanceof ApplicantAuthError) {

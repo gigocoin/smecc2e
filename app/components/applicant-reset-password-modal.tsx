@@ -111,7 +111,7 @@ export function ApplicantResetPasswordModal({
           <div>
             <h2
               id="applicant-reset-password-title"
-              className="text-lg font-bold text-[#062763]"
+              className="text-base font-bold text-[#062763]"
             >
               Reset password
             </h2>

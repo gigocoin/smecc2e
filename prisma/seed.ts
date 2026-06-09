@@ -27,7 +27,7 @@ const seedUsers = [
     email: "j.okonkwo@unn.edu.ng",
     phoneNumber: "+234 803 000 0002",
     institution: "University of Nigeria (UNN)",
-    role: UserRole.REVIEWER,
+    role: UserRole.EVALUATOR,
     status: UserStatus.ACTIVE,
   },
   {
@@ -36,7 +36,7 @@ const seedUsers = [
     email: "a.bello@unn.edu.ng",
     phoneNumber: "+250 788 000 003",
     institution: "University of Rwanda",
-    role: UserRole.REVIEWER,
+    role: UserRole.EVALUATOR,
     status: UserStatus.ACTIVE,
   },
   {

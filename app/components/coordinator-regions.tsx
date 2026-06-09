@@ -318,10 +318,10 @@ export function CoordinatorRegions({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-6 lg:pl-6">
+      <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-6 lg:pl-6">
         <div className="pl-12 lg:pl-0">
-          <h1 className="text-lg font-bold text-[#062763] sm:text-xl">Regions</h1>
-          <p className="text-sm font-semibold text-slate-800">
+          <h1 className="text-base font-bold text-[#062763] sm:text-lg">Regions</h1>
+          <p className="text-xs font-medium text-slate-600 sm:text-sm">
             SMECC2E mobility & scholarship coordination
           </p>
         </div>
@@ -359,7 +359,7 @@ export function CoordinatorRegions({
                 <p className="mt-1 line-clamp-2 text-xs font-semibold text-slate-700">
                   {formatCountries(region.countries)}
                 </p>
-                <p className="mt-3 text-3xl font-bold text-[#062763] tabular-nums">
+                <p className="mt-3 text-xl font-bold text-[#062763] tabular-nums">
                   {loading ? "—" : total}
                 </p>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
@@ -490,7 +490,7 @@ export function CoordinatorRegions({
           >
             <h2
               id="create-region-title"
-              className="text-lg font-bold text-[#062763]"
+              className="text-base font-bold text-[#062763]"
             >
               Create region
             </h2>
@@ -633,7 +633,7 @@ export function CoordinatorRegions({
           >
             <h2
               id="edit-region-title"
-              className="text-lg font-bold text-[#062763]"
+              className="text-base font-bold text-[#062763]"
             >
               Edit region
             </h2>
@@ -775,7 +775,7 @@ export function CoordinatorRegions({
           >
             <h2
               id="delete-region-title"
-              className="text-lg font-bold text-red-800"
+              className="text-base font-bold text-red-800"
             >
               Delete region
             </h2>

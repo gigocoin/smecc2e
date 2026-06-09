@@ -1,6 +1,6 @@
 import type { DashboardUser } from "./dashboard-users";
 
-export type DashboardPortalKey = "coordinator" | "administrator";
+export type DashboardPortalKey = "coordinator" | "administrator" | "evaluator";
 
 export type DashboardPortalConfig = {
   key: DashboardPortalKey;
@@ -25,10 +25,17 @@ export const DASHBOARD_PORTALS: Record<
     label: "Administrator",
     allowedRoles: ["Administrator"],
   },
+  evaluator: {
+    key: "evaluator",
+    basePath: "/evaluator",
+    label: "Evaluator",
+    allowedRoles: ["Evaluator"],
+  },
 };
 
 export function portalKeyFromPath(pathname: string): DashboardPortalKey | null {
   if (pathname.startsWith("/administrator")) return "administrator";
+  if (pathname.startsWith("/evaluator")) return "evaluator";
   if (pathname.startsWith("/coordinator")) return "coordinator";
   return null;
 }
@@ -38,6 +45,7 @@ export function portalForRole(
 ): DashboardPortalKey | null {
   if (role === "Coordinator") return "coordinator";
   if (role === "Administrator") return "administrator";
+  if (role === "Evaluator") return "evaluator";
   return null;
 }
 
@@ -57,7 +65,8 @@ export function safeDashboardRedirect(
   if (!redirect || redirect.includes("//")) return fallback;
   if (
     redirect.startsWith("/coordinator") ||
-    redirect.startsWith("/administrator")
+    redirect.startsWith("/administrator") ||
+    redirect.startsWith("/evaluator")
   ) {
     return redirect;
   }

@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Only coordinators and administrators can access the dashboard.",
+            "Only coordinators, administrators, and evaluators can access the dashboard.",
         },
         { status: 403 }
       );

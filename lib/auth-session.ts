@@ -125,7 +125,8 @@ export async function verifySessionToken(
   }
   if (
     role !== "Coordinator" &&
-    role !== "Reviewer" &&
+    role !== "Evaluator" &&
+    role !== "Reviewer" && // legacy session tokens
     role !== "Administrator"
   ) {
     return null;

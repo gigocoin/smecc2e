@@ -1,0 +1,2 @@
+-- Rename UserRole enum value REVIEWER -> EVALUATOR (PostgreSQL 10+)
+ALTER TYPE "UserRole" RENAME VALUE 'REVIEWER' TO 'EVALUATOR';

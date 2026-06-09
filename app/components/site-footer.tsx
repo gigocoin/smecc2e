@@ -4,14 +4,29 @@ import { FooterLoginMenu } from "./footer-login-menu";
 type SiteFooterProps = {
   /** Hide the login button (e.g. on auth pages). */
   hideLogin?: boolean;
+  /** Tighter layout for the fixed-viewport home page. */
+  compact?: boolean;
 };
 
-export function SiteFooter({ hideLogin = false }: SiteFooterProps = {}) {
+export function SiteFooter({
+  hideLogin = false,
+  compact = false,
+}: SiteFooterProps = {}) {
   return (
-    <footer className="border-t border-white/10 bg-[#062763] px-4 py-8 text-white sm:py-10">
+    <footer
+      className={`shrink-0 border-t border-white/10 bg-[#062763] px-4 text-white ${
+        compact ? "py-3 sm:py-4" : "py-8 sm:py-10"
+      }`}
+    >
       <div className="mx-auto max-w-6xl">
-        <div className="grid items-center gap-4 sm:grid-cols-3">
-          <p className="text-center text-xs font-medium text-white/70 sm:text-left sm:text-sm">
+        <div
+          className={`grid items-center sm:grid-cols-3 ${compact ? "gap-2" : "gap-4"}`}
+        >
+          <p
+            className={`text-center font-medium text-white/70 sm:text-left ${
+              compact ? "text-[0.65rem] sm:text-xs" : "text-xs sm:text-sm"
+            }`}
+          >
             Funded by the European Union
           </p>
           <div className="flex justify-center">
@@ -21,12 +36,12 @@ export function SiteFooter({ hideLogin = false }: SiteFooterProps = {}) {
               width={380}
               height={80}
               sizes="(max-width: 640px) 280px, 380px"
-              className="max-h-16 object-contain sm:max-h-20"
+              className={`object-contain ${compact ? "max-h-10 sm:max-h-12" : "max-h-16 sm:max-h-20"}`}
               style={{ width: "auto", height: "auto" }}
             />
           </div>
           {!hideLogin ? (
-            <FooterLoginMenu />
+            <FooterLoginMenu compact={compact} />
           ) : (
             <div className="hidden sm:block" aria-hidden />
           )}
