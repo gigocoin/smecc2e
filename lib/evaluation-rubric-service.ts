@@ -8,6 +8,7 @@ import {
   RUBRIC_TEMPLATE_MOBILITY,
   TRAINEESHIP_MOBILITY,
   isFullRubricMobility,
+  isRubricTemplateMobility,
   resolveMobilityType,
   type MobilityType,
 } from "./mobility-types";

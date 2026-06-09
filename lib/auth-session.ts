@@ -111,7 +111,7 @@ export async function verifySessionToken(
   if (parts.length !== 3 && parts.length !== 4) return null;
 
   const publicId = parts[0] ?? "";
-  const role = parts[1] as DashboardUser["role"];
+  const roleRaw = parts[1] ?? "";
   const exp = parseInt(parts[2] ?? "", 10);
   if (!publicId || !Number.isFinite(exp) || Date.now() > exp) return null;
   if (parts.length === 4) {
@@ -123,12 +123,17 @@ export async function verifySessionToken(
       return null;
     }
   }
+
+  let role: DashboardUser["role"];
   if (
-    role !== "Coordinator" &&
-    role !== "Evaluator" &&
-    role !== "Reviewer" && // legacy session tokens
-    role !== "Administrator"
+    roleRaw === "Coordinator" ||
+    roleRaw === "Evaluator" ||
+    roleRaw === "Administrator"
   ) {
+    role = roleRaw;
+  } else if (roleRaw === "Reviewer") {
+    role = "Evaluator"; // legacy session tokens
+  } else {
     return null;
   }
 
