@@ -20,6 +20,8 @@ export async function GET() {
     const applications = await listApplications({
       assignedToEvaluatorPublicId:
         user.role === "Evaluator" ? user.id : undefined,
+      includeDrafts:
+        user.role === "Coordinator" || user.role === "Administrator",
     });
     return NextResponse.json({ applications });
   } catch (err) {

@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   applicantDisplayName,
   applicantPrimaryEmail,
+  COORDINATOR_APPLICANT_FILTER_STATUSES,
   COORDINATOR_APPLICATION_STATUSES,
   isApplicationStatus,
   STATUS_LABELS,
@@ -66,10 +67,17 @@ export function CoordinatorApplicants({
     portalKey === "evaluator"
       ? "Review assigned scholarship applications"
       : "SMECC2E mobility & scholarship coordination";
-  const tableColSpan = canDeleteApplications ? 7 : 6;
+  const tableColSpan = canDeleteApplications ? 8 : 7;
   const managementNav = useMemo(
     () => buildApplicantsManagementNav(basePath),
     [basePath]
+  );
+  const statusFilterOptions = useMemo(
+    () =>
+      portalKey === "coordinator" || portalKey === "administrator"
+        ? COORDINATOR_APPLICANT_FILTER_STATUSES
+        : COORDINATOR_APPLICATION_STATUSES,
+    [portalKey]
   );
 
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
@@ -246,7 +254,7 @@ export function CoordinatorApplicants({
               className="mt-1 rounded-lg border-2 border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-[#062763] outline-none focus:border-[#062763] focus:ring-2 focus:ring-[#062763]/15"
             >
               <option value="all">All statuses</option>
-              {COORDINATOR_APPLICATION_STATUSES.map((s) => (
+              {statusFilterOptions.map((s) => (
                 <option key={s} value={s}>
                   {STATUS_LABELS[s]}
                 </option>
@@ -291,6 +299,7 @@ export function CoordinatorApplicants({
                   <th className="px-4 py-3">Mobility</th>
                   <th className="px-4 py-3">Host / Programme</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Current page</th>
                   <th className="px-4 py-3">Submitted</th>
                   {canDeleteApplications && (
                     <th className="px-4 py-3 text-right">Actions</th>
@@ -363,6 +372,9 @@ export function CoordinatorApplicants({
                           </td>
                           <td className="px-4 py-3">
                             <StatusBadge status={app.status} />
+                          </td>
+                          <td className="px-4 py-3 font-semibold text-slate-900">
+                            {app.currentPage != null ? app.currentPage : "—"}
                           </td>
                           <td className="px-4 py-3 font-semibold text-slate-900">
                             {formatDate(app.submittedAt)}

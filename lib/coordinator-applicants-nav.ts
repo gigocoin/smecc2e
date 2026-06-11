@@ -6,6 +6,7 @@ export type ApplicantsManagementNavId =
   | "regions"
   | "applicants"
   | "criterion_weights"
+  | "draft"
   | "evaluation"
   | "interview"
   | "final_evaluation"
@@ -30,6 +31,7 @@ export const EVALUATOR_APPLICANTS_MANAGEMENT_HIDDEN_IDS: ApplicantsManagementNav
     "regions",
     "applicants",
     "criterion_weights",
+    "draft",
   ];
 
 export function buildApplicantsManagementNav(
@@ -50,6 +52,12 @@ export function buildApplicantsManagementNav(
       id: "criterion_weights",
       label: "Manage Criterion Weight",
       href: `${root}/criterion-weights`,
+    },
+    {
+      id: "draft",
+      label: "Draft",
+      href: `${root}/applicants?status=draft`,
+      statusFilter: "draft",
     },
     {
       id: "evaluation",

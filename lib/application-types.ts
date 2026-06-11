@@ -153,7 +153,7 @@ export const APPLICATION_STATUSES: ApplicationStatus[] = [
   "pre_departure",
 ];
 
-/** Statuses shown in coordinator review workflows (excludes in-progress drafts). */
+/** Statuses coordinators may set after submission (excludes in-progress drafts). */
 export const COORDINATOR_APPLICATION_STATUSES: ApplicationStatus[] = [
   "pending",
   "under_review",
@@ -165,6 +165,12 @@ export const COORDINATOR_APPLICATION_STATUSES: ApplicationStatus[] = [
   "approved",
   "rejected",
   "pre_departure",
+];
+
+/** Statuses in coordinator applicants list filters (includes in-progress drafts). */
+export const COORDINATOR_APPLICANT_FILTER_STATUSES: ApplicationStatus[] = [
+  "draft",
+  ...COORDINATOR_APPLICATION_STATUSES,
 ];
 
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {
