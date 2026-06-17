@@ -27,6 +27,9 @@
 !/public/uploads/applications/
 /public/uploads/applications/*
 !/public/uploads/applications/.gitkeep
+!/public/uploads/communication/
+/public/uploads/communication/*
+!/public/uploads/communication/.gitkeep
 
 # misc
 .DS_Store

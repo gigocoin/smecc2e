@@ -18,7 +18,10 @@ import {
   isFinancialManagementSubActive,
 } from "@/lib/coordinator-financial-nav";
 import {
+  buildCommunicationDocumentsNav,
   buildCommunicationKnowledgeNav,
+  isCommunicationDocumentsGroupActive,
+  isCommunicationDocumentsSubActive,
   isCommunicationKnowledgeGroupActive,
   isCommunicationKnowledgeSubActive,
 } from "@/lib/coordinator-communication-nav";
@@ -551,29 +554,127 @@ function CommunicationKnowledgeIcon() {
   );
 }
 
+function FlyoutNestedSubmenu({
+  label,
+  groupActive,
+  open,
+  onToggle,
+  onClose,
+  children,
+}: {
+  label: string;
+  groupActive: boolean;
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelPos, setPanelPos] = useState<{ top: number; left: number } | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (!open) {
+      setPanelPos(null);
+      return;
+    }
+    const updatePosition = () => {
+      const el = triggerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      setPanelPos({ top: rect.top, left: rect.right + 4 });
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        triggerRef.current?.contains(target) ||
+        panelRef.current?.contains(target)
+      ) {
+        return;
+      }
+      onClose();
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [open, onClose]);
+
+  return (
+    <div ref={triggerRef}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className={`flex w-full items-center gap-2 px-4 py-2 text-xs font-semibold transition sm:text-sm ${
+          groupActive
+            ? "bg-[#f7be2a] text-[#062763]"
+            : "text-white hover:bg-white/15"
+        }`}
+      >
+        <span className="flex-1 text-left">{label}</span>
+        <FlyoutChevron open={open} />
+      </button>
+      {open && panelPos && (
+        <div
+          ref={panelRef}
+          role="menu"
+          aria-label={label}
+          style={{ top: panelPos.top, left: panelPos.left }}
+          className="fixed z-[80] w-56 max-h-[min(70vh,28rem)] overflow-x-hidden overflow-y-auto rounded-lg border border-white/15 bg-[#062763] py-2 shadow-2xl"
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CommunicationKnowledgeNav({
   basePath,
   pathname,
   sectionParam,
+  documentsViewParam,
   onNavigate,
 }: {
   basePath: string;
   pathname: string;
   sectionParam: string | null;
+  documentsViewParam: string | null;
   onNavigate: () => void;
 }) {
   const items = buildCommunicationKnowledgeNav(basePath);
+  const documentsItems = buildCommunicationDocumentsNav(basePath);
   const groupActive = isCommunicationKnowledgeGroupActive(
     items,
     pathname,
     sectionParam,
     basePath
   );
+  const documentsGroupActive = isCommunicationDocumentsGroupActive(
+    pathname,
+    sectionParam,
+    basePath
+  );
   const [open, setOpen] = useState(false);
+  const [documentsOpen, setDocumentsOpen] = useState(false);
 
   useEffect(() => {
     setOpen(false);
-  }, [pathname, sectionParam]);
+    setDocumentsOpen(false);
+  }, [pathname, sectionParam, documentsViewParam]);
 
   return (
     <SidebarFlyoutSubmenu
@@ -585,6 +686,43 @@ function CommunicationKnowledgeNav({
       onClose={() => setOpen(false)}
     >
       {items.map((item) => {
+        if (item.section === "documents") {
+          return (
+            <FlyoutNestedSubmenu
+              key={item.id}
+              label={item.label}
+              groupActive={documentsGroupActive}
+              open={documentsOpen}
+              onToggle={() => setDocumentsOpen((prev) => !prev)}
+              onClose={() => setDocumentsOpen(false)}
+            >
+              {documentsItems.map((docItem) => {
+                const active = isCommunicationDocumentsSubActive(
+                  docItem,
+                  pathname,
+                  sectionParam,
+                  documentsViewParam,
+                  basePath
+                );
+                return (
+                  <FlyoutSubmenuLink
+                    key={docItem.id}
+                    href={docItem.href}
+                    active={active}
+                    onNavigate={() => {
+                      setDocumentsOpen(false);
+                      setOpen(false);
+                      onNavigate();
+                    }}
+                  >
+                    {docItem.label}
+                  </FlyoutSubmenuLink>
+                );
+              })}
+            </FlyoutNestedSubmenu>
+          );
+        }
+
         const active = isCommunicationKnowledgeSubActive(
           item,
           pathname,
@@ -661,6 +799,12 @@ export function CoordinatorSidebar({
     isHydrated && pathname.includes("/project") ? section : null;
   const communicationSectionParam =
     isHydrated && pathname.includes("/communication") ? section : null;
+  const documentsViewParam =
+    isHydrated &&
+    pathname.includes("/communication") &&
+    communicationSectionParam === "documents"
+      ? searchParams.get("view")
+      : null;
 
   const close = () => {
     setSidebarOpen(false);
@@ -732,6 +876,7 @@ export function CoordinatorSidebar({
                     basePath={basePath}
                     pathname={pathname}
                     sectionParam={communicationSectionParam}
+                    documentsViewParam={documentsViewParam}
                     onNavigate={close}
                   />
                 </div>
@@ -792,6 +937,7 @@ export function CoordinatorSidebar({
                       basePath={basePath}
                       pathname={pathname}
                       sectionParam={communicationSectionParam}
+                      documentsViewParam={documentsViewParam}
                       onNavigate={close}
                     />
                   </div>

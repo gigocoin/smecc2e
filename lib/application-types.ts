@@ -176,7 +176,7 @@ export const COORDINATOR_APPLICANT_FILTER_STATUSES: ApplicationStatus[] = [
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {
   draft: "Draft",
   pending: "Pending",
-  under_review: "Under review",
+  under_review: "Eligibility Checks",
   evaluation: "Evaluation",
   interview: "Interview",
   final_evaluation: "Final Evaluation",

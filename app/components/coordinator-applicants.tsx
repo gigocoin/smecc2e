@@ -4,8 +4,6 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   applicantDisplayName,
   applicantPrimaryEmail,
-  COORDINATOR_APPLICANT_FILTER_STATUSES,
-  COORDINATOR_APPLICATION_STATUSES,
   isApplicationStatus,
   STATUS_LABELS,
   type ApplicationRecord,
@@ -71,13 +69,6 @@ export function CoordinatorApplicants({
   const managementNav = useMemo(
     () => buildApplicantsManagementNav(basePath),
     [basePath]
-  );
-  const statusFilterOptions = useMemo(
-    () =>
-      portalKey === "coordinator" || portalKey === "administrator"
-        ? COORDINATOR_APPLICANT_FILTER_STATUSES
-        : COORDINATOR_APPLICATION_STATUSES,
-    [portalKey]
   );
 
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
@@ -241,25 +232,6 @@ export function CoordinatorApplicants({
               onChange={(e) => setSearch(e.target.value)}
               className="mt-1 w-full rounded-lg border-2 border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-[#062763] focus:ring-2 focus:ring-[#062763]/15"
             />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-800">
-              Status
-            </label>
-            <select
-              value={statusFilter}
-              onChange={(e) =>
-                setStatusFilter(e.target.value as ApplicationStatus | "all")
-              }
-              className="mt-1 rounded-lg border-2 border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-[#062763] outline-none focus:border-[#062763] focus:ring-2 focus:ring-[#062763]/15"
-            >
-              <option value="all">All statuses</option>
-              {statusFilterOptions.map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_LABELS[s]}
-                </option>
-              ))}
-            </select>
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-800">

@@ -328,3 +328,36 @@ model EvaluationRubricSetting {
 
   @@map("evaluation_rubric_settings")
 }
+
+/// Published file in Communication & Knowledge → Documents.
+model CommunicationDocument {
+  id               String   @id @default(cuid())
+  description      String   @default("")
+  categoryId       String?  @map("category_id")
+  category         CommunicationDocumentCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  subCategory      String   @default("") @map("sub_category")
+  fileName         String   @map("file_name")
+  fileUrl          String   @map("file_url")
+  mimeType         String   @map("mime_type")
+  fileSize         Int      @map("file_size")
+  uploadedByName   String   @map("uploaded_by_name")
+  uploadedByEmail  String   @map("uploaded_by_email")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([categoryId])
+  @@map("communication_documents")
+}
+
+/// Category for Communication & Knowledge documents.
+model CommunicationDocumentCategory {
+  id             String                  @id @default(cuid())
+  name           String                  @unique
+  slug           String                  @unique
+  subCategories  String[]                @default([]) @map("sub_categories")
+  createdAt      DateTime                @default(now()) @map("created_at")
+  documents      CommunicationDocument[]
+
+  @@index([createdAt])
+  @@map("communication_document_categories")
+}
