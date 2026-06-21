@@ -27,6 +27,13 @@ import {
 } from "./evaluator-evaluation-rubric";
 import type { EvaluatorEvaluationSubmission } from "./evaluator-evaluation-types";
 import { parseEvaluatorEvaluationSubmission } from "./evaluator-evaluation-types";
+import type { DashboardUser } from "./dashboard-users";
+import { getActiveInterviewCriteria } from "./interview-rubric-service";
+import type { InterviewEvaluationSubmission, InterviewScoreSummary } from "./interview-scoring-sheet";
+import {
+  computeTotalInterviewScore,
+  interviewScoreMaximum,
+} from "./interview-scoring-sheet";
 import { prisma } from "./prisma";
 
 export class DuplicateApplicationError extends Error {
@@ -145,6 +152,7 @@ function applicantIncludeEvaluators() {
   return {
     evaluator1: evaluatorSelect,
     evaluator2: evaluatorSelect,
+    interviewer: evaluatorSelect,
   } as const;
 }
 
@@ -240,13 +248,32 @@ export async function listApplications(options?: {
   includeDrafts?: boolean;
   /** When set, only applications assigned to this evaluator (public id) are returned. */
   assignedToEvaluatorPublicId?: string;
+  /** Evaluator interview queue: assigned as interviewer with completed scorecards. */
+  interviewQueueForPublicId?: string;
 }): Promise<ApplicationRecord[]> {
   const includeDrafts = options?.includeDrafts ?? false;
+  const interviewUserInternalId = options?.interviewQueueForPublicId
+    ? await resolveUserInternalId(options.interviewQueueForPublicId)
+    : null;
+
+  if (options?.interviewQueueForPublicId && !interviewUserInternalId) {
+    return [];
+  }
+
   let assignedFilter:
     | { OR: Array<{ evaluator1Id: string } | { evaluator2Id: string }> }
+    | { interviewerId: string; OR: Array<{ evaluator1ReviewStatus: "evaluated" } | { evaluator2ReviewStatus: "evaluated" }> }
     | undefined;
 
-  if (options?.assignedToEvaluatorPublicId) {
+  if (interviewUserInternalId) {
+    assignedFilter = {
+      interviewerId: interviewUserInternalId,
+      OR: [
+        { evaluator1ReviewStatus: "evaluated" },
+        { evaluator2ReviewStatus: "evaluated" },
+      ],
+    };
+  } else if (options?.assignedToEvaluatorPublicId) {
     const evaluatorId = await resolveUserInternalId(
       options.assignedToEvaluatorPublicId
     );
@@ -265,9 +292,11 @@ export async function listApplications(options?: {
     include: applicantIncludeEvaluators(),
   });
 
-  const evaluatorInternalId = options?.assignedToEvaluatorPublicId
-    ? await resolveUserInternalId(options.assignedToEvaluatorPublicId)
-    : null;
+  const evaluatorInternalId =
+    interviewUserInternalId ??
+    (options?.assignedToEvaluatorPublicId
+      ? await resolveUserInternalId(options.assignedToEvaluatorPublicId)
+      : null);
 
   return rows.map((row) => {
     const application = mapPrismaApplicant(row);
@@ -503,6 +532,153 @@ export async function assignApplicationEvaluator(
     include: applicantIncludeEvaluators(),
   });
   return mapPrismaApplicant(updated);
+}
+
+export async function assignApplicationInterviewer(
+  id: string,
+  interviewerRef: string | null
+): Promise<ApplicationRecord | null> {
+  const existing = await prisma.applicant.findFirst({
+    where: applicantWhereByRef(id),
+  });
+  if (!existing) return null;
+
+  let interviewerId: string | null = null;
+  if (interviewerRef) {
+    const interviewer = await prisma.user.findFirst({
+      where: {
+        OR: [{ id: interviewerRef }, { publicId: interviewerRef }],
+        role: { in: ["EVALUATOR", "COORDINATOR"] },
+        status: "ACTIVE",
+      },
+      select: { id: true },
+    });
+    if (!interviewer) {
+      throw new Error("Invalid or inactive interviewer");
+    }
+    interviewerId = interviewer.id;
+  }
+
+  const updated = await prisma.applicant.update({
+    where: { id: existing.id },
+    data: {
+      interviewerId,
+      updatedAt: new Date(),
+    },
+    include: applicantIncludeEvaluators(),
+  });
+  return mapPrismaApplicant(updated);
+}
+
+export async function isApplicationAssignedToInterviewer(
+  applicationRef: string,
+  interviewerPublicId: string
+): Promise<boolean> {
+  const interviewerId = await resolveUserInternalId(interviewerPublicId);
+  if (!interviewerId) return false;
+
+  const row = await prisma.applicant.findFirst({
+    where: {
+      ...applicantWhereByRef(applicationRef),
+      interviewerId,
+    },
+    select: { id: true },
+  });
+  return Boolean(row);
+}
+
+const INTERVIEW_SCORE_MIN = 0;
+
+export async function submitInterviewScore(
+  applicationRef: string,
+  interviewerPublicId: string,
+  interviewScore: number,
+  interviewEvaluationData?: InterviewEvaluationSubmission
+): Promise<ApplicationRecord | null> {
+  const scoreMaximum = interviewEvaluationData
+    ? interviewScoreMaximum(interviewEvaluationData.criteria)
+    : interviewScoreMaximum();
+
+  if (
+    !Number.isFinite(interviewScore) ||
+    interviewScore < INTERVIEW_SCORE_MIN ||
+    interviewScore > scoreMaximum
+  ) {
+    throw new Error(
+      `Interview score must be between ${INTERVIEW_SCORE_MIN} and ${scoreMaximum}`
+    );
+  }
+
+  const validatedEvaluation = interviewEvaluationData
+    ? {
+        ...interviewEvaluationData,
+        totalScore: computeTotalInterviewScore(
+          interviewEvaluationData.criterionScores,
+          interviewEvaluationData.criteria
+        ),
+        submittedAt: new Date().toISOString(),
+      }
+    : undefined;
+
+  const scoreToStore =
+    validatedEvaluation?.totalScore ?? interviewScore;
+
+  const interviewerId = await resolveUserInternalId(interviewerPublicId);
+  if (!interviewerId) {
+    throw new Error("Invalid interviewer");
+  }
+
+  const existing = await prisma.applicant.findFirst({
+    where: {
+      ...applicantWhereByRef(applicationRef),
+      interviewerId,
+    },
+  });
+  if (!existing) {
+    throw new Error("You are not assigned to interview this application");
+  }
+
+  const updated = await prisma.applicant.update({
+    where: { id: existing.id },
+    data: {
+      interviewScore: scoreToStore,
+      ...(validatedEvaluation
+        ? { interviewEvaluationData: validatedEvaluation }
+        : {}),
+      updatedAt: new Date(),
+    },
+    include: applicantIncludeEvaluators(),
+  });
+  return mapPrismaApplicant(updated);
+}
+
+export async function getInterviewScoreSummary(
+  applicationRef: string,
+  user: DashboardUser
+): Promise<InterviewScoreSummary | null> {
+  const application = await getApplication(applicationRef);
+  if (!application) return null;
+
+  if (user.role === "Evaluator") {
+    const assigned = await isApplicationAssignedToInterviewer(
+      applicationRef,
+      user.id
+    );
+    if (!assigned) return null;
+  }
+
+  const configuredCriteria = await getActiveInterviewCriteria();
+  const evaluation = application.interviewEvaluationData ?? null;
+
+  return {
+    criteria: configuredCriteria,
+    evaluation,
+    interviewScore: application.interviewScore,
+    completed:
+      evaluation != null ||
+      (application.interviewScore != null &&
+        Number.isFinite(application.interviewScore)),
+  };
 }
 
 function validateEvaluationSubmission(

@@ -12,6 +12,7 @@ import {
   isApplicationAssignedToEvaluator,
   updateApplicationStatus,
   assignApplicationEvaluator,
+  assignApplicationInterviewer,
   deleteApplication,
 } from "@/lib/applications-service";
 import { toUserFacingDatabaseError } from "@/lib/prisma-errors";
@@ -73,12 +74,18 @@ export async function PATCH(request: Request, context: RouteContext) {
       status?: ApplicationStatus;
       evaluator1Id?: string | null;
       evaluator2Id?: string | null;
+      interviewerId?: string | null;
     };
 
     const hasEvaluatorUpdate =
       body.evaluator1Id !== undefined || body.evaluator2Id !== undefined;
+    const hasInterviewerUpdate = body.interviewerId !== undefined;
 
-    if (body.status === undefined && !hasEvaluatorUpdate) {
+    if (
+      body.status === undefined &&
+      !hasEvaluatorUpdate &&
+      !hasInterviewerUpdate
+    ) {
       return NextResponse.json(
         { error: "No updates provided" },
         { status: 400 }
@@ -124,6 +131,17 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ application });
     }
 
+    if (body.interviewerId !== undefined) {
+      const application = await assignApplicationInterviewer(
+        id,
+        body.interviewerId
+      );
+      if (!application) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+      return NextResponse.json({ application });
+    }
+
     const application = await getApplication(id);
     if (!application) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -137,6 +155,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
     if (err instanceof Error && err.message.toLowerCase().includes("evaluator")) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    if (err instanceof Error && err.message.toLowerCase().includes("interviewer")) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
     console.error("PATCH /api/applications/[id]", err);

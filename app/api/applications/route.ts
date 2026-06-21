@@ -14,12 +14,17 @@ import {
 import { toUserFacingDatabaseError } from "@/lib/prisma-errors";
 import { sendApplicationConfirmationEmail } from "@/lib/send-application-confirmation-email";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await requireDashboardSessionUser();
+    const forInterview =
+      new URL(request.url).searchParams.get("forInterview") === "true";
+
     const applications = await listApplications({
+      interviewQueueForPublicId:
+        user.role === "Evaluator" && forInterview ? user.id : undefined,
       assignedToEvaluatorPublicId:
-        user.role === "Evaluator" ? user.id : undefined,
+        user.role === "Evaluator" && !forInterview ? user.id : undefined,
       includeDrafts:
         user.role === "Coordinator" || user.role === "Administrator",
     });

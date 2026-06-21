@@ -1,4 +1,5 @@
 import type { EvaluatorEvaluationSubmission } from "./evaluator-evaluation-types";
+import type { InterviewEvaluationSubmission } from "./interview-scoring-sheet";
 
 export type ApplicationStatus =
   | "draft"
@@ -133,6 +134,14 @@ export type ApplicationRecord = ApplicationPayload & {
   evaluator2Email?: string | null;
   evaluator1ReviewStatus?: EvaluatorReviewStatus;
   evaluator2ReviewStatus?: EvaluatorReviewStatus;
+  evaluator1EvaluationData?: EvaluatorEvaluationSubmission | null;
+  evaluator2EvaluationData?: EvaluatorEvaluationSubmission | null;
+  /** Assigned interviewer public id (e.g. USR-001), if any */
+  interviewerId?: string | null;
+  interviewerName?: string | null;
+  interviewerEmail?: string | null;
+  interviewScore?: number | null;
+  interviewEvaluationData?: InterviewEvaluationSubmission | null;
   /** Populated for evaluator sessions: this user's review on the application */
   myEvaluatorReviewStatus?: EvaluatorReviewStatus | null;
   /** Populated for evaluator sessions: this user's submitted evaluation scores */

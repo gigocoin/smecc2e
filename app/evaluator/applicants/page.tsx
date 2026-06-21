@@ -1,6 +1,7 @@
 import { CoordinatorApplicants } from "../../components/coordinator-applicants";
 import { EvaluatorEvaluationApplicants } from "../../components/evaluator-evaluation-applicants";
 import { EvaluatorFinalEvaluationApplicants } from "../../components/evaluator-final-evaluation-applicants";
+import { InterviewApplicants } from "../../components/interview-applicants";
 
 export const metadata = {
   title: "Applicants | Evaluator | SMECC2E",
@@ -20,6 +21,10 @@ export default async function EvaluatorApplicantsPage({
 
   if (status === "final_evaluation") {
     return <EvaluatorFinalEvaluationApplicants />;
+  }
+
+  if (status === "interview") {
+    return <InterviewApplicants />;
   }
 
   return <CoordinatorApplicants statusFromUrl={status ?? null} />;

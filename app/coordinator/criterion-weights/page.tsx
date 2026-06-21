@@ -1,7 +1,7 @@
 import { CoordinatorCriterionWeights } from "../../components/coordinator-criterion-weights";
 
 export const metadata = {
-  title: "Manage Criterion Weight | Coordinator | SMECC2E",
+  title: "Evaluation Criterion Weights | Coordinator | SMECC2E",
   description: "Configure evaluation scorecard criterion weights.",
 };
 

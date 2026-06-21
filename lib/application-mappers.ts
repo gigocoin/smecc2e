@@ -6,6 +6,8 @@ import type {
   EvaluatorReviewStatus,
 } from "./application-types";
 import { applicantPrimaryEmail } from "./application-types";
+import { parseEvaluatorEvaluationSubmission } from "./evaluator-evaluation-types";
+import { parseInterviewEvaluationSubmission } from "./interview-scoring-sheet";
 
 export function applicantEmailFromPayload(payload: ApplicationPayload): string {
   return applicantPrimaryEmail(payload).trim().toLowerCase();
@@ -125,6 +127,8 @@ export function mapPrismaApplicant(
   row: Applicant & {
     evaluator1?: Pick<User, "id" | "publicId" | "name" | "email"> | null;
     evaluator2?: Pick<User, "id" | "publicId" | "name" | "email"> | null;
+    interviewer?: Pick<User, "id" | "publicId" | "name" | "email"> | null;
+    interviewEvaluationData?: unknown;
   }
 ): ApplicationRecord {
   const submittedAt = row.submittedAt ?? row.createdAt;
@@ -142,6 +146,22 @@ export function mapPrismaApplicant(
     evaluator2Email: row.evaluator2?.email ?? null,
     evaluator1ReviewStatus: row.evaluator1ReviewStatus as EvaluatorReviewStatus,
     evaluator2ReviewStatus: row.evaluator2ReviewStatus as EvaluatorReviewStatus,
+    evaluator1EvaluationData: parseEvaluatorEvaluationSubmission(
+      row.evaluator1EvaluationData
+    ),
+    evaluator2EvaluationData: parseEvaluatorEvaluationSubmission(
+      row.evaluator2EvaluationData
+    ),
+    interviewerId: row.interviewer?.publicId ?? null,
+    interviewerName: row.interviewer?.name ?? null,
+    interviewerEmail: row.interviewer?.email ?? null,
+    interviewScore:
+      row.interviewScore != null && Number.isFinite(row.interviewScore)
+        ? row.interviewScore
+        : null,
+    interviewEvaluationData: parseInterviewEvaluationSubmission(
+      row.interviewEvaluationData
+    ),
     email: row.email,
     nationality: row.nationality,
     countryOfResidence: row.countryOfResidence,

@@ -1,4 +1,7 @@
 import { CoordinatorApplicants } from "../../components/coordinator-applicants";
+import { CoordinatorEvaluationApplicants } from "../../components/coordinator-evaluation-applicants";
+import { CoordinatorFinalEvaluationApplicants } from "../../components/coordinator-final-evaluation-applicants";
+import { InterviewApplicants } from "../../components/interview-applicants";
 
 export const metadata = {
   title: "Applicants | Coordinator | SMECC2E",
@@ -11,6 +14,18 @@ export default async function CoordinatorApplicantsPage({
   searchParams: Promise<{ status?: string }>;
 }) {
   const { status } = await searchParams;
+
+  if (status === "evaluation") {
+    return <CoordinatorEvaluationApplicants />;
+  }
+
+  if (status === "interview") {
+    return <InterviewApplicants />;
+  }
+
+  if (status === "final_evaluation") {
+    return <CoordinatorFinalEvaluationApplicants />;
+  }
 
   return <CoordinatorApplicants statusFromUrl={status ?? null} />;
 }

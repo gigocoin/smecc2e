@@ -3,7 +3,6 @@ export type ProjectManagementSection =
   | "milestones"
   | "deliverables"
   | "meetings"
-  | "minutes"
   | "capacity_building"
   | "m_and_e"
   | "risks"
@@ -25,8 +24,7 @@ export const PROJECT_MANAGEMENT_SECTION_LABELS: Record<
   tasks: "Tasks",
   milestones: "Milestones",
   deliverables: "Deliverables",
-  meetings: "Meetings",
-  minutes: "Minutes",
+  meetings: "Meetings & Minutes",
   capacity_building: "Capacity Building",
   m_and_e: "M & E",
   risks: "Risks",

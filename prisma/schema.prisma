@@ -76,6 +76,11 @@ model Applicant {
   evaluator1EvaluationData Json? @map("evaluator1_evaluation_data")
   evaluator2EvaluationData Json? @map("evaluator2_evaluation_data")
 
+  interviewerId  String? @map("interviewer_id")
+  interviewer    User?   @relation("ApplicantInterviewer", fields: [interviewerId], references: [id], onDelete: SetNull)
+  interviewScore Float?  @map("interview_score")
+  interviewEvaluationData Json? @map("interview_evaluation_data")
+
   // --- Section 2–4: Registration & personal ---
   email                   String
   nationality             String
@@ -223,6 +228,7 @@ model User {
 
   assignedApplicationsAsEvaluator1 Applicant[] @relation("ApplicantEvaluator1")
   assignedApplicationsAsEvaluator2 Applicant[] @relation("ApplicantEvaluator2")
+  assignedApplicationsAsInterviewer Applicant[] @relation("ApplicantInterviewer")
 
   @@map("users")
 }
@@ -327,6 +333,15 @@ model EvaluationRubricSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("evaluation_rubric_settings")
+}
+
+/// Coordinator-managed interview scoring criteria (single global rubric).
+model InterviewRubricSetting {
+  id        String   @id @default("default")
+  criteria  Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("interview_rubric_settings")
 }
 
 /// Published file in Communication & Knowledge → Documents.

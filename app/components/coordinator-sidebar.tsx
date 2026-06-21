@@ -7,9 +7,12 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { isDashboardNavActive, type CoordinatorNavId } from "@/lib/coordinator-nav";
 import {
   buildApplicantsManagementNav,
+  buildCriterionWeightsNav,
   EVALUATOR_APPLICANTS_MANAGEMENT_HIDDEN_IDS,
   isApplicantsManagementGroupActive,
   isApplicantsManagementSubActive,
+  isCriterionWeightsGroupActive,
+  isCriterionWeightsSubActive,
   type ApplicantsManagementNavId,
 } from "@/lib/coordinator-applicants-nav";
 import {
@@ -257,6 +260,11 @@ function ApplicantsManagementNav({
   hideIds?: ApplicantsManagementNavId[];
 }) {
   const items = buildApplicantsManagementNav(basePath, { hideIds });
+  const criterionWeightsItems = buildCriterionWeightsNav(basePath);
+  const criterionWeightsGroupActive = isCriterionWeightsGroupActive(
+    pathname,
+    basePath
+  );
   const groupActive = isApplicantsManagementGroupActive(
     items,
     pathname,
@@ -264,9 +272,11 @@ function ApplicantsManagementNav({
     basePath
   );
   const [open, setOpen] = useState(false);
+  const [criterionWeightsOpen, setCriterionWeightsOpen] = useState(false);
 
   useEffect(() => {
     setOpen(false);
+    setCriterionWeightsOpen(false);
   }, [pathname, statusParam]);
 
   return (
@@ -279,6 +289,41 @@ function ApplicantsManagementNav({
       onClose={() => setOpen(false)}
     >
       {items.map((item) => {
+        if (item.nestedMenu === "criterion_weights") {
+          return (
+            <FlyoutNestedSubmenu
+              key={item.id}
+              label={item.label}
+              groupActive={criterionWeightsGroupActive}
+              open={criterionWeightsOpen}
+              onToggle={() => setCriterionWeightsOpen((prev) => !prev)}
+              onClose={() => setCriterionWeightsOpen(false)}
+            >
+              {criterionWeightsItems.map((cwItem) => {
+                const active = isCriterionWeightsSubActive(
+                  cwItem,
+                  pathname,
+                  basePath
+                );
+                return (
+                  <FlyoutSubmenuLink
+                    key={cwItem.id}
+                    href={cwItem.href}
+                    active={active}
+                    onNavigate={() => {
+                      setCriterionWeightsOpen(false);
+                      setOpen(false);
+                      onNavigate();
+                    }}
+                  >
+                    {cwItem.label}
+                  </FlyoutSubmenuLink>
+                );
+              })}
+            </FlyoutNestedSubmenu>
+          );
+        }
+
         const active = isApplicantsManagementSubActive(
           item,
           pathname,
@@ -288,7 +333,7 @@ function ApplicantsManagementNav({
         return (
           <FlyoutSubmenuLink
             key={item.id}
-            href={item.href}
+            href={item.href!}
             active={active}
             onNavigate={() => {
               setOpen(false);

@@ -15,12 +15,22 @@ export type ApplicantsManagementNavId =
   | "rejected"
   | "pre_departure";
 
+export type CriterionWeightsNavId = "evaluation" | "interview";
+
+export type CriterionWeightsNavItem = {
+  id: CriterionWeightsNavId;
+  label: string;
+  href: string;
+};
+
 export type ApplicantsManagementNavItem = {
   id: ApplicantsManagementNavId;
   label: string;
-  href: string;
+  href?: string;
   /** When set, highlights `/applicants` with this status query. */
   statusFilter?: ApplicationStatus;
+  /** Renders a nested right flyout instead of a direct link. */
+  nestedMenu?: "criterion_weights";
 };
 
 /** Hidden from evaluator Applicants management flyout. */
@@ -51,7 +61,7 @@ export function buildApplicantsManagementNav(
     {
       id: "criterion_weights",
       label: "Manage Criterion Weight",
-      href: `${root}/criterion-weights`,
+      nestedMenu: "criterion_weights",
     },
     {
       id: "draft",
@@ -108,6 +118,47 @@ export function buildApplicantsManagementNav(
   return items.filter((item) => !hideIds.includes(item.id));
 }
 
+export function buildCriterionWeightsNav(
+  basePath: string
+): CriterionWeightsNavItem[] {
+  const root = basePath.replace(/\/$/, "");
+  return [
+    {
+      id: "evaluation",
+      label: "Evaluation Criterion weights",
+      href: `${root}/criterion-weights`,
+    },
+    {
+      id: "interview",
+      label: "Interview criterion weights",
+      href: `${root}/criterion-weights/interview`,
+    },
+  ];
+}
+
+export function isCriterionWeightsGroupActive(
+  pathname: string,
+  basePath: string
+): boolean {
+  const root = basePath.replace(/\/$/, "");
+  return (
+    pathname === `${root}/criterion-weights` ||
+    pathname.startsWith(`${root}/criterion-weights/`)
+  );
+}
+
+export function isCriterionWeightsSubActive(
+  item: CriterionWeightsNavItem,
+  pathname: string,
+  basePath: string
+): boolean {
+  const root = basePath.replace(/\/$/, "");
+  if (item.id === "evaluation") {
+    return pathname === `${root}/criterion-weights`;
+  }
+  return pathname === `${root}/criterion-weights/interview`;
+}
+
 export function isApplicantsManagementSubActive(
   item: ApplicantsManagementNavItem,
   pathname: string,
@@ -122,7 +173,7 @@ export function isApplicantsManagementSubActive(
     return pathname === `${root}/applicants` && !statusParam;
   }
   if (item.id === "criterion_weights") {
-    return pathname === `${root}/criterion-weights`;
+    return isCriterionWeightsGroupActive(pathname, basePath);
   }
   if (item.statusFilter) {
     return (

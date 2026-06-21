@@ -15,6 +15,7 @@ import {
   getApplication,
   getApplicationDocumentStorageRefs,
   isApplicationAssignedToEvaluator,
+  isApplicationAssignedToInterviewer,
 } from "@/lib/applications-service";
 import { AuthError, requireDashboardSessionUser } from "@/lib/auth-service";
 
@@ -27,11 +28,15 @@ async function authorizeDocumentAccess(application: NonNullable<
   }
   const user = await requireDashboardSessionUser();
   if (user.role === "Evaluator") {
-    const assigned = await isApplicationAssignedToEvaluator(
+    const assignedAsEvaluator = await isApplicationAssignedToEvaluator(
       application.id,
       user.id
     );
-    if (!assigned) {
+    const assignedAsInterviewer = await isApplicationAssignedToInterviewer(
+      application.id,
+      user.id
+    );
+    if (!assignedAsEvaluator && !assignedAsInterviewer) {
       throw new AuthError("Forbidden", 403);
     }
   }
