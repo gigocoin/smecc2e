@@ -669,15 +669,17 @@ export async function getInterviewScoreSummary(
 
   const configuredCriteria = await getActiveInterviewCriteria();
   const evaluation = application.interviewEvaluationData ?? null;
+  const interviewScore =
+    application.interviewScore != null &&
+    Number.isFinite(application.interviewScore)
+      ? application.interviewScore
+      : null;
 
   return {
     criteria: configuredCriteria,
     evaluation,
-    interviewScore: application.interviewScore,
-    completed:
-      evaluation != null ||
-      (application.interviewScore != null &&
-        Number.isFinite(application.interviewScore)),
+    interviewScore,
+    completed: evaluation != null || interviewScore != null,
   };
 }
 
