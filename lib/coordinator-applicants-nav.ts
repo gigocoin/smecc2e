@@ -10,6 +10,7 @@ export type ApplicantsManagementNavId =
   | "evaluation"
   | "interview"
   | "final_evaluation"
+  | "approved"
   | "offered"
   | "reserved"
   | "rejected"
@@ -86,6 +87,12 @@ export function buildApplicantsManagementNav(
       label: "Final Evaluation",
       href: `${root}/applicants?status=final_evaluation`,
       statusFilter: "final_evaluation",
+    },
+    {
+      id: "approved",
+      label: "Approved",
+      href: `${root}/applicants?status=approved`,
+      statusFilter: "approved",
     },
     {
       id: "offered",

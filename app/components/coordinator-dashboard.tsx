@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   applicantDisplayName,
   COORDINATOR_APPLICATION_STATUSES,
@@ -10,37 +10,99 @@ import {
   type ApplicationRecord,
   type ApplicationStatus,
 } from "@/lib/application-types";
+import { isApplicantEvaluatorEvaluated } from "@/lib/coordinator-evaluation";
+import { isApplicantInterviewed } from "@/lib/coordinator-interview";
 import { hostInstitutions } from "@/lib/programmes";
 import { useDashboardPortal } from "./dashboard-portal-provider";
 import { StatusBadge } from "./coordinator-shared";
 
+const COORDINATOR_PIPELINE_STATUSES: ApplicationStatus[] = [
+  "draft",
+  ...COORDINATOR_APPLICATION_STATUSES.filter((status) => status !== "pending"),
+];
+
+function pipelineStatusLabel(status: ApplicationStatus): string {
+  if (status === "draft") return "Draft applicants";
+  if (status === "under_review") return "Submitted applications";
+  if (status === "evaluation") return "Evaluated applicants";
+  if (status === "interview") return "Interviewed applicants";
+  if (status === "final_evaluation") return "Final Scores";
+  return STATUS_LABELS[status];
+}
+
+function pipelineStatusHref(
+  basePath: string,
+  status: ApplicationStatus
+): string | null {
+  if (status === "final_evaluation") {
+    return `${basePath}/applicants?status=final_evaluation`;
+  }
+  return null;
+}
+
+function pipelineStatusCount(
+  applications: ApplicationRecord[],
+  status: ApplicationStatus
+): number {
+  if (status === "evaluation") {
+    return applications.filter(isApplicantEvaluatorEvaluated).length;
+  }
+  if (status === "interview") {
+    return applications.filter(isApplicantInterviewed).length;
+  }
+  if (status === "final_evaluation") {
+    return applications.filter(isApplicantEvaluatorEvaluated).length;
+  }
+  return applications.filter((app) => app.status === status).length;
+}
+
 function StatCard({
   label,
+  subtitle,
   value,
   accent,
+  href,
 }: {
-  label: string;
+  label: ReactNode;
+  subtitle?: ReactNode;
   value: number;
-  accent?: "amber" | "sky" | "emerald" | "red";
+  accent?: "brand" | "amber" | "sky" | "emerald" | "red";
+  href?: string;
 }) {
   const accentBorder: Record<string, string> = {
+    brand: "border-t-[#062763]",
     amber: "border-t-amber-400",
     sky: "border-t-sky-400",
     emerald: "border-t-emerald-400",
     red: "border-t-red-400",
   };
-  return (
-    <div
-      className={`rounded-xl border border-slate-200 bg-white px-4 py-5 shadow-sm ${
-        accent ? `border-t-4 ${accentBorder[accent]}` : ""
-      }`}
-    >
+  const className = `rounded-xl border border-slate-200 bg-white px-4 py-5 shadow-sm ${
+    accent ? `border-t-4 ${accentBorder[accent]}` : ""
+  } ${href ? "text-left transition hover:border-[#062763]/30 hover:shadow-sm" : ""}`;
+
+  const content = (
+    <>
       <p className="text-xs font-bold uppercase tracking-wide text-slate-900">
         {label}
+        {subtitle ? (
+          <span className="mt-0.5 block normal-case tracking-normal text-slate-600">
+            {subtitle}
+          </span>
+        ) : null}
       </p>
       <p className="mt-2 text-xl font-bold text-[#062763]">{value}</p>
-    </div>
+    </>
   );
+
+  if (href) {
+    return (
+      <Link href={href} className={`block ${className}`}>
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className={className}>{content}</div>;
 }
 
 export function CoordinatorDashboard() {
@@ -163,33 +225,57 @@ export function CoordinatorDashboard() {
 
       <main className="flex-1 overflow-auto bg-slate-50 p-4 sm:p-6">
         <div className="space-y-6">
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <div
+                className={`grid gap-4 sm:grid-cols-2 ${
+                  portalKey === "evaluator" ? "" : "xl:grid-cols-4"
+                }`}
+              >
                 <StatCard
                   label={
+                    portalKey === "evaluator" ? "Assigned applicants" : "Total Applicants"
+                  }
+                  subtitle={
                     portalKey === "evaluator"
-                      ? "Assigned applicants"
-                      : "Total applicants"
+                      ? undefined
+                      : "(Submitted & Draft)"
                   }
                   value={stats.total}
+                  accent={portalKey === "evaluator" ? undefined : "brand"}
+                  href={
+                    portalKey === "evaluator"
+                      ? undefined
+                      : `${basePath}/applicants`
+                  }
                 />
+                {portalKey !== "evaluator" ? (
+                  <>
+                    <StatCard
+                      label="Offered Applicants"
+                      value={stats.byStatus.offered ?? 0}
+                      accent="sky"
+                      href={`${basePath}/applicants?status=offered`}
+                    />
+                    <StatCard
+                      label="Reserved Applicants"
+                      value={stats.byStatus.reserved ?? 0}
+                      accent="amber"
+                      href={`${basePath}/applicants?status=reserved`}
+                    />
+                  </>
+                ) : null}
                 <StatCard
                   label={
                     portalKey === "evaluator"
                       ? "Assigned scholars"
-                      : "Scholars (approved)"
+                      : "Approved Scholars"
                   }
                   value={stats.byStatus.approved ?? 0}
                   accent="emerald"
-                />
-                <StatCard
-                  label="Under review"
-                  value={stats.byStatus.under_review ?? 0}
-                  accent="sky"
-                />
-                <StatCard
-                  label="Pending"
-                  value={stats.byStatus.pending ?? 0}
-                  accent="amber"
+                  href={
+                    portalKey === "evaluator"
+                      ? undefined
+                      : `${basePath}/applicants?status=approved`
+                  }
                 />
               </div>
 
@@ -199,19 +285,22 @@ export function CoordinatorDashboard() {
                     Application pipeline
                   </h2>
                   <ul className="mt-4 space-y-3">
-                    {COORDINATOR_APPLICATION_STATUSES.map((status) => {
-                      const count = applications.filter(
-                        (a) => a.status === status
-                      ).length;
+                    {COORDINATOR_PIPELINE_STATUSES.map((status) => {
+                      const count = pipelineStatusCount(applications, status);
+                      const href = pipelineStatusHref(basePath, status);
                       const pct =
                         stats.total > 0
                           ? Math.round((count / stats.total) * 100)
                           : 0;
-                      return (
-                        <li key={status}>
+                      const row = (
+                        <>
                           <div className="flex justify-between text-sm">
-                            <span className="font-bold text-slate-900">
-                              {STATUS_LABELS[status]}
+                            <span
+                              className={`font-bold text-slate-900 ${
+                                href ? "text-[#062763] group-hover:underline" : ""
+                              }`}
+                            >
+                              {pipelineStatusLabel(status)}
                             </span>
                             <span className="font-bold text-[#062763]">
                               {count} ({pct}%)
@@ -223,6 +312,21 @@ export function CoordinatorDashboard() {
                               style={{ width: `${pct}%` }}
                             />
                           </div>
+                        </>
+                      );
+
+                      return (
+                        <li key={status}>
+                          {href ? (
+                            <Link
+                              href={href}
+                              className="group block rounded-lg px-2 py-1 -mx-2 transition hover:bg-[#062763]/5"
+                            >
+                              {row}
+                            </Link>
+                          ) : (
+                            row
+                          )}
                         </li>
                       );
                     })}

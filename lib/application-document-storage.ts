@@ -10,6 +10,9 @@ import {
 const BLOB_ACCESS = "private" as const;
 
 export function useBlobStorage(): boolean {
+  if (process.env.APPLICATION_DOCUMENT_STORAGE === "local") {
+    return false;
+  }
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 }
 
@@ -19,6 +22,23 @@ export function isProductionWithoutBlobStorage(): boolean {
 
 export function blobStorageConfigurationError(): string {
   return "Document uploads are not configured for production. Add a Vercel Blob store and set BLOB_READ_WRITE_TOKEN.";
+}
+
+export function blobStorageQuotaExceededError(): string {
+  return "Document storage is full (Vercel Blob quota reached). Free space in your Vercel Blob store, upgrade your plan, or set APPLICATION_DOCUMENT_STORAGE=local in .env for local development.";
+}
+
+export function applicationDocumentStorageErrorResponse(
+  err: unknown
+): { error: string; status: number } | null {
+  const message = err instanceof Error ? err.message : String(err);
+  if (message.includes("BLOB_READ_WRITE_TOKEN")) {
+    return { error: blobStorageConfigurationError(), status: 503 };
+  }
+  if (/quota exceeded|storage quota/i.test(message)) {
+    return { error: blobStorageQuotaExceededError(), status: 507 };
+  }
+  return null;
 }
 
 function localDocumentsDir(applicationRef: string): string {

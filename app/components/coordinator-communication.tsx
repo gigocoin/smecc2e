@@ -9,7 +9,12 @@ import {
   COMMUNICATION_KNOWLEDGE_SECTION_LABELS,
   parseCommunicationDocumentsView,
   parseCommunicationKnowledgeSection,
+  parseCommunicationMailsView,
+  COMMUNICATION_MAILS_VIEW_LABELS,
 } from "@/lib/coordinator-communication-nav";
+import { CommunicationApplicantMailsSection } from "./coordinator-communication-applicant-mails";
+import { CommunicationScholarMailsSection } from "./coordinator-communication-scholar-mails";
+import { CommunicationUserMailsSection } from "./coordinator-communication-user-mails";
 import { useDashboardPortal } from "./dashboard-portal-provider";
 import { formatDate } from "./coordinator-shared";
 
@@ -1117,10 +1122,13 @@ export function CoordinatorCommunication() {
   const documentsView = parseCommunicationDocumentsView(
     searchParams.get("view")
   );
+  const mailsView = parseCommunicationMailsView(searchParams.get("view"));
   const pageTitle =
     activeSection === "documents"
       ? COMMUNICATION_DOCUMENTS_VIEW_LABELS[documentsView]
-      : COMMUNICATION_KNOWLEDGE_SECTION_LABELS[activeSection];
+      : activeSection === "mails"
+        ? COMMUNICATION_MAILS_VIEW_LABELS[mailsView]
+        : COMMUNICATION_KNOWLEDGE_SECTION_LABELS[activeSection];
   const canUploadDocuments =
     portalKey === "coordinator" || portalKey === "administrator";
 
@@ -1144,6 +1152,12 @@ export function CoordinatorCommunication() {
           />
         ) : activeSection === "documents" ? (
           <CommunicationDocumentsSection canUpload={canUploadDocuments} />
+        ) : activeSection === "mails" && mailsView === "applicants" ? (
+          <CommunicationApplicantMailsSection canSend={canUploadDocuments} />
+        ) : activeSection === "mails" && mailsView === "scholars" ? (
+          <CommunicationScholarMailsSection canSend={canUploadDocuments} />
+        ) : activeSection === "mails" && mailsView === "users" ? (
+          <CommunicationUserMailsSection canSend={canUploadDocuments} />
         ) : (
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <p className="text-sm font-semibold text-slate-800">

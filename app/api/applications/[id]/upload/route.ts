@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApplicantOwnsApplication } from "@/lib/applicant-application-auth";
 import { ApplicantAuthError } from "@/lib/applicant-auth-service";
 import {
+  applicationDocumentStorageErrorResponse,
   blobStorageConfigurationError,
   isProductionWithoutBlobStorage,
   saveApplicationDocument,
@@ -158,10 +159,12 @@ export async function POST(
       );
     }
     console.error("POST /api/applications/[id]/upload", err);
-    const message =
-      err instanceof Error ? err.message : "Failed to upload document";
-    if (message.includes("BLOB_READ_WRITE_TOKEN")) {
-      return NextResponse.json({ error: blobStorageConfigurationError() }, { status: 503 });
+    const storageError = applicationDocumentStorageErrorResponse(err);
+    if (storageError) {
+      return NextResponse.json(
+        { error: storageError.error },
+        { status: storageError.status }
+      );
     }
     return NextResponse.json({ error: "Failed to upload document" }, { status: 500 });
   }

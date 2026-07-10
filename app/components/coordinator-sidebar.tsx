@@ -23,10 +23,13 @@ import {
 import {
   buildCommunicationDocumentsNav,
   buildCommunicationKnowledgeNav,
+  buildCommunicationMailsNav,
   isCommunicationDocumentsGroupActive,
   isCommunicationDocumentsSubActive,
   isCommunicationKnowledgeGroupActive,
   isCommunicationKnowledgeSubActive,
+  isCommunicationMailsGroupActive,
+  isCommunicationMailsSubActive,
 } from "@/lib/coordinator-communication-nav";
 import {
   buildProjectManagementNav,
@@ -692,16 +695,19 @@ function CommunicationKnowledgeNav({
   pathname,
   sectionParam,
   documentsViewParam,
+  mailsViewParam,
   onNavigate,
 }: {
   basePath: string;
   pathname: string;
   sectionParam: string | null;
   documentsViewParam: string | null;
+  mailsViewParam: string | null;
   onNavigate: () => void;
 }) {
   const items = buildCommunicationKnowledgeNav(basePath);
   const documentsItems = buildCommunicationDocumentsNav(basePath);
+  const mailsItems = buildCommunicationMailsNav(basePath);
   const groupActive = isCommunicationKnowledgeGroupActive(
     items,
     pathname,
@@ -713,13 +719,20 @@ function CommunicationKnowledgeNav({
     sectionParam,
     basePath
   );
+  const mailsGroupActive = isCommunicationMailsGroupActive(
+    pathname,
+    sectionParam,
+    basePath
+  );
   const [open, setOpen] = useState(false);
   const [documentsOpen, setDocumentsOpen] = useState(false);
+  const [mailsOpen, setMailsOpen] = useState(false);
 
   useEffect(() => {
     setOpen(false);
     setDocumentsOpen(false);
-  }, [pathname, sectionParam, documentsViewParam]);
+    setMailsOpen(false);
+  }, [pathname, sectionParam, documentsViewParam, mailsViewParam]);
 
   return (
     <SidebarFlyoutSubmenu
@@ -761,6 +774,43 @@ function CommunicationKnowledgeNav({
                     }}
                   >
                     {docItem.label}
+                  </FlyoutSubmenuLink>
+                );
+              })}
+            </FlyoutNestedSubmenu>
+          );
+        }
+
+        if (item.section === "mails") {
+          return (
+            <FlyoutNestedSubmenu
+              key={item.id}
+              label={item.label}
+              groupActive={mailsGroupActive}
+              open={mailsOpen}
+              onToggle={() => setMailsOpen((prev) => !prev)}
+              onClose={() => setMailsOpen(false)}
+            >
+              {mailsItems.map((mailItem) => {
+                const active = isCommunicationMailsSubActive(
+                  mailItem,
+                  pathname,
+                  sectionParam,
+                  mailsViewParam,
+                  basePath
+                );
+                return (
+                  <FlyoutSubmenuLink
+                    key={mailItem.id}
+                    href={mailItem.href}
+                    active={active}
+                    onNavigate={() => {
+                      setMailsOpen(false);
+                      setOpen(false);
+                      onNavigate();
+                    }}
+                  >
+                    {mailItem.label}
                   </FlyoutSubmenuLink>
                 );
               })}
@@ -850,6 +900,12 @@ export function CoordinatorSidebar({
     communicationSectionParam === "documents"
       ? searchParams.get("view")
       : null;
+  const mailsViewParam =
+    isHydrated &&
+    pathname.includes("/communication") &&
+    communicationSectionParam === "mails"
+      ? searchParams.get("view")
+      : null;
 
   const close = () => {
     setSidebarOpen(false);
@@ -922,6 +978,7 @@ export function CoordinatorSidebar({
                     pathname={pathname}
                     sectionParam={communicationSectionParam}
                     documentsViewParam={documentsViewParam}
+                    mailsViewParam={mailsViewParam}
                     onNavigate={close}
                   />
                 </div>
@@ -983,6 +1040,7 @@ export function CoordinatorSidebar({
                       pathname={pathname}
                       sectionParam={communicationSectionParam}
                       documentsViewParam={documentsViewParam}
+                      mailsViewParam={mailsViewParam}
                       onNavigate={close}
                     />
                   </div>

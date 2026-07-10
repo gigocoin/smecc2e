@@ -1,5 +1,6 @@
 export type CommunicationKnowledgeSection =
   | "announcements"
+  | "mails"
   | "newsletters"
   | "workshops"
   | "conferences"
@@ -7,6 +8,8 @@ export type CommunicationKnowledgeSection =
   | "documents";
 
 export type CommunicationDocumentsView = "upload" | "categories";
+
+export type CommunicationMailsView = "applicants" | "scholars" | "users";
 
 export type CommunicationKnowledgeNavId = CommunicationKnowledgeSection;
 
@@ -24,11 +27,19 @@ export type CommunicationDocumentsNavItem = {
   view: CommunicationDocumentsView;
 };
 
+export type CommunicationMailsNavItem = {
+  id: CommunicationMailsView;
+  label: string;
+  href: string;
+  view: CommunicationMailsView;
+};
+
 export const COMMUNICATION_KNOWLEDGE_SECTION_LABELS: Record<
   CommunicationKnowledgeSection,
   string
 > = {
   announcements: "Announcements",
+  mails: "Mails",
   newsletters: "Newsletters",
   workshops: "Workshops",
   conferences: "Conferences",
@@ -42,6 +53,15 @@ export const COMMUNICATION_DOCUMENTS_VIEW_LABELS: Record<
 > = {
   upload: "View/Upload Documents",
   categories: "Manage Document Category",
+};
+
+export const COMMUNICATION_MAILS_VIEW_LABELS: Record<
+  CommunicationMailsView,
+  string
+> = {
+  applicants: "Applicants",
+  scholars: "Scholars",
+  users: "Users (Team Members)",
 };
 
 export function buildCommunicationKnowledgeNav(
@@ -87,10 +107,46 @@ export function buildCommunicationDocumentsNav(
   ];
 }
 
+export function buildCommunicationMailsNav(
+  basePath: string
+): CommunicationMailsNavItem[] {
+  const root = basePath.replace(/\/$/, "");
+  const base = `${root}/communication?section=mails`;
+
+  return [
+    {
+      id: "applicants",
+      label: COMMUNICATION_MAILS_VIEW_LABELS.applicants,
+      href: base,
+      view: "applicants",
+    },
+    {
+      id: "scholars",
+      label: COMMUNICATION_MAILS_VIEW_LABELS.scholars,
+      href: `${base}&view=scholars`,
+      view: "scholars",
+    },
+    {
+      id: "users",
+      label: COMMUNICATION_MAILS_VIEW_LABELS.users,
+      href: `${base}&view=users`,
+      view: "users",
+    },
+  ];
+}
+
 export function parseCommunicationDocumentsView(
   viewParam: string | null
 ): CommunicationDocumentsView {
   return viewParam === "categories" ? "categories" : "upload";
+}
+
+export function parseCommunicationMailsView(
+  viewParam: string | null
+): CommunicationMailsView {
+  if (viewParam === "scholars") return "scholars";
+  if (viewParam === "users") return "users";
+  return "applicants";
 }
 
 export function parseCommunicationKnowledgeSection(
@@ -154,4 +210,29 @@ export function isCommunicationDocumentsSubActive(
     return viewParam === "categories";
   }
   return viewParam !== "categories";
+}
+
+export function isCommunicationMailsGroupActive(
+  pathname: string,
+  sectionParam: string | null,
+  basePath: string
+): boolean {
+  const root = basePath.replace(/\/$/, "");
+  return pathname === `${root}/communication` && sectionParam === "mails";
+}
+
+export function isCommunicationMailsSubActive(
+  item: CommunicationMailsNavItem,
+  pathname: string,
+  sectionParam: string | null,
+  viewParam: string | null,
+  basePath: string
+): boolean {
+  if (!isCommunicationMailsGroupActive(pathname, sectionParam, basePath)) {
+    return false;
+  }
+  if (item.view === "applicants") {
+    return !viewParam || viewParam === "applicants";
+  }
+  return viewParam === item.view;
 }
