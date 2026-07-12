@@ -8,7 +8,6 @@ import {
 import { applicationDocumentUrl } from "@/lib/application-documents";
 import {
   INTERVIEW_RAW_SCORE_MAX,
-  applicantHomeInstitution,
   computeTotalInterviewScore,
   computeWeightedInterviewScore,
   formatInterviewScore,
@@ -192,8 +191,9 @@ export function InterviewModal({
   );
   const [interviewFormat, setInterviewFormat] =
     useState<InterviewFormat>("Online");
-  const [interviewerSignature, setInterviewerSignature] = useState("");
+  const [panelMemberNames, setPanelMemberNames] = useState<string[]>([""]);
   const [interviewDate, setInterviewDate] = useState("");
+  const [otherComments, setOtherComments] = useState("");
   const [interviewerName, setInterviewerName] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -226,8 +226,9 @@ export function InterviewModal({
             mergeInterviewCriterionScores(undefined, DEFAULT_INTERVIEW_CRITERIA)
           );
           setInterviewFormat("Online");
-          setInterviewerSignature("");
+          setPanelMemberNames([""]);
           setInterviewDate(formatDisplayDate(new Date()));
+          setOtherComments("");
           return;
         }
 
@@ -244,14 +245,25 @@ export function InterviewModal({
 
         if (existing) {
           setInterviewFormat(existing.interviewFormat);
-          setInterviewerSignature(existing.interviewerSignature);
+          const names =
+            existing.panelMemberNames && existing.panelMemberNames.length > 0
+              ? existing.panelMemberNames
+              : existing.interviewerSignature.trim()
+                ? existing.interviewerSignature
+                    .split(/\r?\n|;|\|/)
+                    .map((name) => name.trim())
+                    .filter(Boolean)
+                : [];
+          setPanelMemberNames(names.length > 0 ? names : [""]);
           setInterviewDate(
             existing.interviewDate || formatDisplayDate(new Date())
           );
+          setOtherComments(existing.otherComments ?? "");
         } else {
           setInterviewFormat("Online");
-          setInterviewerSignature("");
+          setPanelMemberNames([""]);
           setInterviewDate(formatDisplayDate(new Date()));
+          setOtherComments("");
         }
       })
       .catch(() => {
@@ -262,8 +274,9 @@ export function InterviewModal({
           mergeInterviewCriterionScores(undefined, DEFAULT_INTERVIEW_CRITERIA)
         );
         setInterviewFormat("Online");
-        setInterviewerSignature("");
+        setPanelMemberNames([""]);
         setInterviewDate(formatDisplayDate(new Date()));
+        setOtherComments("");
       })
       .finally(() => {
         if (!cancelled) setCriteriaLoading(false);
@@ -275,7 +288,6 @@ export function InterviewModal({
         const data = (await res.json()) as { user?: { name: string } };
         if (data.user?.name) {
           setInterviewerName(data.user.name);
-          setInterviewerSignature((current) => current || data.user!.name);
         }
       })
       .catch(() => undefined);
@@ -303,15 +315,37 @@ export function InterviewModal({
     }));
   };
 
+  const handlePanelMemberNameChange = (index: number, value: string) => {
+    setPanelMemberNames((prev) =>
+      prev.map((name, i) => (i === index ? value : name))
+    );
+  };
+
+  const handleAddPanelMember = () => {
+    setPanelMemberNames((prev) => [...prev, ""]);
+  };
+
+  const handleRemovePanelMember = (index: number) => {
+    setPanelMemberNames((prev) => {
+      if (prev.length <= 1) return [""];
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
   const handleSubmit = async () => {
     setSubmitError(null);
+    const cleanedNames = panelMemberNames
+      .map((name) => name.trim())
+      .filter(Boolean);
     const submission: InterviewEvaluationSubmission = {
       criterionScores: { ...criterionScores },
       criteria,
       totalScore,
       interviewFormat,
-      interviewerSignature: interviewerSignature.trim(),
+      panelMemberNames: cleanedNames,
+      interviewerSignature: cleanedNames.join("\n"),
       interviewDate,
+      otherComments: otherComments.trim(),
       submittedAt: new Date().toISOString(),
     };
     const ok = await onSubmit(submission);
@@ -403,14 +437,14 @@ export function InterviewModal({
                       value={application.preferredHostInstitution || "—"}
                     />
                     <InfoCell
-                      label="Interviewer Name:"
+                      label="Chairperson of the Interview Panel:"
                       value={
                         interviewerName || application.interviewerName || "—"
                       }
                     />
                     <InfoCell
-                      label="Home Institution:"
-                      value={applicantHomeInstitution(application)}
+                      label="Proposed Course of Study:"
+                      value={application.proposedAcademicProgramme || "—"}
                     />
                     <InfoCell label="Date of Interview:" value={interviewDate} />
                     <InfoCell label="Interview Format (Online / In-person):">
@@ -452,20 +486,76 @@ export function InterviewModal({
 
                 <div className="mt-4 grid grid-cols-1 gap-0 border border-black sm:grid-cols-2">
                   <div className="border-b border-black bg-[#dce6f1] p-2 sm:border-b-0 sm:border-r">
-                    <label
-                      htmlFor="interviewer-signature"
-                      className="text-xs font-bold text-black"
-                    >
-                      Interviewer Full Name:
-                    </label>
-                    <input
-                      id="interviewer-signature"
-                      type="text"
-                      value={interviewerSignature}
-                      disabled={submitting}
-                      onChange={(e) => setInterviewerSignature(e.target.value)}
-                      className="mt-2 min-h-16 w-full rounded border border-slate-400 bg-white px-2 py-2 text-xs font-semibold text-black outline-none focus:border-[#062763] disabled:opacity-50"
-                    />
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-xs font-bold text-black">
+                        Names of Other Panel Members:
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleAddPanelMember}
+                        disabled={submitting}
+                        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded border border-[#062763]/30 bg-white text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
+                        aria-label="Add panel member"
+                        title="Add panel member"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2.5}
+                          aria-hidden
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M12 5v14M5 12h14"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="mt-2 space-y-2">
+                      {panelMemberNames.map((name, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <input
+                            id={`panel-member-${index}`}
+                            type="text"
+                            value={name}
+                            disabled={submitting}
+                            onChange={(e) =>
+                              handlePanelMemberNameChange(index, e.target.value)
+                            }
+                            placeholder={`Panel member ${index + 1}`}
+                            className="min-h-10 w-full rounded border border-slate-400 bg-white px-2 py-2 text-xs font-semibold text-black outline-none focus:border-[#062763] disabled:opacity-50"
+                          />
+                          {panelMemberNames.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePanelMember(index)}
+                              disabled={submitting}
+                              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-red-200 bg-white text-red-700 transition hover:bg-red-50 disabled:opacity-50"
+                              aria-label={`Remove panel member ${index + 1}`}
+                              title="Remove"
+                            >
+                              <svg
+                                className="h-4 w-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2.5}
+                                aria-hidden
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M6 18L18 6M6 6l12 12"
+                                />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   <div className="bg-[#dce6f1] p-2">
                     <label
@@ -483,6 +573,24 @@ export function InterviewModal({
                       className="mt-2 min-h-16 w-full rounded border border-slate-400 bg-white px-2 py-2 text-xs font-semibold text-black outline-none focus:border-[#062763] disabled:opacity-50"
                     />
                   </div>
+                </div>
+
+                <div className="mt-4 border border-black bg-[#dce6f1] p-2">
+                  <label
+                    htmlFor="interview-other-comments"
+                    className="text-xs font-bold text-black"
+                  >
+                    Other Comments:
+                  </label>
+                  <textarea
+                    id="interview-other-comments"
+                    rows={4}
+                    value={otherComments}
+                    disabled={submitting}
+                    onChange={(e) => setOtherComments(e.target.value)}
+                    placeholder="Enter any additional comments from the interview panel"
+                    className="mt-2 w-full rounded border border-slate-400 bg-white px-2 py-2 text-xs font-semibold text-black outline-none focus:border-[#062763] disabled:opacity-50"
+                  />
                 </div>
 
                 {submitError && (

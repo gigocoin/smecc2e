@@ -212,6 +212,12 @@ function ApplicantLoginFormContent() {
           Begin your application
         </Link>
       </p>
+      <p className="mt-3 text-center text-sm text-slate-600">
+        Staff or coordinator?{" "}
+        <Link href="/login" className="font-semibold text-[#062763] hover:underline">
+          Admin login
+        </Link>
+      </p>
     </div>
   );
 }

@@ -34,6 +34,7 @@ import {
   computeTotalInterviewScore,
   interviewScoreMaximum,
 } from "./interview-scoring-sheet";
+import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 
 export class DuplicateApplicationError extends Error {
@@ -548,7 +549,7 @@ export async function assignApplicationInterviewer(
     const interviewer = await prisma.user.findFirst({
       where: {
         OR: [{ id: interviewerRef }, { publicId: interviewerRef }],
-        role: { in: ["EVALUATOR", "COORDINATOR"] },
+        role: { in: ["EVALUATOR", "COORDINATOR", "ADMINISTRATOR"] },
         status: "ACTIVE",
       },
       select: { id: true },
@@ -593,7 +594,8 @@ export async function submitInterviewScore(
   applicationRef: string,
   interviewerPublicId: string,
   interviewScore: number,
-  interviewEvaluationData?: InterviewEvaluationSubmission
+  interviewEvaluationData?: InterviewEvaluationSubmission,
+  options?: { bypassAssignmentCheck?: boolean }
 ): Promise<ApplicationRecord | null> {
   const scoreMaximum = interviewEvaluationData
     ? interviewScoreMaximum(interviewEvaluationData.criteria)
@@ -631,11 +633,15 @@ export async function submitInterviewScore(
   const existing = await prisma.applicant.findFirst({
     where: {
       ...applicantWhereByRef(applicationRef),
-      interviewerId,
+      ...(options?.bypassAssignmentCheck ? {} : { interviewerId }),
     },
   });
   if (!existing) {
-    throw new Error("You are not assigned to interview this application");
+    throw new Error(
+      options?.bypassAssignmentCheck
+        ? "Application not found"
+        : "You are not assigned to interview this application"
+    );
   }
 
   const updated = await prisma.applicant.update({
@@ -645,6 +651,30 @@ export async function submitInterviewScore(
       ...(validatedEvaluation
         ? { interviewEvaluationData: validatedEvaluation }
         : {}),
+      ...(options?.bypassAssignmentCheck
+        ? { interviewerId }
+        : {}),
+      updatedAt: new Date(),
+    },
+    include: applicantIncludeEvaluators(),
+  });
+  return mapPrismaApplicant(updated);
+}
+
+/** Clears interview score and evaluation data so the interview can be redone. */
+export async function resetApplicationInterview(
+  id: string
+): Promise<ApplicationRecord | null> {
+  const existing = await prisma.applicant.findFirst({
+    where: applicantWhereByRef(id),
+  });
+  if (!existing) return null;
+
+  const updated = await prisma.applicant.update({
+    where: { id: existing.id },
+    data: {
+      interviewScore: null,
+      interviewEvaluationData: Prisma.DbNull,
       updatedAt: new Date(),
     },
     include: applicantIncludeEvaluators(),

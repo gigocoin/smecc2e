@@ -8,10 +8,17 @@ import type { DashboardUser } from "@/lib/dashboard-users";
 const actionBtnClass =
   "rounded-lg border-2 px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50";
 
+const DEFAULT_INTERVIEWER_ROLES: DashboardUser["role"][] = [
+  "Evaluator",
+  "Coordinator",
+];
+
 export function AssignInterviewerControl({
   application,
   assigning,
   onAssign,
+  allowedRoles = DEFAULT_INTERVIEWER_ROLES,
+  showAssignedName = true,
 }: {
   application: ApplicationRecord;
   assigning: boolean;
@@ -19,6 +26,10 @@ export function AssignInterviewerControl({
     applicationId: string,
     interviewerId: string | null
   ) => void | Promise<boolean>;
+  /** Roles available in the assign interviewer menu. */
+  allowedRoles?: DashboardUser["role"][];
+  /** Show the currently assigned interviewer name above the action button. */
+  showAssignedName?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [users, setUsers] = useState<DashboardUser[]>([]);
@@ -42,10 +53,9 @@ export function AssignInterviewerControl({
     () =>
       users.filter(
         (user) =>
-          user.status === "Active" &&
-          (user.role === "Evaluator" || user.role === "Coordinator")
+          user.status === "Active" && allowedRoles.includes(user.role)
       ),
-    [users]
+    [users, allowedRoles]
   );
 
   const loadUsers = useCallback(async () => {
@@ -94,17 +104,28 @@ export function AssignInterviewerControl({
     }
   };
 
+  const emptyRolesLabel =
+    allowedRoles.length === 1 && allowedRoles[0] === "Administrator"
+      ? "No active administrators found."
+      : "No active users found for interviewer assignment.";
+
   return (
     <>
-      <div className="text-right">
-        {assignedId && (
+      <div
+        className={
+          showAssignedName && assignedId
+            ? "inline-flex flex-col items-end"
+            : "contents"
+        }
+      >
+        {showAssignedName && assignedId && (
           <p className="mb-1 text-xs font-semibold text-slate-700">
             {application.interviewerName ?? assignedId}
           </p>
         )}
         {interviewed ? (
           <span
-            className={`inline-block ${actionButtonClass}`}
+            className={`inline-block whitespace-nowrap ${actionButtonClass}`}
             aria-label="Interview completed"
           >
             {actionLabel}
@@ -114,7 +135,7 @@ export function AssignInterviewerControl({
             type="button"
             onClick={() => setOpen(true)}
             disabled={assigning}
-            className={actionButtonClass}
+            className={`whitespace-nowrap ${actionButtonClass}`}
           >
             {actionLabel}
           </button>
@@ -171,7 +192,7 @@ export function AssignInterviewerControl({
               )}
               {!loadingUsers && interviewers.length === 0 && (
                 <p className="mt-2 text-xs font-semibold text-amber-800">
-                  No active coordinators or evaluators found.
+                  {emptyRolesLabel}
                 </p>
               )}
               {loadError && (

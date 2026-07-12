@@ -1,4 +1,5 @@
 import { CoordinatorApplicants } from "../../components/coordinator-applicants";
+import { CoordinatorEvaluationApplicants } from "../../components/coordinator-evaluation-applicants";
 import { CoordinatorFinalEvaluationApplicants } from "../../components/coordinator-final-evaluation-applicants";
 import { InterviewApplicants } from "../../components/interview-applicants";
 
@@ -13,6 +14,10 @@ export default async function AdministratorApplicantsPage({
   searchParams: Promise<{ status?: string }>;
 }) {
   const { status } = await searchParams;
+
+  if (status === "evaluation") {
+    return <CoordinatorEvaluationApplicants />;
+  }
 
   if (status === "interview") {
     return <InterviewApplicants />;

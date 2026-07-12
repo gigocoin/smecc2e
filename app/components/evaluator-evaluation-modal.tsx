@@ -174,6 +174,9 @@ export function EvaluatorEvaluationModal({
           </h2>
           <p className="mt-1 text-sm font-medium text-white/90">
             {application.id} · {applicantDisplayName(application) || "Applicant"}
+            {application.typeOfMobility?.trim()
+              ? ` · ${application.typeOfMobility.trim()}`
+              : ""}
           </p>
           <p className="mt-1 text-xs font-medium text-[#f7be2a]">
             Review applicant details on the left and score each criterion (0–

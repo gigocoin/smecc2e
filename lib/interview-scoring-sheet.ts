@@ -14,8 +14,13 @@ export type InterviewEvaluationSubmission = {
   criteria: InterviewCriterion[];
   totalScore: number;
   interviewFormat: InterviewFormat;
+  /** Joined panel member names (legacy + display). */
   interviewerSignature: string;
+  /** Individual other panel member names. */
+  panelMemberNames?: string[];
   interviewDate: string;
+  /** Free-text comments from the interview panel. */
+  otherComments?: string;
   submittedAt: string;
 };
 
@@ -121,17 +126,37 @@ export function parseInterviewEvaluationSubmission(
   const interviewFormat =
     record.interviewFormat === "In-person" ? "In-person" : "Online";
 
+  const interviewerSignature =
+    typeof record.interviewerSignature === "string"
+      ? record.interviewerSignature
+      : "";
+
+  let panelMemberNames: string[] | undefined;
+  if (Array.isArray(record.panelMemberNames)) {
+    panelMemberNames = record.panelMemberNames
+      .filter((name): name is string => typeof name === "string")
+      .map((name) => name.trim())
+      .filter(Boolean);
+  } else if (interviewerSignature.trim()) {
+    panelMemberNames = interviewerSignature
+      .split(/\r?\n|;|\|/)
+      .map((name) => name.trim())
+      .filter(Boolean);
+  }
+
   return {
     criterionScores,
     criteria,
     totalScore,
     interviewFormat,
-    interviewerSignature:
-      typeof record.interviewerSignature === "string"
-        ? record.interviewerSignature
-        : "",
+    interviewerSignature,
+    ...(panelMemberNames && panelMemberNames.length > 0
+      ? { panelMemberNames }
+      : {}),
     interviewDate:
       typeof record.interviewDate === "string" ? record.interviewDate : "",
+    otherComments:
+      typeof record.otherComments === "string" ? record.otherComments : "",
     submittedAt:
       typeof record.submittedAt === "string"
         ? record.submittedAt

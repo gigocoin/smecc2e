@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   applicantDisplayName,
   applicantPrimaryEmail,
@@ -9,6 +10,10 @@ import {
   type ApplicationRecord,
   type ApplicationStatus,
 } from "@/lib/application-types";
+import {
+  downloadApplicationsExcel,
+  downloadApplicationsPdf,
+} from "@/lib/application-export";
 import {
   buildApplicantsManagementNav,
   type ApplicantsManagementNavItem,
@@ -22,6 +27,12 @@ import {
 
 const actionBtnClass =
   "rounded-lg border-2 px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50";
+
+/** Status options shown in the /applicants header filter. */
+const APPLICANTS_STATUS_FILTER_OPTIONS: ApplicationStatus[] = [
+  "draft",
+  "under_review",
+];
 
 function applicantsPageTitle(
   statusFilter: ApplicationStatus | "all",
@@ -58,6 +69,7 @@ export function CoordinatorApplicants({
 }: {
   statusFromUrl?: string | null;
 }) {
+  const router = useRouter();
   const { basePath, portalKey } = useDashboardPortal();
   const showAssignEvaluator = portalKey === "coordinator";
   const canDeleteApplications = portalKey === "coordinator";
@@ -70,6 +82,7 @@ export function CoordinatorApplicants({
     () => buildApplicantsManagementNav(basePath),
     [basePath]
   );
+  const downloadMenuRef = useRef<HTMLDivElement>(null);
 
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,6 +92,7 @@ export function CoordinatorApplicants({
     () => statusFilterFromParam(statusFromUrl)
   );
   const [mobilityFilter, setMobilityFilter] = useState("all");
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const [assigningEvaluatorSlot, setAssigningEvaluatorSlot] = useState<
     1 | 2 | null
   >(null);
@@ -109,6 +123,29 @@ export function CoordinatorApplicants({
     setStatusFilter(statusFilterFromParam(statusFromUrl));
   }, [statusFromUrl]);
 
+  useEffect(() => {
+    if (!downloadMenuOpen) return;
+
+    const onPointerDown = (event: MouseEvent) => {
+      if (
+        downloadMenuRef.current &&
+        !downloadMenuRef.current.contains(event.target as Node)
+      ) {
+        setDownloadMenuOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDownloadMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [downloadMenuOpen]);
+
   const pageTitle = applicantsPageTitle(statusFilter, managementNav);
 
   const mobilityOptions = useMemo(() => {
@@ -138,6 +175,25 @@ export function CoordinatorApplicants({
       return haystack.includes(q);
     });
   }, [applications, search, statusFilter, mobilityFilter]);
+
+  const handleStatusFilterChange = (value: string) => {
+    if (value === "all") {
+      router.push(`${basePath}/applicants`);
+      return;
+    }
+    if (isApplicationStatus(value)) {
+      router.push(`${basePath}/applicants?status=${value}`);
+    }
+  };
+
+  const handleDownload = (format: "excel" | "pdf") => {
+    setDownloadMenuOpen(false);
+    if (format === "excel") {
+      downloadApplicationsExcel(filteredApplicants);
+      return;
+    }
+    downloadApplicationsPdf(filteredApplicants);
+  };
 
   const handleAssignEvaluator = async (
     id: string,
@@ -209,14 +265,89 @@ export function CoordinatorApplicants({
             {pageSubtitle}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={loadApplications}
-          disabled={loading}
-          className="shrink-0 rounded-lg border-2 border-[#062763]/25 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
-        >
-          {loading ? "Refreshing…" : "Refresh"}
-        </button>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <label className="sr-only" htmlFor="applicants-status-filter">
+            Filter status
+          </label>
+          <select
+            id="applicants-status-filter"
+            value={statusFilter}
+            onChange={(e) => handleStatusFilterChange(e.target.value)}
+            className="rounded-lg border-2 border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-[#062763] outline-none focus:border-[#062763] focus:ring-2 focus:ring-[#062763]/15"
+          >
+            <option value="all">All statuses</option>
+            {APPLICANTS_STATUS_FILTER_OPTIONS.map((status) => (
+              <option key={status} value={status}>
+                {STATUS_LABELS[status]}
+              </option>
+            ))}
+            {statusFilter !== "all" &&
+            !APPLICANTS_STATUS_FILTER_OPTIONS.includes(statusFilter) ? (
+              <option value={statusFilter}>
+                {STATUS_LABELS[statusFilter]}
+              </option>
+            ) : null}
+          </select>
+
+          <div ref={downloadMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setDownloadMenuOpen((open) => !open)}
+              aria-expanded={downloadMenuOpen}
+              aria-haspopup="menu"
+              className="inline-flex items-center gap-1.5 rounded-lg border-2 border-[#062763]/25 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5"
+            >
+              Download Applications
+              <svg
+                className={`h-4 w-4 transition ${downloadMenuOpen ? "rotate-180" : ""}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
+            {downloadMenuOpen && (
+              <div
+                role="menu"
+                aria-label="Download applications"
+                className="absolute right-0 z-40 mt-2 min-w-40 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => handleDownload("excel")}
+                  className="block w-full px-4 py-2.5 text-left text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5"
+                >
+                  Excel
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => handleDownload("pdf")}
+                  className="block w-full px-4 py-2.5 text-left text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5"
+                >
+                  PDF
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={loadApplications}
+            disabled={loading}
+            className="rounded-lg border-2 border-[#062763]/25 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
+          >
+            {loading ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 overflow-auto bg-slate-50 p-4 sm:p-6">

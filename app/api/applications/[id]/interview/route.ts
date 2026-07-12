@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import type { InterviewEvaluationSubmission } from "@/lib/interview-scoring-sheet";
-import { AuthError, requireDashboardSessionUser } from "@/lib/auth-service";
+import {
+  AuthError,
+  requireCoordinatorOrAdministratorSessionUser,
+  requireDashboardSessionUser,
+} from "@/lib/auth-service";
 import {
   getInterviewScoreSummary,
+  resetApplicationInterview,
   submitInterviewScore,
 } from "@/lib/applications-service";
 import { toUserFacingDatabaseError } from "@/lib/prisma-errors";
@@ -45,16 +50,26 @@ export async function GET(_request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const user = await requireDashboardSessionUser();
-    if (user.role !== "Evaluator") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const { id } = await context.params;
     const body = (await request.json()) as {
+      reset?: boolean;
       interviewScore?: number;
       interviewEvaluationData?: InterviewEvaluationSubmission;
     };
+
+    if (body.reset === true) {
+      await requireCoordinatorOrAdministratorSessionUser();
+      const application = await resetApplicationInterview(id);
+      if (!application) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+      return NextResponse.json({ application });
+    }
+
+    const user = await requireDashboardSessionUser();
+    if (user.role !== "Evaluator" && user.role !== "Administrator") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     if (body.interviewScore === undefined) {
       return NextResponse.json(
@@ -67,7 +82,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       id,
       user.id,
       body.interviewScore,
-      body.interviewEvaluationData
+      body.interviewEvaluationData,
+      { bypassAssignmentCheck: user.role === "Administrator" }
     );
     if (!application) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });

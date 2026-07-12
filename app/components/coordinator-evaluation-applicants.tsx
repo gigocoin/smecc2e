@@ -13,6 +13,26 @@ import { formatInterviewScore } from "@/lib/interview-scoring-sheet";
 import { formatEvaluationScore } from "@/lib/evaluator-evaluation-types";
 import { AssignInterviewerControl } from "@/app/components/assign-interviewer-control";
 
+const EVALUATION_WEIGHT = 0.7;
+const INTERVIEW_WEIGHT = 0.3;
+
+function weightedEvaluationAverage(
+  averageGrandTotal: number | undefined
+): number | null {
+  if (averageGrandTotal === undefined || !Number.isFinite(averageGrandTotal)) {
+    return null;
+  }
+  return averageGrandTotal * EVALUATION_WEIGHT;
+}
+
+function weightedInterviewScore(
+  interviewScore: number | null | undefined
+): number | null {
+  if (interviewScore === null || interviewScore === undefined) return null;
+  if (!Number.isFinite(interviewScore)) return null;
+  return interviewScore * INTERVIEW_WEIGHT;
+}
+
 export function CoordinatorEvaluationApplicants() {
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,22 +157,31 @@ export function CoordinatorEvaluationApplicants() {
               Evaluated applicants ({evaluatedApplicants.length})
             </h2>
             <p className="mt-1 text-xs font-semibold text-slate-700">
-              Applicants with at least one completed evaluator scorecard. Totals
-              are averaged when both evaluators have submitted.
+              All applicants with at least one completed evaluator scorecard.
+              Evaluation average is weighted at 70%; interview score at 30%.
+              Assign an administrator as interviewer when ready.
             </p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="w-full min-w-[1100px] text-left text-sm">
               <thead className="bg-[#e8f0ff] text-xs font-bold uppercase tracking-wide text-[#062763]">
                 <tr>
                   <th className="px-4 py-3">Application No</th>
                   <th className="px-4 py-3">Applicant Name</th>
                   <th className="px-4 py-3">Mobility Type</th>
-                  <th className="px-4 py-3">Evaluator 1</th>
-                  <th className="px-4 py-3">Evaluator 2</th>
-                  <th className="px-4 py-3 text-center">Avg Total</th>
-                  <th className="px-4 py-3 text-center">Interview Score</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3 text-center">
+                    Evaluator 1 Score (100%)
+                  </th>
+                  <th className="px-4 py-3 text-center">
+                    Evaluator 2 Score (100%)
+                  </th>
+                  <th className="px-4 py-3 text-center">
+                    Evaluation Ave Score × 0.70
+                  </th>
+                  <th className="px-4 py-3 text-center">
+                    Interview Score (30%)
+                  </th>
+                  <th className="px-4 py-3 text-right">Assign Interviewer</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -170,6 +199,12 @@ export function CoordinatorEvaluationApplicants() {
                 ) : (
                   evaluatedApplicants.map((app) => {
                     const averaged = averagedEvaluatorEvaluation(app);
+                    const evalWeighted = weightedEvaluationAverage(
+                      averaged?.grandTotal
+                    );
+                    const interviewWeighted = weightedInterviewScore(
+                      app.interviewScore
+                    );
 
                     return (
                       <tr key={app.id} className="hover:bg-[#062763]/5">
@@ -182,41 +217,32 @@ export function CoordinatorEvaluationApplicants() {
                         <td className="px-4 py-3 font-medium text-slate-900">
                           {app.typeOfMobility || "—"}
                         </td>
-                        <td className="px-4 py-3 text-slate-900">
-                          <p className="font-semibold">
-                            {app.evaluator1Name ?? app.evaluator1Id ?? "—"}
-                          </p>
-                          <p className="text-xs font-semibold text-slate-700">
-                            {app.evaluator1ReviewStatus === "evaluated"
-                              ? formatEvaluationScore(
-                                  app.evaluator1EvaluationData?.grandTotal
-                                )
-                              : "—"}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 text-slate-900">
-                          <p className="font-semibold">
-                            {app.evaluator2Name ?? app.evaluator2Id ?? "—"}
-                          </p>
-                          <p className="text-xs font-semibold text-slate-700">
-                            {app.evaluator2ReviewStatus === "evaluated"
-                              ? formatEvaluationScore(
-                                  app.evaluator2EvaluationData?.grandTotal
-                                )
-                              : "—"}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 text-center font-bold text-[#062763]">
-                          {formatEvaluationScore(averaged?.grandTotal)}
+                        <td className="px-4 py-3 text-center font-semibold text-slate-900">
+                          {app.evaluator1ReviewStatus === "evaluated"
+                            ? formatEvaluationScore(
+                                app.evaluator1EvaluationData?.grandTotal
+                              )
+                            : "—"}
                         </td>
                         <td className="px-4 py-3 text-center font-semibold text-slate-900">
-                          {formatInterviewScore(app.interviewScore)}
+                          {app.evaluator2ReviewStatus === "evaluated"
+                            ? formatEvaluationScore(
+                                app.evaluator2EvaluationData?.grandTotal
+                              )
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-center font-bold text-[#062763]">
+                          {formatEvaluationScore(evalWeighted)}
+                        </td>
+                        <td className="px-4 py-3 text-center font-semibold text-slate-900">
+                          {formatInterviewScore(interviewWeighted)}
                         </td>
                         <td className="px-4 py-3">
                           <AssignInterviewerControl
                             application={app}
                             assigning={assigningInterviewerId === app.id}
                             onAssign={handleAssignInterviewer}
+                            allowedRoles={["Administrator"]}
                           />
                         </td>
                       </tr>

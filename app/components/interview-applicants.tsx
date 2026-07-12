@@ -9,13 +9,9 @@ import {
   isApplicantAssignedForInterview,
   isApplicantAssignedToInterviewer,
 } from "@/lib/coordinator-interview";
-import {
-  averagedEvaluatorEvaluation,
-  isApplicantEvaluatorEvaluated,
-} from "@/lib/coordinator-evaluation";
+import { isApplicantEvaluatorEvaluated } from "@/lib/coordinator-evaluation";
 import type { InterviewEvaluationSubmission } from "@/lib/interview-scoring-sheet";
 import { formatInterviewScore } from "@/lib/interview-scoring-sheet";
-import { formatEvaluationScore } from "@/lib/evaluator-evaluation-types";
 import { AssignInterviewerControl } from "@/app/components/assign-interviewer-control";
 import { InterviewModal } from "@/app/components/interview-modal";
 import { useDashboardPortal } from "./dashboard-portal-provider";
@@ -25,9 +21,12 @@ const actionBtnClass =
 
 export function InterviewApplicants() {
   const { portalKey } = useDashboardPortal();
-  const showAssignInterviewer =
-    portalKey === "coordinator" || portalKey === "administrator";
+  const showAssignInterviewer = portalKey === "coordinator";
+  const showConductInterview =
+    portalKey === "evaluator" || portalKey === "administrator";
   const filterToCurrentUser = portalKey === "evaluator";
+  const showResetInterview =
+    portalKey === "coordinator" || portalKey === "administrator";
 
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -37,6 +36,10 @@ export function InterviewApplicants() {
     string | null
   >(null);
   const [assignError, setAssignError] = useState<string | null>(null);
+  const [resettingInterviewId, setResettingInterviewId] = useState<
+    string | null
+  >(null);
+  const [resetError, setResetError] = useState<string | null>(null);
   const [interviewingApplication, setInterviewingApplication] =
     useState<ApplicationRecord | null>(null);
   const [submittingInterview, setSubmittingInterview] = useState(false);
@@ -143,6 +146,36 @@ export function InterviewApplicants() {
     }
   };
 
+  const handleResetInterview = async (id: string) => {
+    setResettingInterviewId(id);
+    setResetError(null);
+    try {
+      const res = await fetch(
+        `/api/applications/${encodeURIComponent(id)}/interview`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reset: true }),
+        }
+      );
+      const data = (await res.json()) as {
+        application?: ApplicationRecord;
+        error?: string;
+      };
+      if (!res.ok || !data.application) {
+        setResetError(data.error ?? "Could not reset interview.");
+        return;
+      }
+      setApplications((prev) =>
+        prev.map((app) => (app.id === id ? data.application! : app))
+      );
+    } catch {
+      setResetError("Could not reset interview.");
+    } finally {
+      setResettingInterviewId(null);
+    }
+  };
+
   const handleSubmitInterview = async (
     submission: InterviewEvaluationSubmission
   ): Promise<boolean> => {
@@ -185,14 +218,15 @@ export function InterviewApplicants() {
     }
   };
 
-  const tableColSpan = showAssignInterviewer
-    ? 7
-    : filterToCurrentUser
-      ? 5
-      : 6;
+  const tableColSpan =
+    showAssignInterviewer || showConductInterview || showResetInterview
+      ? 6
+      : 5;
   const pageSubtitle = filterToCurrentUser
     ? "Evaluated applicants assigned to you for interview"
-    : "Applicants assigned to interviewers";
+    : portalKey === "administrator"
+      ? "Conduct interviews for evaluated applicants"
+      : "Applicants assigned to interviewers";
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -234,6 +268,15 @@ export function InterviewApplicants() {
           </p>
         )}
 
+        {resetError && (
+          <p
+            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800"
+            role="alert"
+          >
+            {resetError}
+          </p>
+        )}
+
         {interviewActionError && (
           <p
             className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800"
@@ -264,11 +307,10 @@ export function InterviewApplicants() {
                   {!filterToCurrentUser && (
                     <th className="px-4 py-3">Interviewer</th>
                   )}
-                  {!filterToCurrentUser && (
-                    <th className="px-4 py-3 text-center">Eval Avg Total</th>
-                  )}
                   <th className="px-4 py-3 text-center">Interview Score</th>
-                  {(showAssignInterviewer || filterToCurrentUser) && (
+                  {(showAssignInterviewer ||
+                    showConductInterview ||
+                    showResetInterview) && (
                     <th className="px-4 py-3 text-right">Actions</th>
                   )}
                 </tr>
@@ -289,7 +331,6 @@ export function InterviewApplicants() {
                   </tr>
                 ) : (
                   interviewApplicants.map((app) => {
-                    const averaged = averagedEvaluatorEvaluation(app);
                     const hasInterviewScore =
                       app.interviewScore != null &&
                       Number.isFinite(app.interviewScore);
@@ -317,38 +358,70 @@ export function InterviewApplicants() {
                             )}
                           </td>
                         )}
-                        {!filterToCurrentUser && (
-                          <td className="px-4 py-3 text-center font-bold text-[#062763]">
-                            {formatEvaluationScore(averaged?.grandTotal)}
-                          </td>
-                        )}
                         <td className="px-4 py-3 text-center font-semibold text-slate-900">
                           {formatInterviewScore(app.interviewScore)}
                         </td>
-                        {showAssignInterviewer && (
+                        {(showAssignInterviewer ||
+                          showConductInterview ||
+                          showResetInterview) && (
                           <td className="px-4 py-3">
-                            <AssignInterviewerControl
-                              application={app}
-                              assigning={assigningInterviewerId === app.id}
-                              onAssign={handleAssignInterviewer}
-                            />
-                          </td>
-                        )}
-                        {filterToCurrentUser && (
-                          <td className="px-4 py-3 text-right">
-                            <button
-                              type="button"
-                              disabled={submittingInterview}
-                              onClick={() => {
-                                setInterviewActionError(null);
-                                setInterviewingApplication(app);
-                              }}
-                              className={`${actionBtnClass} border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
-                            >
-                              {hasInterviewScore
-                                ? "Review interview"
-                                : "Start Interview"}
-                            </button>
+                            <div className="flex flex-nowrap items-center justify-end gap-2">
+                              {showAssignInterviewer && (
+                                <AssignInterviewerControl
+                                  application={app}
+                                  assigning={assigningInterviewerId === app.id}
+                                  onAssign={handleAssignInterviewer}
+                                  showAssignedName={false}
+                                />
+                              )}
+                              {showConductInterview &&
+                                (portalKey === "administrator" &&
+                                hasInterviewScore ? (
+                                  <span
+                                    className={`${actionBtnClass} whitespace-nowrap border-emerald-300 bg-emerald-50 text-emerald-900`}
+                                    aria-label="Interview completed"
+                                  >
+                                    Interviewed
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      submittingInterview ||
+                                      resettingInterviewId === app.id
+                                    }
+                                    onClick={() => {
+                                      setInterviewActionError(null);
+                                      setInterviewingApplication(app);
+                                    }}
+                                    className={`${actionBtnClass} whitespace-nowrap border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
+                                  >
+                                    {portalKey === "administrator"
+                                      ? "Interview"
+                                      : hasInterviewScore
+                                        ? "Review interview"
+                                        : "Start Interview"}
+                                  </button>
+                                ))}
+                              {showResetInterview && hasInterviewScore && (
+                                <button
+                                  type="button"
+                                  disabled={
+                                    resettingInterviewId === app.id ||
+                                    assigningInterviewerId === app.id ||
+                                    submittingInterview
+                                  }
+                                  onClick={() =>
+                                    void handleResetInterview(app.id)
+                                  }
+                                  className={`${actionBtnClass} whitespace-nowrap border-amber-300 text-amber-900 hover:bg-amber-50`}
+                                >
+                                  {resettingInterviewId === app.id
+                                    ? "Resetting…"
+                                    : "Reset"}
+                                </button>
+                              )}
+                            </div>
                           </td>
                         )}
                       </tr>

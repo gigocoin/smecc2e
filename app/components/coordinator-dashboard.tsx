@@ -22,9 +22,9 @@ const COORDINATOR_PIPELINE_STATUSES: ApplicationStatus[] = [
 ];
 
 function pipelineStatusLabel(status: ApplicationStatus): string {
-  if (status === "draft") return "Draft applicants";
+  if (status === "draft") return "Draft applications";
   if (status === "under_review") return "Submitted applications";
-  if (status === "evaluation") return "Evaluated applicants";
+  if (status === "evaluation") return "Evaluated applications";
   if (status === "interview") return "Interviewed applicants";
   if (status === "final_evaluation") return "Final Scores";
   return STATUS_LABELS[status];

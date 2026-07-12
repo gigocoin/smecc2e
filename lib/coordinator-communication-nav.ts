@@ -64,13 +64,18 @@ export const COMMUNICATION_MAILS_VIEW_LABELS: Record<
   users: "Users (Team Members)",
 };
 
+/** Hidden from evaluator Communication & Knowledge flyout. */
+export const EVALUATOR_COMMUNICATION_KNOWLEDGE_HIDDEN_IDS: CommunicationKnowledgeNavId[] =
+  ["documents"];
+
 export function buildCommunicationKnowledgeNav(
-  basePath: string
+  basePath: string,
+  options?: { hideIds?: CommunicationKnowledgeNavId[] }
 ): CommunicationKnowledgeNavItem[] {
   const root = basePath.replace(/\/$/, "");
   const base = `${root}/communication`;
 
-  return (
+  const items = (
     Object.keys(
       COMMUNICATION_KNOWLEDGE_SECTION_LABELS
     ) as CommunicationKnowledgeSection[]
@@ -83,6 +88,10 @@ export function buildCommunicationKnowledgeNav(
         ? base
         : `${base}?section=${section}`,
   }));
+
+  const hideIds = options?.hideIds;
+  if (!hideIds?.length) return items;
+  return items.filter((item) => !hideIds.includes(item.id));
 }
 
 export function buildCommunicationDocumentsNav(

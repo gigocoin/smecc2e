@@ -24,12 +24,14 @@ import {
   buildCommunicationDocumentsNav,
   buildCommunicationKnowledgeNav,
   buildCommunicationMailsNav,
+  EVALUATOR_COMMUNICATION_KNOWLEDGE_HIDDEN_IDS,
   isCommunicationDocumentsGroupActive,
   isCommunicationDocumentsSubActive,
   isCommunicationKnowledgeGroupActive,
   isCommunicationKnowledgeSubActive,
   isCommunicationMailsGroupActive,
   isCommunicationMailsSubActive,
+  type CommunicationKnowledgeNavId,
 } from "@/lib/coordinator-communication-nav";
 import {
   buildProjectManagementNav,
@@ -697,6 +699,7 @@ function CommunicationKnowledgeNav({
   documentsViewParam,
   mailsViewParam,
   onNavigate,
+  hideIds,
 }: {
   basePath: string;
   pathname: string;
@@ -704,8 +707,9 @@ function CommunicationKnowledgeNav({
   documentsViewParam: string | null;
   mailsViewParam: string | null;
   onNavigate: () => void;
+  hideIds?: CommunicationKnowledgeNavId[];
 }) {
-  const items = buildCommunicationKnowledgeNav(basePath);
+  const items = buildCommunicationKnowledgeNav(basePath, { hideIds });
   const documentsItems = buildCommunicationDocumentsNav(basePath);
   const mailsItems = buildCommunicationMailsNav(basePath);
   const groupActive = isCommunicationKnowledgeGroupActive(
@@ -980,6 +984,7 @@ export function CoordinatorSidebar({
                     documentsViewParam={documentsViewParam}
                     mailsViewParam={mailsViewParam}
                     onNavigate={close}
+                    hideIds={EVALUATOR_COMMUNICATION_KNOWLEDGE_HIDDEN_IDS}
                   />
                 </div>
               );

@@ -43,6 +43,12 @@ export const EVALUATOR_APPLICANTS_MANAGEMENT_HIDDEN_IDS: ApplicantsManagementNav
     "applicants",
     "criterion_weights",
     "draft",
+    "interview",
+    "approved",
+    "offered",
+    "reserved",
+    "rejected",
+    "pre_departure",
   ];
 
 export function buildApplicantsManagementNav(
@@ -84,7 +90,7 @@ export function buildApplicantsManagementNav(
     },
     {
       id: "final_evaluation",
-      label: "Final Evaluation",
+      label: "Final Scores",
       href: `${root}/applicants?status=final_evaluation`,
       statusFilter: "final_evaluation",
     },
