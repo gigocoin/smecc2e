@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import {
   applicantDisplayName,
   COORDINATOR_APPLICATION_STATUSES,
@@ -101,11 +104,26 @@ function DetailRow({
   );
 }
 
+function decisionFromApplication(
+  application: ApplicationRecord
+): "accepted" | "rejected" | null {
+  if (application.status === "rejected") return "rejected";
+  if (
+    application.status === "evaluation" ||
+    application.evaluator1Id ||
+    application.evaluator2Id
+  ) {
+    return "accepted";
+  }
+  return null;
+}
+
 export function ApplicationDetailPanel({
   selected,
   updatingStatus = false,
   onStatusChange,
   showStatusUpdate = true,
+  showAcceptRejectActions = false,
   showAssignEvaluator = false,
   assigningEvaluatorSlot = null,
   onAssignEvaluator,
@@ -116,6 +134,8 @@ export function ApplicationDetailPanel({
   updatingStatus?: boolean;
   onStatusChange?: (id: string, status: ApplicationStatus) => void;
   showStatusUpdate?: boolean;
+  /** Accept / Reject controls after section O (coordinator & administrator). */
+  showAcceptRejectActions?: boolean;
   showAssignEvaluator?: boolean;
   assigningEvaluatorSlot?: 1 | 2 | null;
   onAssignEvaluator?: (
@@ -131,6 +151,52 @@ export function ApplicationDetailPanel({
   const sections = buildApplicantDetailSections(selected, {
     profileUploaded: selected.profileUploaded,
   });
+  const [decision, setDecision] = useState<"accepted" | "rejected" | null>(() =>
+    decisionFromApplication(selected)
+  );
+
+  useEffect(() => {
+    setDecision(decisionFromApplication(selected));
+  }, [
+    selected.id,
+    selected.status,
+    selected.evaluator1Id,
+    selected.evaluator2Id,
+  ]);
+
+  const showAssignSection =
+    showAssignEvaluator &&
+    onAssignEvaluator &&
+    (!showAcceptRejectActions || decision === "accepted");
+
+  const handleAccept = () => {
+    setDecision("accepted");
+    if (selected.status !== "evaluation") {
+      onStatusChange?.(selected.id, "evaluation");
+    }
+  };
+
+  const handleReject = () => {
+    setDecision("rejected");
+    if (selected.status !== "rejected") {
+      onStatusChange?.(selected.id, "rejected");
+    }
+  };
+
+  const handleReset = () => {
+    setDecision(null);
+    if (selected.status !== "under_review") {
+      onStatusChange?.(selected.id, "under_review");
+    }
+    if (onAssignEvaluator) {
+      if (selected.evaluator1Id) {
+        void onAssignEvaluator(selected.id, 1, null);
+      }
+      if (selected.evaluator2Id) {
+        void onAssignEvaluator(selected.id, 2, null);
+      }
+    }
+  };
 
   return (
     <div
@@ -172,11 +238,11 @@ export function ApplicationDetailPanel({
         </div>
       )}
 
-      {showAssignEvaluator && onAssignEvaluator && (
+      {!showAcceptRejectActions && showAssignSection && (
         <AssignEvaluatorSection
           application={selected}
           assigningSlot={assigningEvaluatorSlot}
-          onAssign={onAssignEvaluator}
+          onAssign={onAssignEvaluator!}
         />
       )}
 
@@ -241,6 +307,53 @@ export function ApplicationDetailPanel({
           )
         )}
       </div>
+
+      {showAcceptRejectActions && onStatusChange && (
+        <div className="mt-6 border-t border-slate-200 pt-4">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={updatingStatus || decision === "accepted"}
+              onClick={handleAccept}
+              className={`rounded-lg border-2 px-4 py-2 text-sm font-semibold transition disabled:opacity-50 ${
+                decision === "accepted"
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+                  : "border-emerald-300 text-emerald-800 hover:bg-emerald-50"
+              }`}
+            >
+              {decision === "accepted" ? "Accepted" : "Accept Applicant"}
+            </button>
+            <button
+              type="button"
+              disabled={updatingStatus || decision === "rejected"}
+              onClick={handleReject}
+              className={`rounded-lg border-2 px-4 py-2 text-sm font-semibold transition disabled:opacity-50 ${
+                decision === "rejected"
+                  ? "border-red-300 bg-red-50 text-red-900"
+                  : "border-red-300 text-red-800 hover:bg-red-50"
+              }`}
+            >
+              {decision === "rejected" ? "Rejected" : "Reject Applicant"}
+            </button>
+            <button
+              type="button"
+              disabled={updatingStatus || decision === null}
+              onClick={handleReset}
+              className="rounded-lg border-2 border-amber-300 px-4 py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-50 disabled:opacity-50"
+            >
+              Reset
+            </button>
+          </div>
+
+          {showAssignSection && (
+            <AssignEvaluatorSection
+              application={selected}
+              assigningSlot={assigningEvaluatorSlot}
+              onAssign={onAssignEvaluator!}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }

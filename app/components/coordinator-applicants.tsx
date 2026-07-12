@@ -71,7 +71,10 @@ export function CoordinatorApplicants({
 }) {
   const router = useRouter();
   const { basePath, portalKey } = useDashboardPortal();
-  const showAssignEvaluator = portalKey === "coordinator";
+  const showAcceptRejectActions =
+    portalKey === "coordinator" || portalKey === "administrator";
+  const showAssignEvaluator =
+    portalKey === "coordinator" || portalKey === "administrator";
   const canDeleteApplications = portalKey === "coordinator";
   const pageSubtitle =
     portalKey === "evaluator"
@@ -96,12 +99,14 @@ export function CoordinatorApplicants({
   const [assigningEvaluatorSlot, setAssigningEvaluatorSlot] = useState<
     1 | 2 | null
   >(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
   const [deletingApplication, setDeletingApplication] =
     useState<ApplicationRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const tableBusy = assigningEvaluatorSlot !== null || deleting;
+  const tableBusy =
+    assigningEvaluatorSlot !== null || deleting || updatingStatus;
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -193,6 +198,24 @@ export function CoordinatorApplicants({
       return;
     }
     downloadApplicationsPdf(filteredApplicants);
+  };
+
+  const handleStatusChange = async (id: string, status: ApplicationStatus) => {
+    setUpdatingStatus(true);
+    try {
+      const res = await fetch(`/api/applications/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { application: ApplicationRecord };
+      setApplications((prev) =>
+        prev.map((a) => (a.id === id ? data.application : a))
+      );
+    } finally {
+      setUpdatingStatus(false);
+    }
   };
 
   const handleAssignEvaluator = async (
@@ -509,6 +532,15 @@ export function CoordinatorApplicants({
                                 <ApplicationDetailPanel
                                   selected={app}
                                   showStatusUpdate={false}
+                                  showAcceptRejectActions={
+                                    showAcceptRejectActions
+                                  }
+                                  updatingStatus={updatingStatus}
+                                  onStatusChange={
+                                    showAcceptRejectActions
+                                      ? handleStatusChange
+                                      : undefined
+                                  }
                                   showAssignEvaluator={showAssignEvaluator}
                                   assigningEvaluatorSlot={assigningEvaluatorSlot}
                                   onAssignEvaluator={
