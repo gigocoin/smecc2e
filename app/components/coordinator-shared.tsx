@@ -321,7 +321,9 @@ export function ApplicationDetailPanel({
                   : "border-emerald-300 text-emerald-800 hover:bg-emerald-50"
               }`}
             >
-              {decision === "accepted" ? "Accepted" : "Accept Applicant"}
+              {decision === "accepted"
+                ? "Proceeded to Evaluation"
+                : "Proceed to Evaluation"}
             </button>
             <button
               type="button"
