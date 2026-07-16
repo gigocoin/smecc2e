@@ -1,20 +1,32 @@
+import ExcelJS from "exceljs";
 import {
   applicantDisplayName,
   applicantPrimaryEmail,
   STATUS_LABELS,
+  type ApplicationPayload,
   type ApplicationRecord,
 } from "./application-types";
 
 export type ApplicantExportRow = {
   applicationNo: string;
-  applicant: string;
-  email: string;
-  mobility: string;
-  hostInstitution: string;
-  programme: string;
   status: string;
   currentPage: string;
   submittedAt: string;
+  applicantNames: string;
+  gender: string;
+  email: string;
+  mobilityType: string;
+  nationality: string;
+  countryOfResidence: string;
+  preferredHostInstitution: string;
+  proposedAcademicProgramme: string;
+  masterProgrammeUniversity: string;
+  bachelorProgrammeUniversity: string;
+  linkedinUrl: string;
+  belongsToDisadvantagedGroup: string;
+  disadvantagedCategories: string;
+  previousIntraAfricaScholarship: string;
+  languageOfPreviousInstruction: string;
 };
 
 function formatSubmittedAt(iso: string): string {
@@ -25,40 +37,89 @@ function formatSubmittedAt(iso: string): string {
   });
 }
 
+function formatDisadvantagedCategories(payload: ApplicationPayload): string {
+  const labels: string[] = [];
+  if (payload.disadvantagedFinancially) {
+    labels.push("Financially disadvantaged background");
+  }
+  if (payload.disadvantagedDisability) labels.push("Disability");
+  if (payload.disadvantagedRefugee) labels.push("Refugee/displaced person");
+  if (payload.disadvantagedConflict) labels.push("Conflict-affected region");
+  if (payload.disadvantagedMinority) {
+    labels.push("Minority/underrepresented community");
+  }
+  if (payload.disadvantagedOther) {
+    labels.push(
+      payload.disadvantagedOtherSpecify?.trim()
+        ? `Other: ${payload.disadvantagedOtherSpecify.trim()}`
+        : "Other (specify)"
+    );
+  }
+  return labels.join("; ");
+}
+
 export function buildApplicantExportRows(
   applications: ApplicationRecord[]
 ): ApplicantExportRow[] {
   return applications.map((app) => ({
     applicationNo: app.id,
-    applicant: applicantDisplayName(app) || "",
-    email: applicantPrimaryEmail(app) || "",
-    mobility: app.typeOfMobility || "",
-    hostInstitution: app.preferredHostInstitution || "",
-    programme: app.proposedAcademicProgramme || "",
     status: STATUS_LABELS[app.status] ?? app.status,
     currentPage: app.currentPage != null ? String(app.currentPage) : "",
     submittedAt: formatSubmittedAt(app.submittedAt),
+    applicantNames: applicantDisplayName(app) || "",
+    gender: app.gender || "",
+    email: applicantPrimaryEmail(app) || "",
+    mobilityType: app.typeOfMobility || "",
+    nationality: app.nationality || "",
+    countryOfResidence: app.countryOfResidence || "",
+    preferredHostInstitution: app.preferredHostInstitution || "",
+    proposedAcademicProgramme: app.proposedAcademicProgramme || "",
+    masterProgrammeUniversity: app.masterProgrammeUniversity || "",
+    bachelorProgrammeUniversity: app.bachelorProgrammeUniversity || "",
+    linkedinUrl: app.linkedinUrl || "",
+    belongsToDisadvantagedGroup: app.belongsToDisadvantagedGroup || "",
+    disadvantagedCategories: formatDisadvantagedCategories(app),
+    previousIntraAfricaScholarship: app.previousIntraAfricaScholarship || "",
+    languageOfPreviousInstruction: app.homeInstructionLanguage || "",
   }));
 }
 
 const EXPORT_HEADERS: { key: keyof ApplicantExportRow; label: string }[] = [
   { key: "applicationNo", label: "Application No." },
-  { key: "applicant", label: "Applicant" },
-  { key: "email", label: "Email" },
-  { key: "mobility", label: "Mobility" },
-  { key: "hostInstitution", label: "Host institution" },
-  { key: "programme", label: "Programme" },
   { key: "status", label: "Status" },
   { key: "currentPage", label: "Current page" },
   { key: "submittedAt", label: "Submitted" },
+  { key: "applicantNames", label: "Applicant names" },
+  { key: "gender", label: "Gender" },
+  { key: "email", label: "Email" },
+  { key: "mobilityType", label: "Mobility type" },
+  { key: "nationality", label: "Nationality" },
+  { key: "countryOfResidence", label: "Country of residence" },
+  { key: "preferredHostInstitution", label: "Preferred host institution" },
+  { key: "proposedAcademicProgramme", label: "Proposed academic programme" },
+  {
+    key: "masterProgrammeUniversity",
+    label: "Masters programme & university",
+  },
+  {
+    key: "bachelorProgrammeUniversity",
+    label: "Bachelor programme & university",
+  },
+  { key: "linkedinUrl", label: "LinkedIn" },
+  {
+    key: "belongsToDisadvantagedGroup",
+    label: "Belongs to disadvantaged group",
+  },
+  { key: "disadvantagedCategories", label: "Disadvantaged categories" },
+  {
+    key: "previousIntraAfricaScholarship",
+    label: "Previous Intra-Africa/ACP scholarship",
+  },
+  {
+    key: "languageOfPreviousInstruction",
+    label: "Language of previous instruction",
+  },
 ];
-
-function escapeCsvCell(value: string): string {
-  if (/[",\r\n]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
-}
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -74,20 +135,48 @@ function exportFilename(extension: string): string {
   return `smecc2e-applications-${stamp}.${extension}`;
 }
 
-export function downloadApplicationsExcel(
+export async function downloadApplicationsExcel(
   applications: ApplicationRecord[]
-): void {
+): Promise<void> {
   const rows = buildApplicantExportRows(applications);
-  const lines = [
-    EXPORT_HEADERS.map((header) => escapeCsvCell(header.label)).join(","),
-    ...rows.map((row) =>
-      EXPORT_HEADERS.map((header) => escapeCsvCell(row[header.key])).join(",")
-    ),
-  ];
-  const csv = `\uFEFF${lines.join("\r\n")}`;
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "SMECC2E";
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet("Applications", {
+    views: [{ state: "frozen", ySplit: 1 }],
+  });
+
+  sheet.columns = EXPORT_HEADERS.map((header) => ({
+    header: header.label,
+    key: header.key,
+    width: Math.min(Math.max(header.label.length + 4, 16), 40),
+  }));
+
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: "FF062763" } };
+  headerRow.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFE8F0FF" },
+  };
+  headerRow.alignment = { vertical: "middle", wrapText: true };
+
+  for (const row of rows) {
+    const values: Record<string, string> = {};
+    for (const header of EXPORT_HEADERS) {
+      values[header.key] = row[header.key];
+    }
+    const excelRow = sheet.addRow(values);
+    excelRow.alignment = { vertical: "top", wrapText: true };
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer();
   downloadBlob(
-    new Blob([csv], { type: "text/csv;charset=utf-8" }),
-    exportFilename("csv")
+    new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }),
+    exportFilename("xlsx")
   );
 }
 
@@ -121,11 +210,12 @@ export function downloadApplicationsPdf(
   <meta charset="utf-8" />
   <title>SMECC2E Applications</title>
   <style>
-    body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 24px; }
-    h1 { font-size: 18px; margin: 0 0 4px; color: #062763; }
-    p { font-size: 12px; margin: 0 0 16px; color: #475569; }
-    table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; vertical-align: top; }
+    @page { size: landscape; margin: 10mm; }
+    body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 16px; }
+    h1 { font-size: 16px; margin: 0 0 4px; color: #062763; }
+    p { font-size: 11px; margin: 0 0 12px; color: #475569; }
+    table { width: 100%; border-collapse: collapse; font-size: 8px; }
+    th, td { border: 1px solid #cbd5e1; padding: 4px 5px; text-align: left; vertical-align: top; }
     th { background: #e8f0ff; color: #062763; }
     @media print {
       body { margin: 0; }

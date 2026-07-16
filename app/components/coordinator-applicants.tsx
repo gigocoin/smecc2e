@@ -194,7 +194,7 @@ export function CoordinatorApplicants({
   const handleDownload = (format: "excel" | "pdf") => {
     setDownloadMenuOpen(false);
     if (format === "excel") {
-      downloadApplicationsExcel(filteredApplicants);
+      void downloadApplicationsExcel(filteredApplicants);
       return;
     }
     downloadApplicationsPdf(filteredApplicants);
