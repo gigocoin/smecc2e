@@ -101,21 +101,17 @@ function AssignEvaluatorSlot({
   const reviewStatus = evaluatorReviewStatus(application, slot);
   const actionLabel = slotActionLabel(application, slot);
 
-  const activeEvaluators = useMemo(
-    () =>
-      evaluators.filter(
-        (user) => user.role === "Evaluator" && user.status === "Active"
-      ),
+  const activeUsers = useMemo(
+    () => evaluators.filter((user) => user.status === "Active"),
     [evaluators]
   );
 
-  const selectableEvaluators = useMemo(
+  const selectableUsers = useMemo(
     () =>
-      activeEvaluators.filter(
-        (user) =>
-          !otherSlotEvaluatorId || user.id !== otherSlotEvaluatorId
+      activeUsers.filter(
+        (user) => !otherSlotEvaluatorId || user.id !== otherSlotEvaluatorId
       ),
-    [activeEvaluators, otherSlotEvaluatorId]
+    [activeUsers, otherSlotEvaluatorId]
   );
 
   const loadEvaluators = useCallback(async () => {
@@ -269,22 +265,22 @@ function AssignEvaluatorSlot({
                 className="mt-1 w-full rounded-lg border-2 border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-[#062763] outline-none focus:border-[#062763] focus:ring-2 focus:ring-[#062763]/15 disabled:opacity-50"
               >
                 <option value="">Unassigned</option>
-                {selectableEvaluators.map((evaluator) => (
-                  <option key={evaluator.id} value={evaluator.id}>
-                    {evaluator.name} ({evaluator.id})
+                {selectableUsers.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name} ({user.role}) — {user.id}
                   </option>
                 ))}
               </select>
               {loadingEvaluators && (
                 <p className="mt-2 text-xs font-semibold text-slate-700">
-                  Loading evaluators…
+                  Loading users…
                 </p>
               )}
-              {!loadingEvaluators && selectableEvaluators.length === 0 && (
+              {!loadingEvaluators && selectableUsers.length === 0 && (
                 <p className="mt-2 text-xs font-semibold text-amber-800">
-                  {activeEvaluators.length === 0
-                    ? "No active evaluators found. Create one in Users first."
-                    : "No other evaluators available. The other slot already uses the remaining evaluators."}
+                  {activeUsers.length === 0
+                    ? "No active users found. Create one in Users first."
+                    : "No other users available. The other slot already uses the remaining users."}
                 </p>
               )}
               {loadError && (

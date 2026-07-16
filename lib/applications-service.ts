@@ -495,7 +495,7 @@ export async function assignApplicationEvaluator(
     const evaluator = await prisma.user.findFirst({
       where: {
         OR: [{ id: evaluatorRef }, { publicId: evaluatorRef }],
-        role: "EVALUATOR",
+        role: { in: ["EVALUATOR", "COORDINATOR", "ADMINISTRATOR"] },
         status: "ACTIVE",
       },
       select: { id: true },
