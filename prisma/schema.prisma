@@ -376,3 +376,99 @@ model CommunicationDocumentCategory {
   @@index([createdAt])
   @@map("communication_document_categories")
 }
+
+// ---------------------------------------------------------------------------
+// Project management (coordinator portal → Project management sections)
+// ---------------------------------------------------------------------------
+
+/// Shared progress status for milestones and deliverables.
+/// UI labels: "Not Started" / "On-going" / "Completed"
+/// (see MILESTONE_STATUSES in lib/project-milestones.ts)
+enum ProjectTrackStatus {
+  NOT_STARTED
+  ON_GOING
+  COMPLETED
+}
+
+/// Yes/No answer for risk follow-up questions (null = not answered yet).
+enum YesNoAnswer {
+  YES
+  NO
+}
+
+/// Project milestone (Project management → Milestones).
+model ProjectMilestone {
+  id                  String             @id @default(cuid())
+  name                String
+  workPackageNo       String             @map("work_package_no")
+  leadBeneficiary     String             @map("lead_beneficiary")
+  meansOfVerification String             @map("means_of_verification") @db.Text
+  /// Drives the due-date countdown timer in the milestones table
+  dueDate             DateTime           @map("due_date")
+  status              ProjectTrackStatus @default(NOT_STARTED)
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  @@index([dueDate])
+  @@index([status])
+  @@map("project_milestones")
+}
+
+/// Project deliverable (Project management → Deliverables).
+model ProjectDeliverable {
+  id              String             @id @default(cuid())
+  workPackageNo   String             @map("work_package_no")
+  /// e.g. D1.2
+  deliverableNo   String             @map("deliverable_no")
+  name            String
+  description     String             @default("") @db.Text
+  leadBeneficiary String             @map("lead_beneficiary")
+  /// Drives the due-date countdown timer in the deliverables table
+  dueDate         DateTime           @map("due_date")
+  status          ProjectTrackStatus @default(NOT_STARTED)
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  @@index([dueDate])
+  @@index([status])
+  @@map("project_deliverables")
+}
+
+/// Monitoring & Evaluation indicator (Project management → M & E).
+model ProjectMandEIndicator {
+  id                String   @id @default(cuid())
+  indicator         String
+  /// e.g. Output / Outcome / Impact
+  type              String   @default("")
+  unitOfMeasurement String   @default("") @map("unit_of_measurement")
+  baselineValue     String   @default("") @map("baseline_value")
+  currentStatus     String   @default("") @map("current_status")
+  /// 0–100 (%)
+  completionRate    Int      @default(0) @map("completion_rate")
+  /// Set by the "Send Reminder" action in the M&E table
+  lastReminderAt    DateTime? @map("last_reminder_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([completionRate])
+  @@map("project_m_and_e_indicators")
+}
+
+/// Risk register entry (Project management → Risks).
+model ProjectRisk {
+  id                        String       @id @default(cuid())
+  workPackage               String       @map("work_package")
+  riskMitigationMeasures    String       @default("") @map("risk_mitigation_measures") @db.Text
+  /// Reporting period, e.g. "Q1 2026"
+  stateOfThePlayPeriod      String       @default("") @map("state_of_the_play_period")
+  appliedMitigationMeasures YesNoAnswer? @map("applied_mitigation_measures")
+  riskMaterialised          YesNoAnswer? @map("risk_materialised")
+  stateOfThePlayComments    String       @default("") @map("state_of_the_play_comments") @db.Text
+  /// Free-text actions field edited inline in the risks table
+  actions                   String       @default("") @db.Text
+  createdAt                 DateTime     @default(now()) @map("created_at")
+  updatedAt                 DateTime     @updatedAt @map("updated_at")
+
+  @@index([workPackage])
+  @@map("project_risks")
+}

@@ -5,12 +5,20 @@ import {
   PROJECT_MANAGEMENT_SECTION_LABELS,
   parseProjectManagementSection,
 } from "@/lib/coordinator-project-nav";
+import { useDashboardPortal } from "./dashboard-portal-provider";
+import { CoordinatorProjectDeliverables } from "./coordinator-project-deliverables";
+import { CoordinatorProjectMandE } from "./coordinator-project-m-and-e";
+import { CoordinatorProjectMilestones } from "./coordinator-project-milestones";
+import { CoordinatorProjectRisks } from "./coordinator-project-risks";
 
 export function CoordinatorProject() {
   const searchParams = useSearchParams();
+  const { portalKey } = useDashboardPortal();
   const sectionParam = searchParams.get("section");
   const activeSection = parseProjectManagementSection(sectionParam);
   const pageTitle = PROJECT_MANAGEMENT_SECTION_LABELS[activeSection];
+  const showTaskActions = portalKey === "coordinator" && activeSection === "tasks";
+  const canManageProject = portalKey === "coordinator";
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -23,16 +31,43 @@ export function CoordinatorProject() {
             Project management · SMECC2E coordination
           </p>
         </div>
+        {showTaskActions && (
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90"
+            >
+              Add Task
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border-2 border-[#062763]/25 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5"
+            >
+              Upload Tasks CSV
+            </button>
+          </div>
+        )}
       </header>
 
       <main className="flex-1 overflow-auto bg-slate-50 p-4 sm:p-6">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <p className="text-sm font-semibold text-slate-800">
-            {pageTitle} tools and tracking will be available here. Use the
-            sidebar flyout under <strong className="text-[#062763]">Project
-            management</strong> to switch between project areas.
-          </p>
-        </div>
+        {activeSection === "milestones" ? (
+          <CoordinatorProjectMilestones canManage={canManageProject} />
+        ) : activeSection === "deliverables" ? (
+          <CoordinatorProjectDeliverables canManage={canManageProject} />
+        ) : activeSection === "m_and_e" ? (
+          <CoordinatorProjectMandE canManage={canManageProject} />
+        ) : activeSection === "risks" ? (
+          <CoordinatorProjectRisks canManage={canManageProject} />
+        ) : (
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <p className="text-sm font-semibold text-slate-800">
+              {pageTitle} tools and tracking will be available here. Use the
+              sidebar flyout under{" "}
+              <strong className="text-[#062763]">Project management</strong> to
+              switch between project areas.
+            </p>
+          </div>
+        )}
       </main>
     </div>
   );
