@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { requireApplicantOwnsApplication } from "@/lib/applicant-application-auth";
 import { ApplicantAuthError } from "@/lib/applicant-auth-service";
 import {
+  APPLICATION_DEADLINE_CLOSED_MESSAGE,
+  isApplicationDeadlinePassed,
+} from "@/lib/application-deadline";
+import {
   applicationDocumentStorageErrorResponse,
   blobStorageConfigurationError,
   isProductionWithoutBlobStorage,
@@ -86,6 +90,12 @@ export async function POST(
     if (application.status !== "draft") {
       return NextResponse.json(
         { error: "Documents can only be uploaded while the application is a draft" },
+        { status: 403 }
+      );
+    }
+    if (isApplicationDeadlinePassed()) {
+      return NextResponse.json(
+        { error: APPLICATION_DEADLINE_CLOSED_MESSAGE },
         { status: 403 }
       );
     }

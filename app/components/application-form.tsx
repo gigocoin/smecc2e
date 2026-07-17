@@ -23,6 +23,10 @@ import {
 } from "@/lib/regions";
 import { AFRICAN_COUNTRY_OPTIONS } from "@/lib/african-countries";
 import { APPLICANT_LOGIN_PATH, applicantLoginPath, applicantVerifiedLoginPath } from "@/lib/applicant-login-paths";
+import {
+  APPLICATION_DEADLINE_CLOSED_MESSAGE,
+  isApplicationDeadlinePassed,
+} from "@/lib/application-deadline";
 import { ApplicantIdleSessionGuard } from "./applicant-idle-session-guard";
 
 const ALREADY_VERIFIED_MESSAGE =
@@ -333,6 +337,7 @@ export function ApplicationForm({
 }) {
   const startOnly = !portalMode;
   const visiblePageCount = portalMode ? TOTAL_PAGES : 2;
+  const applicationsClosed = isApplicationDeadlinePassed();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [currentPage, setCurrentPage] = useState(1);
@@ -599,6 +604,10 @@ export function ApplicationForm({
       error?: string;
       status?: number;
     }> => {
+      if (isApplicationDeadlinePassed()) {
+        return { error: APPLICATION_DEADLINE_CLOSED_MESSAGE, status: 403 };
+      }
+
       const email = form.email.trim();
       if (!email) {
         return { error: "Enter your email on page 2 to save your progress." };
@@ -1310,6 +1319,11 @@ export function ApplicationForm({
     e.preventDefault();
     setSubmitError(null);
 
+    if (applicationsClosed) {
+      setSubmitError(APPLICATION_DEADLINE_CLOSED_MESSAGE);
+      return;
+    }
+
     if (!submitValidation.valid) {
       setSubmitError(
         `Please complete all required fields before submitting. Missing: ${submitValidation.errors.slice(0, 6).join("; ")}${
@@ -1383,6 +1397,10 @@ export function ApplicationForm({
   };
 
   const handleNext = async () => {
+    if (applicationsClosed) {
+      setSaveError(APPLICATION_DEADLINE_CLOSED_MESSAGE);
+      return;
+    }
     if (currentPage === 1 && !instructionsAccepted) return;
     if (startOnly && currentPage >= 2) return;
     if (currentPage === 2 && !emailVerified) {
@@ -1418,6 +1436,10 @@ export function ApplicationForm({
   };
 
   const handleSignOutToContinueLater = async () => {
+    if (applicationsClosed) {
+      setSaveError(APPLICATION_DEADLINE_CLOSED_MESSAGE);
+      return;
+    }
     setSaveError(null);
     setSaveMessage(null);
     setSigningOut(true);
@@ -1556,6 +1578,17 @@ export function ApplicationForm({
     {portalMode ? <ApplicantIdleSessionGuard email={form.email.trim()} /> : null}
     <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
       <FormHeader />
+
+      {applicationsClosed && (
+        <div
+          className="border-b border-amber-200 bg-amber-50 px-6 py-4 sm:px-8"
+          role="alert"
+        >
+          <p className="text-sm font-semibold text-amber-950">
+            {APPLICATION_DEADLINE_CLOSED_MESSAGE}
+          </p>
+        </div>
+      )}
 
       <PageStepper
         currentPage={currentPage}
@@ -1697,6 +1730,7 @@ export function ApplicationForm({
                 type="button"
                 onClick={() => void handleNext()}
                 disabled={
+                  applicationsClosed ||
                   savingDraft ||
                   signingOut ||
                   (currentPage === 1 && !instructionsAccepted) ||
@@ -1710,11 +1744,15 @@ export function ApplicationForm({
             ) : (
               <button
                 type="submit"
-                disabled={submitting || !submitValidation.valid}
+                disabled={
+                  applicationsClosed || submitting || !submitValidation.valid
+                }
                 title={
-                  !submitValidation.valid
-                    ? "Complete all required fields before submitting"
-                    : undefined
+                  applicationsClosed
+                    ? APPLICATION_DEADLINE_CLOSED_MESSAGE
+                    : !submitValidation.valid
+                      ? "Complete all required fields before submitting"
+                      : undefined
                 }
                 className="rounded-md bg-[#f7be2a] px-8 py-2.5 text-sm font-extrabold text-[#062763] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -1725,7 +1763,9 @@ export function ApplicationForm({
               <button
                 type="button"
                 onClick={() => void handleSignOutToContinueLater()}
-                disabled={savingDraft || signingOut || submitting}
+                disabled={
+                  applicationsClosed || savingDraft || signingOut || submitting
+                }
                 className="rounded-md border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {signingOut ? "Saving & signing out…" : "Sign Out to Continue Later"}

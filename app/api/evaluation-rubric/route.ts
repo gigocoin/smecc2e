@@ -42,7 +42,7 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const user = await requireDashboardSessionUser();
-    if (user.role !== "Coordinator" && user.role !== "Administrator") {
+    if (user.role !== "Coordinator") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

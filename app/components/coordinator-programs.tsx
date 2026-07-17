@@ -526,22 +526,26 @@ export function CoordinatorPrograms({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setCreateOpen(true)}
-            disabled={loading || universities.length === 0}
-            className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
-          >
-            Create program
-          </button>
-          <button
-            type="button"
-            onClick={() => setUploadOpen(true)}
-            disabled={loading || universities.length === 0}
-            className="rounded-lg border-2 border-[#062763]/25 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
-          >
-            Upload CSV
-          </button>
+          {!hideEditDelete && (
+            <>
+              <button
+                type="button"
+                onClick={() => setCreateOpen(true)}
+                disabled={loading || universities.length === 0}
+                className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
+              >
+                Create program
+              </button>
+              <button
+                type="button"
+                onClick={() => setUploadOpen(true)}
+                disabled={loading || universities.length === 0}
+                className="rounded-lg border-2 border-[#062763]/25 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
+              >
+                Upload CSV
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={refresh}
@@ -625,7 +629,9 @@ export function CoordinatorPrograms({
                     <th className="px-5 py-3">Thematic area</th>
                     <th className="px-5 py-3">Accreditation</th>
                     <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3">Actions</th>
+                    {!hideEditDelete && (
+                      <th className="px-5 py-3">Actions</th>
+                    )}
                   </tr>
                   <tr className="border-b border-slate-200 bg-white text-xs font-semibold normal-case tracking-normal text-slate-800">
                     <th className="px-3 py-2" scope="col">
@@ -719,24 +725,27 @@ export function CoordinatorPrograms({
                       <span className="sr-only">Accreditation filter uses program search</span>
                     </th>
                     <th className="px-3 py-2" scope="col" aria-hidden />
-                    <th className="px-3 py-2" scope="col" aria-hidden />
+                    {!hideEditDelete && (
+                      <th className="px-3 py-2" scope="col" aria-hidden />
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {sortedPrograms.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={hideEditDelete ? 7 : 8}
                         className="px-5 py-10 text-center text-sm font-semibold text-slate-700"
                       >
-                        No programs yet. Create one or upload a CSV to get
-                        started.
+                        {hideEditDelete
+                          ? "No programs yet."
+                          : "No programs yet. Create one or upload a CSV to get started."}
                       </td>
                     </tr>
                   ) : filteredPrograms.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={hideEditDelete ? 7 : 8}
                         className="px-5 py-10 text-center text-sm font-semibold text-slate-700"
                       >
                         No programmes match your filters.
@@ -774,9 +783,9 @@ export function CoordinatorPrograms({
                         <td className="px-5 py-3">
                           <ProgramStatusBadge isActive={program.isActive} />
                         </td>
-                        <td className="px-5 py-3">
-                          <div className="flex flex-wrap items-center justify-end gap-2">
-                            {!hideEditDelete && (
+                        {!hideEditDelete && (
+                          <td className="px-5 py-3">
+                            <div className="flex flex-wrap items-center justify-end gap-2">
                               <button
                                 type="button"
                                 onClick={() => openEdit(program)}
@@ -787,30 +796,32 @@ export function CoordinatorPrograms({
                               >
                                 <EditIcon />
                               </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() =>
-                                void handleToggleProgramActive(
-                                  program.id,
-                                  !program.isActive
-                                )
-                              }
-                              disabled={updatingProgramId === program.id || editing}
-                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
-                                program.isActive
-                                  ? "border border-red-200 bg-red-50 text-red-800 hover:bg-red-100"
-                                  : "border border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
-                              }`}
-                            >
-                              {updatingProgramId === program.id
-                                ? "Saving…"
-                                : program.isActive
-                                  ? "Deactivate"
-                                  : "Activate"}
-                            </button>
-                          </div>
-                        </td>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void handleToggleProgramActive(
+                                    program.id,
+                                    !program.isActive
+                                  )
+                                }
+                                disabled={
+                                  updatingProgramId === program.id || editing
+                                }
+                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
+                                  program.isActive
+                                    ? "border border-red-200 bg-red-50 text-red-800 hover:bg-red-100"
+                                    : "border border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+                                }`}
+                              >
+                                {updatingProgramId === program.id
+                                  ? "Saving…"
+                                  : program.isActive
+                                    ? "Deactivate"
+                                    : "Activate"}
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))
                   )}

@@ -1,3 +1,7 @@
+import {
+  APPLICATION_DEADLINE_CLOSED_MESSAGE,
+  isApplicationDeadlinePassed,
+} from "./application-deadline";
 import type {
   ApplicationPayload,
   ApplicationRecord,
@@ -331,6 +335,10 @@ export async function upsertDraftApplication(
   payload: ApplicationPayload,
   currentPage: number
 ): Promise<ApplicationRecord> {
+  if (isApplicationDeadlinePassed()) {
+    throw new Error(APPLICATION_DEADLINE_CLOSED_MESSAGE);
+  }
+
   const email = applicantEmailFromPayload(payload);
   if (!email) {
     throw new Error("Email is required to save application progress");
@@ -386,6 +394,10 @@ export async function submitApplication(
   payload: ApplicationPayload,
   existingId?: string
 ): Promise<ApplicationRecord> {
+  if (isApplicationDeadlinePassed()) {
+    throw new Error(APPLICATION_DEADLINE_CLOSED_MESSAGE);
+  }
+
   const email = applicantEmailFromPayload(payload);
   if (!email) {
     throw new Error("Email is required to submit your application.");

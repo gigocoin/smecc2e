@@ -71,8 +71,7 @@ export function CoordinatorApplicants({
 }) {
   const router = useRouter();
   const { basePath, portalKey } = useDashboardPortal();
-  const showAcceptRejectActions =
-    portalKey === "coordinator" || portalKey === "administrator";
+  const showAcceptRejectActions = portalKey === "coordinator";
   const showAssignEvaluator =
     portalKey === "coordinator" || portalKey === "administrator";
   const canDeleteApplications = portalKey === "coordinator";
@@ -439,7 +438,9 @@ export function CoordinatorApplicants({
                       colSpan={tableColSpan}
                       className="px-4 py-10 text-center font-semibold text-slate-900"
                     >
-                      No applications match your filters.
+                      {loading
+                        ? "Loading applications…"
+                        : "No applications match your filters."}
                     </td>
                   </tr>
                 ) : (

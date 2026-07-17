@@ -93,7 +93,8 @@ export async function POST(request: Request) {
       err instanceof Error &&
       (/complete all required fields/i.test(err.message) ||
         /verify your email/i.test(err.message) ||
-        /email is required/i.test(err.message));
+        /email is required/i.test(err.message) ||
+        /application deadline has passed/i.test(err.message));
     return NextResponse.json(
       { error: message },
       { status: connectionError ? 503 : isClientError ? 400 : 500 }

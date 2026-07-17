@@ -1,6 +1,9 @@
 /** Application closes at midnight (12:00 AM) on 17 July 2026, West Africa Time. */
 export const APPLICATION_DEADLINE = new Date("2026-07-17T00:00:00+01:00");
 
+export const APPLICATION_DEADLINE_CLOSED_MESSAGE =
+  "The application deadline has passed. Draft applications can no longer be continued or submitted.";
+
 export type ApplicationCountdown = {
   totalMs: number;
   days: number;
