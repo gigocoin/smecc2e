@@ -1,21 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { parseCsv } from "@/lib/csv-parse";
 import {
   createMilestoneId,
   formatMilestoneDueDate,
   getMilestoneCountdown,
   isMilestoneStatus,
-  loadMilestonesFromStorage,
-  milestonesFromCsv,
   MILESTONE_STATUSES,
-  saveMilestonesToStorage,
   type MilestoneStatus,
   type ProjectMilestone,
 } from "@/lib/project-milestones";
-
-const CSV_PREVIEW_ROW_LIMIT = 5;
 
 const inputClass =
   "mt-1 w-full rounded-lg border-2 border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-[#062763] focus:ring-2 focus:ring-[#062763]/15 disabled:opacity-50";
@@ -26,6 +20,7 @@ const selectClass =
 function emptyForm() {
   return {
     name: "",
+    milestoneNo: "",
     workPackageNo: "",
     leadBeneficiary: "",
     meansOfVerification: "",
@@ -79,35 +74,47 @@ export function CoordinatorProjectMilestones({
   canManage?: boolean;
 }) {
   const [milestones, setMilestones] = useState<ProjectMilestone[]>([]);
-  const [hydrated, setHydrated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadCreated, setUploadCreated] = useState(0);
-  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
-  const [csvPreview, setCsvPreview] = useState<{
-    fileName: string;
-    headers: string[];
-    rows: string[][];
-    totalRows: number;
-  } | null>(null);
-  const [csvPreviewLoading, setCsvPreviewLoading] = useState(false);
-  const [csvPreviewError, setCsvPreviewError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setMilestones(loadMilestonesFromStorage());
-    setHydrated(true);
+  const fetchMilestones = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await fetch("/api/project-milestones");
+      const data = (await res.json()) as {
+        milestones?: ProjectMilestone[];
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to load milestones");
+      }
+      setMilestones(data.milestones ?? []);
+    } catch (err) {
+      setLoadError(
+        err instanceof Error ? err.message : "Failed to load milestones"
+      );
+      setMilestones([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
-    saveMilestonesToStorage(milestones);
-  }, [hydrated, milestones]);
+    void fetchMilestones();
+  }, [fetchMilestones]);
+
+  useEffect(() => {
+    if (!saveMessage) return;
+    const id = window.setTimeout(() => setSaveMessage(null), 4000);
+    return () => window.clearTimeout(id);
+  }, [saveMessage]);
 
   const sortedMilestones = useMemo(
     () =>
@@ -129,49 +136,6 @@ export function CoordinatorProjectMilestones({
     resetCreateForm();
   };
 
-  const resetUploadForm = () => {
-    setUploadFile(null);
-    setUploadError(null);
-    setUploadCreated(0);
-    setUploadErrors([]);
-    setCsvPreview(null);
-    setCsvPreviewLoading(false);
-    setCsvPreviewError(null);
-  };
-
-  const closeUploadModal = () => {
-    if (uploading) return;
-    setUploadOpen(false);
-    resetUploadForm();
-  };
-
-  const loadCsvPreview = useCallback(async (file: File) => {
-    setCsvPreviewLoading(true);
-    setCsvPreviewError(null);
-    setCsvPreview(null);
-    try {
-      const text = await file.text();
-      const { headers, rows } = parseCsv(text);
-      const dataRows = rows.filter((row) =>
-        row.some((cell) => cell.trim() !== "")
-      );
-      if (!headers.length) {
-        setCsvPreviewError("CSV has no header row.");
-        return;
-      }
-      setCsvPreview({
-        fileName: file.name,
-        headers,
-        rows: dataRows.slice(0, CSV_PREVIEW_ROW_LIMIT),
-        totalRows: dataRows.length,
-      });
-    } catch {
-      setCsvPreviewError("Could not read CSV file for preview.");
-    } finally {
-      setCsvPreviewLoading(false);
-    }
-  }, []);
-
   const handleCreateMilestone = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) {
@@ -186,6 +150,7 @@ export function CoordinatorProjectMilestones({
     const milestone: ProjectMilestone = {
       id: createMilestoneId(),
       name: form.name.trim(),
+      milestoneNo: form.milestoneNo.trim(),
       workPackageNo: form.workPackageNo.trim(),
       leadBeneficiary: form.leadBeneficiary.trim(),
       meansOfVerification: form.meansOfVerification.trim(),
@@ -194,6 +159,8 @@ export function CoordinatorProjectMilestones({
     };
 
     setMilestones((prev) => [...prev, milestone]);
+    setSaveMessage(null);
+    setSaveError(null);
     closeCreateModal();
   };
 
@@ -203,52 +170,59 @@ export function CoordinatorProjectMilestones({
         milestone.id === id ? { ...milestone, status } : milestone
       )
     );
+    setSaveMessage(null);
+    setSaveError(null);
   };
 
-  const handleUploadCsv = async () => {
-    if (!uploadFile) {
-      setUploadError("Select a CSV file to upload.");
-      return;
-    }
-
-    setUploading(true);
-    setUploadError(null);
-    setUploadCreated(0);
-    setUploadErrors([]);
+  const handleSaveMilestones = async () => {
+    setSaving(true);
+    setSaveError(null);
+    setSaveMessage(null);
     try {
-      const text = await uploadFile.text();
-      const { headers, rows } = parseCsv(text);
-      const dataRows = rows.filter((row) =>
-        row.some((cell) => cell.trim() !== "")
-      );
-      const { milestones: imported, errors } = milestonesFromCsv(
-        headers,
-        dataRows
-      );
-      if (errors.length > 0 && imported.length === 0) {
-        setUploadError(errors[0] ?? "Could not import milestones from CSV.");
-        setUploadErrors(errors);
-        return;
+      const res = await fetch("/api/project-milestones", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ milestones }),
+      });
+      const data = (await res.json()) as {
+        milestones?: ProjectMilestone[];
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to save milestones");
       }
-      if (imported.length === 0) {
-        setUploadError("No valid milestone rows found in the CSV.");
-        return;
-      }
-      setMilestones((prev) => [...prev, ...imported]);
-      setUploadCreated(imported.length);
-      setUploadErrors(errors);
-    } catch {
-      setUploadError("Could not import milestones from CSV.");
+      setMilestones(data.milestones ?? milestones);
+      setSaveMessage(
+        `Saved ${data.milestones?.length ?? milestones.length} milestone${
+          (data.milestones?.length ?? milestones.length) === 1 ? "" : "s"
+        }.`
+      );
+    } catch (err) {
+      setSaveError(
+        err instanceof Error ? err.message : "Failed to save milestones"
+      );
     } finally {
-      setUploading(false);
+      setSaving(false);
     }
   };
 
   return (
-    <>
-      <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+    <div className="min-w-0 w-full max-w-full">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div aria-live="polite" className="min-h-5">
+          {saveMessage && (
+            <p className="text-sm font-semibold text-emerald-800">
+              {saveMessage}
+            </p>
+          )}
+          {saveError && (
+            <p className="text-sm font-semibold text-red-700" role="alert">
+              {saveError}
+            </p>
+          )}
+        </div>
         {canManage && (
-          <>
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
@@ -258,44 +232,63 @@ export function CoordinatorProjectMilestones({
             </button>
             <button
               type="button"
-              onClick={() => setUploadOpen(true)}
-              className="rounded-lg border-2 border-[#062763]/25 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5"
+              onClick={() => void handleSaveMilestones()}
+              disabled={saving || loading}
+              className="rounded-lg border-2 border-[#062763] px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
             >
-              Upload Milestone CSV
+              {saving ? "Saving…" : "Save Milestones"}
             </button>
-          </>
+          </div>
         )}
       </div>
 
+      {loadError && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+          <p className="text-sm font-semibold text-red-800" role="alert">
+            {loadError}
+          </p>
+          <button
+            type="button"
+            onClick={() => void fetchMilestones()}
+            className="rounded-lg border-2 border-red-300 px-3 py-1.5 text-xs font-semibold text-red-900 transition hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-5 py-4">
+        <div className="shrink-0 border-b border-slate-100 px-5 py-4">
           <h2 className="text-base font-bold text-[#062763]">Milestones</h2>
           <p className="mt-1 text-sm font-semibold text-slate-800">
-            {sortedMilestones.length === 0
-              ? "No milestones yet."
-              : `${sortedMilestones.length} milestone${
-                  sortedMilestones.length === 1 ? "" : "s"
-                }.`}
+            {loading
+              ? "Loading milestones…"
+              : sortedMilestones.length === 0
+                ? "No milestones yet."
+                : `${sortedMilestones.length} milestone${
+                    sortedMilestones.length === 1 ? "" : "s"
+                  }.`}
           </p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-left text-sm">
-            <thead className="bg-[#e8f0ff] text-xs font-bold uppercase tracking-wide text-[#062763]">
+        <div className="h-[60vh] min-w-0 overflow-auto">
+          <table className="w-full min-w-[1200px] text-left text-sm">
+            <thead className="sticky top-0 z-10 bg-[#e8f0ff] text-xs font-bold uppercase tracking-wide text-[#062763]">
               <tr>
+                <th className="px-4 py-3">Milestone No</th>
                 <th className="px-4 py-3">Milestone Name</th>
                 <th className="px-4 py-3">Work Package No</th>
                 <th className="px-4 py-3">Lead Beneficiary</th>
                 <th className="px-4 py-3">Means of Verification</th>
                 <th className="px-4 py-3">Due Date</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Due Date Countdown</th>
+                <th className="px-4 py-3">Countdown Timer</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {!hydrated ? (
+              {loading ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-4 py-10 text-center font-semibold text-slate-700"
                   >
                     Loading milestones…
@@ -304,17 +297,20 @@ export function CoordinatorProjectMilestones({
               ) : sortedMilestones.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-4 py-10 text-center font-semibold text-slate-700"
                   >
                     {canManage
-                      ? "No milestones yet. Add one or upload a CSV to get started."
+                      ? "No milestones yet. Add one, then Save Milestones."
                       : "No milestones yet."}
                   </td>
                 </tr>
               ) : (
                 sortedMilestones.map((milestone) => (
                   <tr key={milestone.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-900">
+                      {milestone.milestoneNo || "—"}
+                    </td>
                     <td className="px-4 py-3 font-semibold text-slate-900">
                       {milestone.name}
                     </td>
@@ -335,13 +331,11 @@ export function CoordinatorProjectMilestones({
                         <select
                           value={milestone.status}
                           onChange={(e) => {
-                            const value = e.target.value;
-                            if (isMilestoneStatus(value)) {
-                              handleStatusChange(milestone.id, value);
-                            }
+                            const next = e.target.value;
+                            if (!isMilestoneStatus(next)) return;
+                            handleStatusChange(milestone.id, next);
                           }}
                           className={selectClass}
-                          aria-label={`Status for ${milestone.name}`}
                         >
                           {MILESTONE_STATUSES.map((status) => (
                             <option key={status} value={status}>
@@ -351,7 +345,7 @@ export function CoordinatorProjectMilestones({
                         </select>
                       ) : (
                         <span
-                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClass(
                             milestone.status
                           )}`}
                         >
@@ -379,22 +373,43 @@ export function CoordinatorProjectMilestones({
           onClick={closeCreateModal}
         >
           <div
-            className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-xl"
+            className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h2
               id="add-milestone-title"
-              className="text-base font-bold text-[#062763]"
+              className="shrink-0 border-b border-slate-100 px-5 py-3 text-base font-bold text-[#062763]"
             >
               Add Milestone
             </h2>
-            <form onSubmit={handleCreateMilestone} className="mt-5 space-y-4">
+            <form
+              onSubmit={handleCreateMilestone}
+              className="flex-1 space-y-3 overflow-y-auto px-5 py-4"
+            >
+              <div>
+                <label className="block text-xs font-bold text-slate-800">
+                  Milestone No
+                </label>
+                <input
+                  value={form.milestoneNo}
+                 
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      milestoneNo: e.target.value,
+                    }))
+                  }
+                  className={inputClass}
+                  placeholder="e.g. M1.2"
+                />
+              </div>
               <div>
                 <label className="block text-xs font-bold text-slate-800">
                   Milestone Name
                 </label>
                 <input
                   value={form.name}
+                 
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, name: e.target.value }))
                   }
@@ -408,6 +423,7 @@ export function CoordinatorProjectMilestones({
                 </label>
                 <input
                   value={form.workPackageNo}
+                 
                   onChange={(e) =>
                     setForm((prev) => ({
                       ...prev,
@@ -423,6 +439,7 @@ export function CoordinatorProjectMilestones({
                 </label>
                 <input
                   value={form.leadBeneficiary}
+                 
                   onChange={(e) =>
                     setForm((prev) => ({
                       ...prev,
@@ -437,14 +454,15 @@ export function CoordinatorProjectMilestones({
                   Means of Verification
                 </label>
                 <textarea
+                  rows={3}
                   value={form.meansOfVerification}
+                 
                   onChange={(e) =>
                     setForm((prev) => ({
                       ...prev,
                       meansOfVerification: e.target.value,
                     }))
                   }
-                  rows={3}
                   className={inputClass}
                 />
               </div>
@@ -455,6 +473,7 @@ export function CoordinatorProjectMilestones({
                 <input
                   type="date"
                   value={form.dueDate}
+                 
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, dueDate: e.target.value }))
                   }
@@ -467,11 +486,11 @@ export function CoordinatorProjectMilestones({
                 </label>
                 <select
                   value={form.status}
+                 
                   onChange={(e) => {
-                    const value = e.target.value;
-                    if (isMilestoneStatus(value)) {
-                      setForm((prev) => ({ ...prev, status: value }));
-                    }
+                    const next = e.target.value;
+                    if (!isMilestoneStatus(next)) return;
+                    setForm((prev) => ({ ...prev, status: next }));
                   }}
                   className={inputClass}
                 >
@@ -507,141 +526,6 @@ export function CoordinatorProjectMilestones({
         </div>
       )}
 
-      {canManage && uploadOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="upload-milestones-title"
-          onClick={closeUploadModal}
-        >
-          <div
-            className="w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2
-              id="upload-milestones-title"
-              className="text-base font-bold text-[#062763]"
-            >
-              Upload milestones (CSV)
-            </h2>
-            <p className="mt-2 text-sm font-semibold text-slate-800">
-              CSV headers supported: Milestone Name, Work Package No, Lead
-              Beneficiary, Means of Verification, Due Date, Status
-            </p>
-
-            <div className="mt-4">
-              <label className="block text-xs font-bold text-slate-800">
-                Select CSV file
-              </label>
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                disabled={uploading}
-                onChange={(e) => {
-                  const file = e.target.files?.[0] ?? null;
-                  setUploadFile(file);
-                  setUploadError(null);
-                  setUploadCreated(0);
-                  setUploadErrors([]);
-                  if (file) void loadCsvPreview(file);
-                  else {
-                    setCsvPreview(null);
-                    setCsvPreviewError(null);
-                  }
-                }}
-                className="mt-1 block w-full text-sm font-medium text-slate-800 file:mr-3 file:rounded-lg file:border-0 file:bg-[#062763] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
-              />
-            </div>
-
-            {csvPreviewLoading && (
-              <p className="mt-3 text-sm font-semibold text-slate-700">
-                Reading CSV preview…
-              </p>
-            )}
-            {csvPreviewError && (
-              <p className="mt-3 text-sm font-semibold text-red-700" role="alert">
-                {csvPreviewError}
-              </p>
-            )}
-            {csvPreview && (
-              <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
-                <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
-                  Preview · {csvPreview.fileName} ·{" "}
-                  {csvPreview.totalRows <= CSV_PREVIEW_ROW_LIMIT
-                    ? `${csvPreview.totalRows} row${csvPreview.totalRows === 1 ? "" : "s"}`
-                    : `Showing first ${CSV_PREVIEW_ROW_LIMIT} of ${csvPreview.totalRows} rows`}
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-left text-xs">
-                    <thead className="bg-[#e8f0ff] text-[#062763]">
-                      <tr>
-                        {csvPreview.headers.map((header) => (
-                          <th key={header} className="px-3 py-2 font-bold">
-                            {header}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {csvPreview.rows.map((row, rowIndex) => (
-                        <tr key={`${csvPreview.fileName}-${rowIndex}`}>
-                          {csvPreview.headers.map((_, colIndex) => (
-                            <td
-                              key={`${rowIndex}-${colIndex}`}
-                              className="px-3 py-2 font-medium text-slate-800"
-                            >
-                              {row[colIndex] || "—"}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {uploadCreated > 0 && (
-              <p className="mt-3 text-sm font-semibold text-emerald-800">
-                Imported {uploadCreated} milestone
-                {uploadCreated === 1 ? "" : "s"}.
-              </p>
-            )}
-            {uploadError && (
-              <p className="mt-3 text-sm font-semibold text-red-700" role="alert">
-                {uploadError}
-              </p>
-            )}
-            {uploadErrors.length > 0 && (
-              <ul className="mt-2 max-h-32 list-disc space-y-1 overflow-y-auto pl-5 text-xs font-semibold text-amber-900">
-                {uploadErrors.map((error) => (
-                  <li key={error}>{error}</li>
-                ))}
-              </ul>
-            )}
-
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={closeUploadModal}
-                disabled={uploading}
-                className="rounded-lg border-2 border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleUploadCsv()}
-                disabled={uploading || !uploadFile}
-                className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
-              >
-                {uploading ? "Importing…" : "Import CSV"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    </div>
   );
 }

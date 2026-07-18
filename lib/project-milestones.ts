@@ -9,6 +9,7 @@ export type MilestoneStatus = (typeof MILESTONE_STATUSES)[number];
 export type ProjectMilestone = {
   id: string;
   name: string;
+  milestoneNo: string;
   workPackageNo: string;
   leadBeneficiary: string;
   meansOfVerification: string;
@@ -115,7 +116,9 @@ export function saveMilestonesToStorage(milestones: ProjectMilestone[]): void {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(milestones));
 }
 
-function normalizeMilestone(value: unknown): ProjectMilestone | null {
+export function normalizeProjectMilestone(
+  value: unknown
+): ProjectMilestone | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   const name = typeof record.name === "string" ? record.name.trim() : "";
@@ -128,6 +131,8 @@ function normalizeMilestone(value: unknown): ProjectMilestone | null {
         ? record.id
         : createMilestoneId(),
     name,
+    milestoneNo:
+      typeof record.milestoneNo === "string" ? record.milestoneNo.trim() : "",
     workPackageNo:
       typeof record.workPackageNo === "string" ? record.workPackageNo.trim() : "",
     leadBeneficiary:
@@ -143,12 +148,23 @@ function normalizeMilestone(value: unknown): ProjectMilestone | null {
   };
 }
 
+function normalizeMilestone(value: unknown): ProjectMilestone | null {
+  return normalizeProjectMilestone(value);
+}
+
 function normalizeHeader(header: string): string {
   return header.trim().toLowerCase().replace(/[\s_-]+/g, "");
 }
 
 const HEADER_ALIASES: Record<keyof Omit<ProjectMilestone, "id">, string[]> = {
   name: ["milestonename", "milestone", "name"],
+  milestoneNo: [
+    "milestoneno",
+    "milestonenumber",
+    "milestonenr",
+    "mno",
+    "msno",
+  ],
   workPackageNo: [
     "workpackageno",
     "workpackagenumber",
@@ -180,6 +196,7 @@ export function milestonesFromCsv(
 ): { milestones: ProjectMilestone[]; errors: string[] } {
   const indexes = {
     name: findColumnIndex(headers, "name"),
+    milestoneNo: findColumnIndex(headers, "milestoneNo"),
     workPackageNo: findColumnIndex(headers, "workPackageNo"),
     leadBeneficiary: findColumnIndex(headers, "leadBeneficiary"),
     meansOfVerification: findColumnIndex(headers, "meansOfVerification"),
@@ -234,6 +251,10 @@ export function milestonesFromCsv(
     milestones.push({
       id: createMilestoneId(),
       name,
+      milestoneNo:
+        indexes.milestoneNo >= 0
+          ? (row[indexes.milestoneNo] ?? "").trim()
+          : "",
       workPackageNo:
         indexes.workPackageNo >= 0
           ? (row[indexes.workPackageNo] ?? "").trim()

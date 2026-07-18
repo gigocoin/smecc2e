@@ -390,27 +390,31 @@ enum ProjectTrackStatus {
   COMPLETED
 }
 
-/// Yes/No answer for risk follow-up questions (null = not answered yet).
+/// Yes/No(/Partially) answer for risk follow-up questions (null = not answered yet).
 enum YesNoAnswer {
   YES
   NO
+  PARTIALLY
 }
 
 /// Project milestone (Project management → Milestones).
 model ProjectMilestone {
   id                  String             @id @default(cuid())
   name                String
+  /// e.g. M1.2
+  milestoneNo         String             @default("") @map("milestone_no")
   workPackageNo       String             @map("work_package_no")
   leadBeneficiary     String             @map("lead_beneficiary")
   meansOfVerification String             @map("means_of_verification") @db.Text
   /// Drives the due-date countdown timer in the milestones table
-  dueDate             DateTime           @map("due_date")
+  dueDate             DateTime?          @map("due_date")
   status              ProjectTrackStatus @default(NOT_STARTED)
   createdAt           DateTime           @default(now()) @map("created_at")
   updatedAt           DateTime           @updatedAt @map("updated_at")
 
   @@index([dueDate])
   @@index([status])
+  @@index([milestoneNo])
   @@map("project_milestones")
 }
 
@@ -424,7 +428,7 @@ model ProjectDeliverable {
   description     String             @default("") @db.Text
   leadBeneficiary String             @map("lead_beneficiary")
   /// Drives the due-date countdown timer in the deliverables table
-  dueDate         DateTime           @map("due_date")
+  dueDate         DateTime?          @map("due_date")
   status          ProjectTrackStatus @default(NOT_STARTED)
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
@@ -442,6 +446,8 @@ model ProjectMandEIndicator {
   type              String   @default("")
   unitOfMeasurement String   @default("") @map("unit_of_measurement")
   baselineValue     String   @default("") @map("baseline_value")
+  /// Target value at the end of the project
+  targetValue       String   @default("") @map("target_value")
   currentStatus     String   @default("") @map("current_status")
   /// 0–100 (%)
   completionRate    Int      @default(0) @map("completion_rate")
@@ -457,6 +463,7 @@ model ProjectMandEIndicator {
 /// Risk register entry (Project management → Risks).
 model ProjectRisk {
   id                        String       @id @default(cuid())
+  description               String       @default("") @db.Text
   workPackage               String       @map("work_package")
   riskMitigationMeasures    String       @default("") @map("risk_mitigation_measures") @db.Text
   /// Reporting period, e.g. "Q1 2026"

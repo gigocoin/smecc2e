@@ -1,21 +1,16 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { parseCsv } from "@/lib/csv-parse";
 import {
   createDeliverableId,
   DELIVERABLE_STATUSES,
-  deliverablesFromCsv,
   formatDeliverableDueDate,
   getDeliverableCountdown,
   isDeliverableStatus,
-  loadDeliverablesFromStorage,
-  saveDeliverablesToStorage,
+  parseDeliverableDueDate,
   type DeliverableStatus,
   type ProjectDeliverable,
 } from "@/lib/project-deliverables";
-
-const CSV_PREVIEW_ROW_LIMIT = 5;
 
 const inputClass =
   "mt-1 w-full rounded-lg border-2 border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-[#062763] focus:ring-2 focus:ring-[#062763]/15 disabled:opacity-50";
@@ -49,7 +44,7 @@ function CountdownCell({ dueDate }: { dueDate: string }) {
   );
 
   if (!dueDate.trim()) {
-    return <span className="font-semibold text-slate-500">—</span>;
+    return <span className="font-semibold text-slate-500">â€”</span>;
   }
 
   return (
@@ -74,49 +69,105 @@ function statusBadgeClass(status: DeliverableStatus): string {
   }
 }
 
+function DeliverableStatusControl({
+  deliverable,
+  canManage,
+  onStatusChange,
+}: {
+  deliverable: ProjectDeliverable;
+  canManage: boolean;
+  onStatusChange: (id: string, status: DeliverableStatus) => void;
+}) {
+  if (canManage) {
+    return (
+      <select
+        value={deliverable.status}
+        onChange={(e) => {
+          const value = e.target.value;
+          if (isDeliverableStatus(value)) {
+            onStatusChange(deliverable.id, value);
+          }
+        }}
+        className={selectClass}
+        aria-label={`Status for ${deliverable.name}`}
+      >
+        {DELIVERABLE_STATUSES.map((status) => (
+          <option key={status} value={status}>
+            {status}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  return (
+    <span
+      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(
+        deliverable.status
+      )}`}
+    >
+      {deliverable.status}
+    </span>
+  );
+}
+
 export function CoordinatorProjectDeliverables({
   canManage = true,
 }: {
   canManage?: boolean;
 }) {
   const [deliverables, setDeliverables] = useState<ProjectDeliverable[]>([]);
-  const [hydrated, setHydrated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadCreated, setUploadCreated] = useState(0);
-  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
-  const [csvPreview, setCsvPreview] = useState<{
-    fileName: string;
-    headers: string[];
-    rows: string[][];
-    totalRows: number;
-  } | null>(null);
-  const [csvPreviewLoading, setCsvPreviewLoading] = useState(false);
-  const [csvPreviewError, setCsvPreviewError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setDeliverables(loadDeliverablesFromStorage());
-    setHydrated(true);
+  const fetchDeliverables = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await fetch("/api/project-deliverables");
+      const data = (await res.json()) as {
+        deliverables?: ProjectDeliverable[];
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to load deliverables");
+      }
+      setDeliverables(data.deliverables ?? []);
+    } catch (err) {
+      setLoadError(
+        err instanceof Error ? err.message : "Failed to load deliverables"
+      );
+      setDeliverables([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
-    saveDeliverablesToStorage(deliverables);
-  }, [hydrated, deliverables]);
+    void fetchDeliverables();
+  }, [fetchDeliverables]);
+
+  useEffect(() => {
+    if (!saveMessage) return;
+    const id = window.setTimeout(() => setSaveMessage(null), 4000);
+    return () => window.clearTimeout(id);
+  }, [saveMessage]);
 
   const sortedDeliverables = useMemo(
     () =>
       [...deliverables].sort((a, b) => {
-        const aDue = a.dueDate || "9999-12-31";
-        const bDue = b.dueDate || "9999-12-31";
+        const aParsed = parseDeliverableDueDate(a.dueDate);
+        const bParsed = parseDeliverableDueDate(b.dueDate);
+        const aSort = aParsed?.getTime() ?? Number.POSITIVE_INFINITY;
+        const bSort = bParsed?.getTime() ?? Number.POSITIVE_INFINITY;
+        if (aSort !== bSort) return aSort - bSort;
         return (
-          aDue.localeCompare(bDue) ||
           a.workPackageNo.localeCompare(b.workPackageNo) ||
           a.deliverableNo.localeCompare(b.deliverableNo) ||
           a.name.localeCompare(b.name)
@@ -134,49 +185,6 @@ export function CoordinatorProjectDeliverables({
     setCreateOpen(false);
     resetCreateForm();
   };
-
-  const resetUploadForm = () => {
-    setUploadFile(null);
-    setUploadError(null);
-    setUploadCreated(0);
-    setUploadErrors([]);
-    setCsvPreview(null);
-    setCsvPreviewLoading(false);
-    setCsvPreviewError(null);
-  };
-
-  const closeUploadModal = () => {
-    if (uploading) return;
-    setUploadOpen(false);
-    resetUploadForm();
-  };
-
-  const loadCsvPreview = useCallback(async (file: File) => {
-    setCsvPreviewLoading(true);
-    setCsvPreviewError(null);
-    setCsvPreview(null);
-    try {
-      const text = await file.text();
-      const { headers, rows } = parseCsv(text);
-      const dataRows = rows.filter((row) =>
-        row.some((cell) => cell.trim() !== "")
-      );
-      if (!headers.length) {
-        setCsvPreviewError("CSV has no header row.");
-        return;
-      }
-      setCsvPreview({
-        fileName: file.name,
-        headers,
-        rows: dataRows.slice(0, CSV_PREVIEW_ROW_LIMIT),
-        totalRows: dataRows.length,
-      });
-    } catch {
-      setCsvPreviewError("Could not read CSV file for preview.");
-    } finally {
-      setCsvPreviewLoading(false);
-    }
-  }, []);
 
   const handleCreateDeliverable = (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,6 +209,8 @@ export function CoordinatorProjectDeliverables({
     };
 
     setDeliverables((prev) => [...prev, deliverable]);
+    setSaveMessage(null);
+    setSaveError(null);
     closeCreateModal();
   };
 
@@ -210,52 +220,64 @@ export function CoordinatorProjectDeliverables({
         deliverable.id === id ? { ...deliverable, status } : deliverable
       )
     );
+    setSaveMessage(null);
+    setSaveError(null);
   };
 
-  const handleUploadCsv = async () => {
-    if (!uploadFile) {
-      setUploadError("Select a CSV file to upload.");
-      return;
-    }
-
-    setUploading(true);
-    setUploadError(null);
-    setUploadCreated(0);
-    setUploadErrors([]);
+  const handleSaveDeliverables = async () => {
+    setSaving(true);
+    setSaveError(null);
+    setSaveMessage(null);
     try {
-      const text = await uploadFile.text();
-      const { headers, rows } = parseCsv(text);
-      const dataRows = rows.filter((row) =>
-        row.some((cell) => cell.trim() !== "")
-      );
-      const { deliverables: imported, errors } = deliverablesFromCsv(
-        headers,
-        dataRows
-      );
-      if (errors.length > 0 && imported.length === 0) {
-        setUploadError(errors[0] ?? "Could not import deliverables from CSV.");
-        setUploadErrors(errors);
-        return;
+      const res = await fetch("/api/project-deliverables", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deliverables }),
+      });
+      const data = (await res.json()) as {
+        deliverables?: ProjectDeliverable[];
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to save deliverables");
       }
-      if (imported.length === 0) {
-        setUploadError("No valid deliverable rows found in the CSV.");
-        return;
-      }
-      setDeliverables((prev) => [...prev, ...imported]);
-      setUploadCreated(imported.length);
-      setUploadErrors(errors);
-    } catch {
-      setUploadError("Could not import deliverables from CSV.");
+      setDeliverables(data.deliverables ?? deliverables);
+      setSaveMessage(
+        `Saved ${data.deliverables?.length ?? deliverables.length} deliverable${
+          (data.deliverables?.length ?? deliverables.length) === 1 ? "" : "s"
+        }.`
+      );
+    } catch (err) {
+      setSaveError(
+        err instanceof Error ? err.message : "Failed to save deliverables"
+      );
     } finally {
-      setUploading(false);
+      setSaving(false);
     }
   };
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div aria-live="polite" className="min-h-5">
+          {saveMessage && (
+            <p className="text-sm font-semibold text-emerald-800">
+              {saveMessage}
+            </p>
+          )}
+          {saveError && (
+            <p className="text-sm font-semibold text-red-700" role="alert">
+              {saveError}
+            </p>
+          )}
+          {loadError && (
+            <p className="text-sm font-semibold text-red-700" role="alert">
+              {loadError}
+            </p>
+          )}
+        </div>
         {canManage && (
-          <>
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
@@ -265,121 +287,177 @@ export function CoordinatorProjectDeliverables({
             </button>
             <button
               type="button"
-              onClick={() => setUploadOpen(true)}
-              className="rounded-lg border-2 border-[#062763]/25 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5"
+              onClick={() => void handleSaveDeliverables()}
+              disabled={saving || loading}
+              className="rounded-lg border-2 border-[#062763] px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
             >
-              Upload Deliverables CSV
+              {saving ? "Savingâ€¦" : "Save Deliverables"}
             </button>
-          </>
+          </div>
         )}
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-5 py-4">
+        <div className="shrink-0 border-b border-slate-100 px-4 py-4 sm:px-5">
           <h2 className="text-base font-bold text-[#062763]">Deliverables</h2>
           <p className="mt-1 text-sm font-semibold text-slate-800">
-            {sortedDeliverables.length === 0
-              ? "No deliverables yet."
-              : `${sortedDeliverables.length} deliverable${
-                  sortedDeliverables.length === 1 ? "" : "s"
-                }.`}
+            {loading
+              ? "Loading deliverablesâ€¦"
+              : sortedDeliverables.length === 0
+                ? "No deliverables yet."
+                : `${sortedDeliverables.length} deliverable${
+                    sortedDeliverables.length === 1 ? "" : "s"
+                  }.`}
           </p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1200px] text-left text-sm">
-            <thead className="bg-[#e8f0ff] text-xs font-bold uppercase tracking-wide text-[#062763]">
-              <tr>
-                <th className="px-4 py-3">Work Package No</th>
-                <th className="px-4 py-3">Deliverable No</th>
-                <th className="px-4 py-3">Deliverable Name</th>
-                <th className="px-4 py-3">Description</th>
-                <th className="px-4 py-3">Lead Beneficiary</th>
-                <th className="px-4 py-3">Due Date</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Countdown Timer</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {!hydrated ? (
+
+        <div className="h-[60vh] min-w-0 overflow-auto">
+          {/* Mobile / tablet card layout */}
+          <div className="divide-y divide-slate-100 lg:hidden">
+            {loading ? (
+              <p className="px-4 py-10 text-center text-sm font-semibold text-slate-700">
+                Loading deliverablesâ€¦
+              </p>
+            ) : sortedDeliverables.length === 0 ? (
+              <p className="px-4 py-10 text-center text-sm font-semibold text-slate-700">
+                {canManage
+                  ? "No deliverables yet. Add one, then Save Deliverables."
+                  : "No deliverables yet."}
+              </p>
+            ) : (
+              sortedDeliverables.map((deliverable) => (
+                <article
+                  key={deliverable.id}
+                  className="space-y-3 px-4 py-4 sm:px-5"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-wide text-[#062763]/70">
+                        {[deliverable.deliverableNo, deliverable.workPackageNo]
+                          .filter(Boolean)
+                          .join(" Â· ") || "Deliverable"}
+                      </p>
+                      <h3 className="mt-1 text-sm font-bold text-slate-900">
+                        {deliverable.name}
+                      </h3>
+                    </div>
+                    <DeliverableStatusControl
+                      deliverable={deliverable}
+                      canManage={canManage}
+                      onStatusChange={handleStatusChange}
+                    />
+                  </div>
+                  {deliverable.description ? (
+                    <p className="text-sm font-medium text-slate-800">
+                      {deliverable.description}
+                    </p>
+                  ) : null}
+                  <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                    <div>
+                      <dt className="text-xs font-bold text-slate-500">
+                        Lead Beneficiary
+                      </dt>
+                      <dd className="font-medium text-slate-900">
+                        {deliverable.leadBeneficiary || "â€”"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-bold text-slate-500">
+                        Due Date
+                      </dt>
+                      <dd className="font-medium text-slate-900">
+                        {formatDeliverableDueDate(deliverable.dueDate)}
+                      </dd>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <dt className="text-xs font-bold text-slate-500">
+                        Countdown
+                      </dt>
+                      <dd className="mt-0.5">
+                        <CountdownCell dueDate={deliverable.dueDate} />
+                      </dd>
+                    </div>
+                  </dl>
+                </article>
+              ))
+            )}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden min-w-0 lg:block">
+            <table className="w-full min-w-[1200px] text-left text-sm">
+              <thead className="sticky top-0 z-10 bg-[#e8f0ff] text-xs font-bold uppercase tracking-wide text-[#062763]">
                 <tr>
-                  <td
-                    colSpan={8}
-                    className="px-4 py-10 text-center font-semibold text-slate-700"
-                  >
-                    Loading deliverables…
-                  </td>
+                  <th className="px-4 py-3">Work Package No</th>
+                  <th className="px-4 py-3">Deliverable No</th>
+                  <th className="px-4 py-3">Deliverable Name</th>
+                  <th className="px-4 py-3">Description</th>
+                  <th className="px-4 py-3">Lead Beneficiary</th>
+                  <th className="px-4 py-3">Due Date</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Countdown Timer</th>
                 </tr>
-              ) : sortedDeliverables.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={8}
-                    className="px-4 py-10 text-center font-semibold text-slate-700"
-                  >
-                    {canManage
-                      ? "No deliverables yet. Add one or upload a CSV to get started."
-                      : "No deliverables yet."}
-                  </td>
-                </tr>
-              ) : (
-                sortedDeliverables.map((deliverable) => (
-                  <tr key={deliverable.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-900">
-                      {deliverable.workPackageNo || "—"}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-slate-900">
-                      {deliverable.deliverableNo || "—"}
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-slate-900">
-                      {deliverable.name}
-                    </td>
-                    <td className="max-w-sm px-4 py-3 font-medium text-slate-900">
-                      <span className="line-clamp-3">
-                        {deliverable.description || "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-medium text-slate-900">
-                      {deliverable.leadBeneficiary || "—"}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-slate-900">
-                      {formatDeliverableDueDate(deliverable.dueDate)}
-                    </td>
-                    <td className="px-4 py-3">
-                      {canManage ? (
-                        <select
-                          value={deliverable.status}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            if (isDeliverableStatus(value)) {
-                              handleStatusChange(deliverable.id, value);
-                            }
-                          }}
-                          className={selectClass}
-                          aria-label={`Status for ${deliverable.name}`}
-                        >
-                          {DELIVERABLE_STATUSES.map((status) => (
-                            <option key={status} value={status}>
-                              {status}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass(
-                            deliverable.status
-                          )}`}
-                        >
-                          {deliverable.status}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <CountdownCell dueDate={deliverable.dueDate} />
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {loading ? (
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="px-4 py-10 text-center font-semibold text-slate-700"
+                    >
+                      Loading deliverablesâ€¦
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : sortedDeliverables.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="px-4 py-10 text-center font-semibold text-slate-700"
+                    >
+                      {canManage
+                        ? "No deliverables yet. Add one, then Save Deliverables."
+                        : "No deliverables yet."}
+                    </td>
+                  </tr>
+                ) : (
+                  sortedDeliverables.map((deliverable) => (
+                    <tr key={deliverable.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-medium text-slate-900">
+                        {deliverable.workPackageNo || "â€”"}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-slate-900">
+                        {deliverable.deliverableNo || "â€”"}
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-slate-900">
+                        {deliverable.name}
+                      </td>
+                      <td className="max-w-sm px-4 py-3 font-medium text-slate-900">
+                        <span className="line-clamp-3">
+                          {deliverable.description || "â€”"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-medium text-slate-900">
+                        {deliverable.leadBeneficiary || "â€”"}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-slate-900">
+                        {formatDeliverableDueDate(deliverable.dueDate)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <DeliverableStatusControl
+                          deliverable={deliverable}
+                          canManage={canManage}
+                          onStatusChange={handleStatusChange}
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <CountdownCell dueDate={deliverable.dueDate} />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -538,141 +616,7 @@ export function CoordinatorProjectDeliverables({
         </div>
       )}
 
-      {canManage && uploadOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="upload-deliverables-title"
-          onClick={closeUploadModal}
-        >
-          <div
-            className="w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2
-              id="upload-deliverables-title"
-              className="text-base font-bold text-[#062763]"
-            >
-              Upload deliverables (CSV)
-            </h2>
-            <p className="mt-2 text-sm font-semibold text-slate-800">
-              CSV headers supported: Work Package No, Deliverable No,
-              Deliverable Name, Description, Lead Beneficiary, Due Date, Status
-            </p>
 
-            <div className="mt-4">
-              <label className="block text-xs font-bold text-slate-800">
-                Select CSV file
-              </label>
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                disabled={uploading}
-                onChange={(e) => {
-                  const file = e.target.files?.[0] ?? null;
-                  setUploadFile(file);
-                  setUploadError(null);
-                  setUploadCreated(0);
-                  setUploadErrors([]);
-                  if (file) void loadCsvPreview(file);
-                  else {
-                    setCsvPreview(null);
-                    setCsvPreviewError(null);
-                  }
-                }}
-                className="mt-1 block w-full text-sm font-medium text-slate-800 file:mr-3 file:rounded-lg file:border-0 file:bg-[#062763] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
-              />
-            </div>
-
-            {csvPreviewLoading && (
-              <p className="mt-3 text-sm font-semibold text-slate-700">
-                Reading CSV preview…
-              </p>
-            )}
-            {csvPreviewError && (
-              <p className="mt-3 text-sm font-semibold text-red-700" role="alert">
-                {csvPreviewError}
-              </p>
-            )}
-            {csvPreview && (
-              <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
-                <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
-                  Preview · {csvPreview.fileName} ·{" "}
-                  {csvPreview.totalRows <= CSV_PREVIEW_ROW_LIMIT
-                    ? `${csvPreview.totalRows} row${csvPreview.totalRows === 1 ? "" : "s"}`
-                    : `Showing first ${CSV_PREVIEW_ROW_LIMIT} of ${csvPreview.totalRows} rows`}
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-left text-xs">
-                    <thead className="bg-[#e8f0ff] text-[#062763]">
-                      <tr>
-                        {csvPreview.headers.map((header) => (
-                          <th key={header} className="px-3 py-2 font-bold">
-                            {header}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {csvPreview.rows.map((row, rowIndex) => (
-                        <tr key={`${csvPreview.fileName}-${rowIndex}`}>
-                          {csvPreview.headers.map((_, colIndex) => (
-                            <td
-                              key={`${rowIndex}-${colIndex}`}
-                              className="px-3 py-2 font-medium text-slate-800"
-                            >
-                              {row[colIndex] || "—"}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {uploadCreated > 0 && (
-              <p className="mt-3 text-sm font-semibold text-emerald-800">
-                Imported {uploadCreated} deliverable
-                {uploadCreated === 1 ? "" : "s"}.
-              </p>
-            )}
-            {uploadError && (
-              <p className="mt-3 text-sm font-semibold text-red-700" role="alert">
-                {uploadError}
-              </p>
-            )}
-            {uploadErrors.length > 0 && (
-              <ul className="mt-2 max-h-32 list-disc space-y-1 overflow-y-auto pl-5 text-xs font-semibold text-amber-900">
-                {uploadErrors.map((error) => (
-                  <li key={error}>{error}</li>
-                ))}
-              </ul>
-            )}
-
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={closeUploadModal}
-                disabled={uploading}
-                className="rounded-lg border-2 border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleUploadCsv()}
-                disabled={uploading || !uploadFile}
-                className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
-              >
-                {uploading ? "Importing…" : "Import CSV"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

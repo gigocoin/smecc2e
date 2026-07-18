@@ -49,7 +49,7 @@ export function CoordinatorProject() {
         )}
       </header>
 
-      <main className="flex-1 overflow-auto bg-slate-50 p-4 sm:p-6">
+      <main className="min-w-0 flex-1 overflow-auto bg-slate-50 p-4 sm:p-6">
         {activeSection === "milestones" ? (
           <CoordinatorProjectMilestones canManage={canManageProject} />
         ) : activeSection === "deliverables" ? (

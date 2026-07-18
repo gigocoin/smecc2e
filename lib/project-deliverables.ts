@@ -65,7 +65,9 @@ export function saveDeliverablesToStorage(
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(deliverables));
 }
 
-function normalizeDeliverable(value: unknown): ProjectDeliverable | null {
+export function normalizeProjectDeliverable(
+  value: unknown
+): ProjectDeliverable | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   const name = typeof record.name === "string" ? record.name.trim() : "";
@@ -95,6 +97,10 @@ function normalizeDeliverable(value: unknown): ProjectDeliverable | null {
     dueDate: typeof record.dueDate === "string" ? record.dueDate.trim() : "",
     status: isDeliverableStatus(statusRaw) ? statusRaw : "Not Started",
   };
+}
+
+function normalizeDeliverable(value: unknown): ProjectDeliverable | null {
+  return normalizeProjectDeliverable(value);
 }
 
 function normalizeHeader(header: string): string {

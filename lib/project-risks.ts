@@ -1,19 +1,24 @@
 export type YesNoAnswer = "Yes" | "No" | "";
+export type RiskMaterialisedAnswer = "Yes" | "No" | "Partially" | "";
 
 export type ProjectRisk = {
   id: string;
+  description: string;
   workPackage: string;
   riskMitigationMeasures: string;
   stateOfThePlayPeriod: string;
   appliedMitigationMeasures: YesNoAnswer;
-  riskMaterialised: YesNoAnswer;
+  riskMaterialised: RiskMaterialisedAnswer;
   stateOfThePlayComments: string;
   actions: string;
 };
 
 export const YES_NO_OPTIONS: YesNoAnswer[] = ["Yes", "No"];
-
-const STORAGE_KEY = "smecc2e-project-risks";
+export const RISK_MATERIALISED_OPTIONS: RiskMaterialisedAnswer[] = [
+  "Yes",
+  "No",
+  "Partially",
+];
 
 export function createRiskId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -22,7 +27,7 @@ export function createRiskId(): string {
   return `risk-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function parseYesNo(value: unknown): YesNoAnswer {
+export function parseYesNo(value: unknown): YesNoAnswer {
   if (typeof value !== "string") return "";
   const normalized = value.trim().toLowerCase();
   if (normalized === "yes" || normalized === "y" || normalized === "true") {
@@ -34,27 +39,26 @@ function parseYesNo(value: unknown): YesNoAnswer {
   return "";
 }
 
-export function loadRisksFromStorage(): ProjectRisk[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map(normalizeRisk)
-      .filter((item): item is ProjectRisk => item != null);
-  } catch {
-    return [];
+export function parseRiskMaterialised(value: unknown): RiskMaterialisedAnswer {
+  if (typeof value !== "string") return "";
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "yes" || normalized === "y" || normalized === "true") {
+    return "Yes";
   }
+  if (normalized === "no" || normalized === "n" || normalized === "false") {
+    return "No";
+  }
+  if (
+    normalized === "partially" ||
+    normalized === "partial" ||
+    normalized === "part"
+  ) {
+    return "Partially";
+  }
+  return "";
 }
 
-export function saveRisksToStorage(risks: ProjectRisk[]): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(risks));
-}
-
-function normalizeRisk(value: unknown): ProjectRisk | null {
+export function normalizeProjectRisk(value: unknown): ProjectRisk | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   const workPackage =
@@ -63,6 +67,8 @@ function normalizeRisk(value: unknown): ProjectRisk | null {
   return {
     id:
       typeof record.id === "string" && record.id ? record.id : createRiskId(),
+    description:
+      typeof record.description === "string" ? record.description.trim() : "",
     workPackage,
     riskMitigationMeasures:
       typeof record.riskMitigationMeasures === "string"
@@ -73,7 +79,7 @@ function normalizeRisk(value: unknown): ProjectRisk | null {
         ? record.stateOfThePlayPeriod.trim()
         : "",
     appliedMitigationMeasures: parseYesNo(record.appliedMitigationMeasures),
-    riskMaterialised: parseYesNo(record.riskMaterialised),
+    riskMaterialised: parseRiskMaterialised(record.riskMaterialised),
     stateOfThePlayComments:
       typeof record.stateOfThePlayComments === "string"
         ? record.stateOfThePlayComments.trim()
@@ -87,6 +93,7 @@ function normalizeHeader(header: string): string {
 }
 
 const HEADER_ALIASES: Record<keyof Omit<ProjectRisk, "id">, string[]> = {
+  description: ["description", "riskdescription", "risk"],
   workPackage: ["workpackage", "wp", "workpackageno", "workpackagenumber"],
   riskMitigationMeasures: [
     "riskmitigationmeasures",
@@ -132,6 +139,7 @@ export function risksFromCsv(
   rows: string[][]
 ): { risks: ProjectRisk[]; errors: string[] } {
   const indexes = {
+    description: findColumnIndex(headers, "description"),
     workPackage: findColumnIndex(headers, "workPackage"),
     riskMitigationMeasures: findColumnIndex(headers, "riskMitigationMeasures"),
     stateOfThePlayPeriod: findColumnIndex(headers, "stateOfThePlayPeriod"),
@@ -166,6 +174,10 @@ export function risksFromCsv(
 
     risks.push({
       id: createRiskId(),
+      description:
+        indexes.description >= 0
+          ? (row[indexes.description] ?? "").trim()
+          : "",
       workPackage,
       riskMitigationMeasures:
         indexes.riskMitigationMeasures >= 0
@@ -181,7 +193,7 @@ export function risksFromCsv(
           : "",
       riskMaterialised:
         indexes.riskMaterialised >= 0
-          ? parseYesNo(row[indexes.riskMaterialised])
+          ? parseRiskMaterialised(row[indexes.riskMaterialised])
           : "",
       stateOfThePlayComments:
         indexes.stateOfThePlayComments >= 0

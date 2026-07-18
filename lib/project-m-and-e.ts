@@ -4,6 +4,7 @@ export type ProjectMandEIndicator = {
   type: string;
   unitOfMeasurement: string;
   baselineValue: string;
+  targetValue: string;
   currentStatus: string;
   completionRate: number;
 };
@@ -20,6 +21,32 @@ export function createMandEId(): string {
 export function clampCompletionRate(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+/** Parse a numeric value from baseline / target / current status fields. */
+export function parseMandENumeric(value: string): number | null {
+  const trimmed = value.trim().replace(/%$/, "");
+  if (!trimmed) return null;
+  const parsed = Number.parseFloat(trimmed.replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Completion rate (%) = currentStatus × 100 / (targetValue − baselineValue)
+ * Returns 0 when inputs are missing/invalid or the denominator is 0.
+ */
+export function calculateMandECompletionRate(
+  currentStatus: string,
+  targetValue: string,
+  baselineValue: string
+): number {
+  const current = parseMandENumeric(currentStatus);
+  const target = parseMandENumeric(targetValue);
+  const baseline = parseMandENumeric(baselineValue);
+  if (current === null || target === null || baseline === null) return 0;
+  const denominator = target - baseline;
+  if (denominator === 0) return 0;
+  return clampCompletionRate((current * 100) / denominator);
 }
 
 export function loadMandEFromStorage(): ProjectMandEIndicator[] {
@@ -42,19 +69,24 @@ export function saveMandEToStorage(indicators: ProjectMandEIndicator[]): void {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(indicators));
 }
 
-function normalizeIndicator(value: unknown): ProjectMandEIndicator | null {
+export function normalizeMandEIndicator(
+  value: unknown
+): ProjectMandEIndicator | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   const indicator =
     typeof record.indicator === "string" ? record.indicator.trim() : "";
   if (!indicator) return null;
-  const rateRaw = record.completionRate;
-  const rate =
-    typeof rateRaw === "number"
-      ? rateRaw
-      : typeof rateRaw === "string"
-        ? Number.parseFloat(rateRaw)
-        : 0;
+  const baselineValue =
+    typeof record.baselineValue === "string"
+      ? record.baselineValue.trim()
+      : "";
+  const targetValue =
+    typeof record.targetValue === "string" ? record.targetValue.trim() : "";
+  const currentStatus =
+    typeof record.currentStatus === "string"
+      ? record.currentStatus.trim()
+      : "";
   return {
     id:
       typeof record.id === "string" && record.id ? record.id : createMandEId(),
@@ -64,16 +96,19 @@ function normalizeIndicator(value: unknown): ProjectMandEIndicator | null {
       typeof record.unitOfMeasurement === "string"
         ? record.unitOfMeasurement.trim()
         : "",
-    baselineValue:
-      typeof record.baselineValue === "string"
-        ? record.baselineValue.trim()
-        : "",
-    currentStatus:
-      typeof record.currentStatus === "string"
-        ? record.currentStatus.trim()
-        : "",
-    completionRate: clampCompletionRate(rate),
+    baselineValue,
+    targetValue,
+    currentStatus,
+    completionRate: calculateMandECompletionRate(
+      currentStatus,
+      targetValue,
+      baselineValue
+    ),
   };
+}
+
+function normalizeIndicator(value: unknown): ProjectMandEIndicator | null {
+  return normalizeMandEIndicator(value);
 }
 
 function normalizeHeader(header: string): string {
@@ -81,15 +116,20 @@ function normalizeHeader(header: string): string {
 }
 
 const HEADER_ALIASES: Record<
-  keyof Omit<ProjectMandEIndicator, "id">,
+  keyof Omit<ProjectMandEIndicator, "id" | "completionRate">,
   string[]
 > = {
   indicator: ["indicator", "indicatorname"],
   type: ["type", "indicatortype"],
   unitOfMeasurement: ["unitofmeasurement", "unit", "uom", "measurement"],
   baselineValue: ["baselinevalue", "baseline"],
+  targetValue: [
+    "targetvalue",
+    "target",
+    "targetvalueattheendoftheproject",
+    "endoftheproject",
+  ],
   currentStatus: ["currentstatus", "status", "current"],
-  completionRate: ["completionrate", "completion", "percent", "percentage"],
 };
 
 function findColumnIndex(
@@ -111,8 +151,8 @@ export function mandEFromCsv(
     type: findColumnIndex(headers, "type"),
     unitOfMeasurement: findColumnIndex(headers, "unitOfMeasurement"),
     baselineValue: findColumnIndex(headers, "baselineValue"),
+    targetValue: findColumnIndex(headers, "targetValue"),
     currentStatus: findColumnIndex(headers, "currentStatus"),
-    completionRate: findColumnIndex(headers, "completionRate"),
   };
 
   if (indexes.indicator < 0) {
@@ -135,19 +175,16 @@ export function mandEFromCsv(
       return;
     }
 
-    const rateRaw =
-      indexes.completionRate >= 0
-        ? (row[indexes.completionRate] ?? "").trim().replace(/%$/, "")
+    const baselineValue =
+      indexes.baselineValue >= 0
+        ? (row[indexes.baselineValue] ?? "").trim()
         : "";
-    let completionRate = 0;
-    if (rateRaw) {
-      const parsed = Number.parseFloat(rateRaw);
-      if (!Number.isFinite(parsed)) {
-        errors.push(`Row ${line}: Invalid completion rate "${rateRaw}".`);
-        return;
-      }
-      completionRate = clampCompletionRate(parsed);
-    }
+    const targetValue =
+      indexes.targetValue >= 0 ? (row[indexes.targetValue] ?? "").trim() : "";
+    const currentStatus =
+      indexes.currentStatus >= 0
+        ? (row[indexes.currentStatus] ?? "").trim()
+        : "";
 
     indicators.push({
       id: createMandEId(),
@@ -157,15 +194,14 @@ export function mandEFromCsv(
         indexes.unitOfMeasurement >= 0
           ? (row[indexes.unitOfMeasurement] ?? "").trim()
           : "",
-      baselineValue:
-        indexes.baselineValue >= 0
-          ? (row[indexes.baselineValue] ?? "").trim()
-          : "",
-      currentStatus:
-        indexes.currentStatus >= 0
-          ? (row[indexes.currentStatus] ?? "").trim()
-          : "",
-      completionRate,
+      baselineValue,
+      targetValue,
+      currentStatus,
+      completionRate: calculateMandECompletionRate(
+        currentStatus,
+        targetValue,
+        baselineValue
+      ),
     });
   });
 

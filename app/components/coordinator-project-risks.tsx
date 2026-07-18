@@ -4,11 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { parseCsv } from "@/lib/csv-parse";
 import {
   createRiskId,
-  loadRisksFromStorage,
   risksFromCsv,
-  saveRisksToStorage,
+  RISK_MATERIALISED_OPTIONS,
   YES_NO_OPTIONS,
   type ProjectRisk,
+  type RiskMaterialisedAnswer,
   type YesNoAnswer,
 } from "@/lib/project-risks";
 
@@ -25,11 +25,12 @@ const tableInputClass =
 
 function emptyForm() {
   return {
+    description: "",
     workPackage: "",
     riskMitigationMeasures: "",
     stateOfThePlayPeriod: "",
     appliedMitigationMeasures: "" as YesNoAnswer,
-    riskMaterialised: "" as YesNoAnswer,
+    riskMaterialised: "" as RiskMaterialisedAnswer,
     stateOfThePlayComments: "",
     actions: "",
   };
@@ -41,10 +42,14 @@ export function CoordinatorProjectRisks({
   canManage?: boolean;
 }) {
   const [risks, setRisks] = useState<ProjectRisk[]>([]);
-  const [hydrated, setHydrated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -61,15 +66,36 @@ export function CoordinatorProjectRisks({
   const [csvPreviewLoading, setCsvPreviewLoading] = useState(false);
   const [csvPreviewError, setCsvPreviewError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setRisks(loadRisksFromStorage());
-    setHydrated(true);
+  const fetchRisks = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await fetch("/api/project-risks");
+      const data = (await res.json()) as {
+        risks?: ProjectRisk[];
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to load risks");
+      }
+      setRisks(data.risks ?? []);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Failed to load risks");
+      setRisks([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
-    saveRisksToStorage(risks);
-  }, [hydrated, risks]);
+    void fetchRisks();
+  }, [fetchRisks]);
+
+  useEffect(() => {
+    if (!saveMessage) return;
+    const id = window.setTimeout(() => setSaveMessage(null), 4000);
+    return () => window.clearTimeout(id);
+  }, [saveMessage]);
 
   const sortedRisks = useMemo(
     () =>
@@ -139,6 +165,7 @@ export function CoordinatorProjectRisks({
 
     const risk: ProjectRisk = {
       id: createRiskId(),
+      description: form.description.trim(),
       workPackage: form.workPackage.trim(),
       riskMitigationMeasures: form.riskMitigationMeasures.trim(),
       stateOfThePlayPeriod: form.stateOfThePlayPeriod.trim(),
@@ -149,6 +176,8 @@ export function CoordinatorProjectRisks({
     };
 
     setRisks((prev) => [...prev, risk]);
+    setSaveMessage(null);
+    setSaveError(null);
     closeCreateModal();
   };
 
@@ -160,6 +189,38 @@ export function CoordinatorProjectRisks({
     setRisks((prev) =>
       prev.map((risk) => (risk.id === id ? { ...risk, [field]: value } : risk))
     );
+    setSaveMessage(null);
+    setSaveError(null);
+  };
+
+  const handleSaveRisks = async () => {
+    setSaving(true);
+    setSaveError(null);
+    setSaveMessage(null);
+    try {
+      const res = await fetch("/api/project-risks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ risks }),
+      });
+      const data = (await res.json()) as {
+        risks?: ProjectRisk[];
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to save risks");
+      }
+      setRisks(data.risks ?? risks);
+      setSaveMessage(
+        `Saved ${data.risks?.length ?? risks.length} risk${
+          (data.risks?.length ?? risks.length) === 1 ? "" : "s"
+        }.`
+      );
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save risks");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleUploadCsv = async () => {
@@ -189,8 +250,11 @@ export function CoordinatorProjectRisks({
         return;
       }
       setRisks((prev) => [...prev, ...imported]);
-      setUploadCreated(imported.length);
-      setUploadErrors(errors);
+      setSaveMessage(null);
+      setSaveError(null);
+      setUploading(false);
+      setUploadOpen(false);
+      resetUploadForm();
     } catch {
       setUploadError("Could not import risks from CSV.");
     } finally {
@@ -200,9 +264,26 @@ export function CoordinatorProjectRisks({
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div aria-live="polite" className="min-h-5">
+          {saveMessage && (
+            <p className="text-sm font-semibold text-emerald-800">
+              {saveMessage}
+            </p>
+          )}
+          {saveError && (
+            <p className="text-sm font-semibold text-red-700" role="alert">
+              {saveError}
+            </p>
+          )}
+          {loadError && (
+            <p className="text-sm font-semibold text-red-700" role="alert">
+              {loadError}
+            </p>
+          )}
+        </div>
         {canManage && (
-          <>
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setCreateOpen(true)}
@@ -217,23 +298,34 @@ export function CoordinatorProjectRisks({
             >
               Upload Risks CSV
             </button>
-          </>
+            <button
+              type="button"
+              onClick={() => void handleSaveRisks()}
+              disabled={saving || loading}
+              className="rounded-lg border-2 border-[#062763] px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
+            >
+              {saving ? "Saving…" : "Save Risks"}
+            </button>
+          </div>
         )}
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-5 py-4">
+        <div className="shrink-0 border-b border-slate-100 px-5 py-4">
           <h2 className="text-base font-bold text-[#062763]">Risks</h2>
           <p className="mt-1 text-sm font-semibold text-slate-800">
-            {sortedRisks.length === 0
-              ? "No risks yet."
-              : `${sortedRisks.length} risk${sortedRisks.length === 1 ? "" : "s"}.`}
+            {loading
+              ? "Loading risks…"
+              : sortedRisks.length === 0
+                ? "No risks yet."
+                : `${sortedRisks.length} risk${sortedRisks.length === 1 ? "" : "s"}.`}
           </p>
         </div>
-        <div className="overflow-x-auto">
+        <div className="h-[60vh] min-w-0 overflow-auto">
           <table className="w-full min-w-[1400px] text-left text-sm">
-            <thead className="bg-[#e8f0ff] text-xs font-bold uppercase tracking-wide text-[#062763]">
+            <thead className="sticky top-0 z-10 bg-[#e8f0ff] text-xs font-bold uppercase tracking-wide text-[#062763]">
               <tr>
+                <th className="px-4 py-3">Description</th>
                 <th className="px-4 py-3">Work Package</th>
                 <th className="px-4 py-3">Risk Mitigation Measures</th>
                 <th className="px-4 py-3">State of the Play Period</th>
@@ -246,10 +338,10 @@ export function CoordinatorProjectRisks({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {!hydrated ? (
+              {loading ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-4 py-10 text-center font-semibold text-slate-700"
                   >
                     Loading risks…
@@ -258,25 +350,46 @@ export function CoordinatorProjectRisks({
               ) : sortedRisks.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-4 py-10 text-center font-semibold text-slate-700"
                   >
                     {canManage
-                      ? "No risks yet. Add one or upload a CSV to get started."
+                      ? "No risks yet. Add one or upload a CSV, then Save Risks."
                       : "No risks yet."}
                   </td>
                 </tr>
               ) : (
                 sortedRisks.map((risk) => (
                   <tr key={risk.id} className="hover:bg-slate-50">
+                    <td className="max-w-xs px-4 py-3 font-semibold text-slate-900">
+                      {risk.description || "—"}
+                    </td>
                     <td className="px-4 py-3 font-semibold text-slate-900">
                       {risk.workPackage}
                     </td>
                     <td className="max-w-xs px-4 py-3 font-medium text-slate-900">
                       {risk.riskMitigationMeasures || "—"}
                     </td>
-                    <td className="px-4 py-3 font-medium text-slate-900">
-                      {risk.stateOfThePlayPeriod || "—"}
+                    <td className="px-4 py-3">
+                      {canManage ? (
+                        <input
+                          type="text"
+                          value={risk.stateOfThePlayPeriod}
+                          onChange={(e) =>
+                            updateRiskField(
+                              risk.id,
+                              "stateOfThePlayPeriod",
+                              e.target.value
+                            )
+                          }
+                          placeholder="e.g. Q1 2026"
+                          className={tableInputClass}
+                        />
+                      ) : (
+                        <span className="font-medium text-slate-900">
+                          {risk.stateOfThePlayPeriod || "—"}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {canManage ? (
@@ -312,13 +425,13 @@ export function CoordinatorProjectRisks({
                             updateRiskField(
                               risk.id,
                               "riskMaterialised",
-                              e.target.value as YesNoAnswer
+                              e.target.value as RiskMaterialisedAnswer
                             )
                           }
                           className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold text-slate-900 outline-none focus:border-[#062763]"
                         >
                           <option value="">Select…</option>
-                          {YES_NO_OPTIONS.map((option) => (
+                          {RISK_MATERIALISED_OPTIONS.map((option) => (
                             <option key={option} value={option}>
                               {option}
                             </option>
@@ -330,8 +443,26 @@ export function CoordinatorProjectRisks({
                         </span>
                       )}
                     </td>
-                    <td className="max-w-xs px-4 py-3 font-medium text-slate-900">
-                      {risk.stateOfThePlayComments || "—"}
+                    <td className="px-4 py-3">
+                      {canManage ? (
+                        <input
+                          type="text"
+                          value={risk.stateOfThePlayComments}
+                          onChange={(e) =>
+                            updateRiskField(
+                              risk.id,
+                              "stateOfThePlayComments",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Enter comments…"
+                          className={tableInputClass}
+                        />
+                      ) : (
+                        <span className="font-medium text-slate-900">
+                          {risk.stateOfThePlayComments || "—"}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {canManage ? (
@@ -382,9 +513,26 @@ export function CoordinatorProjectRisks({
             >
               <div>
                 <label className="block text-xs font-bold text-slate-800">
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  value={form.description}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
+                  }
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-800">
                   Work Package
                 </label>
                 <input
+                  type="text"
                   value={form.workPackage}
                   onChange={(e) =>
                     setForm((prev) => ({
@@ -417,6 +565,7 @@ export function CoordinatorProjectRisks({
                   State of the Play Period
                 </label>
                 <input
+                  type="text"
                   value={form.stateOfThePlayPeriod}
                   onChange={(e) =>
                     setForm((prev) => ({
@@ -460,13 +609,14 @@ export function CoordinatorProjectRisks({
                   onChange={(e) =>
                     setForm((prev) => ({
                       ...prev,
-                      riskMaterialised: e.target.value as YesNoAnswer,
+                      riskMaterialised: e.target
+                        .value as RiskMaterialisedAnswer,
                     }))
                   }
                   className={selectClass}
                 >
                   <option value="">Select…</option>
-                  {YES_NO_OPTIONS.map((option) => (
+                  {RISK_MATERIALISED_OPTIONS.map((option) => (
                     <option key={option} value={option}>
                       {option}
                     </option>
@@ -477,8 +627,8 @@ export function CoordinatorProjectRisks({
                 <label className="block text-xs font-bold text-slate-800">
                   State of the Play Comments
                 </label>
-                <textarea
-                  rows={3}
+                <input
+                  type="text"
                   value={form.stateOfThePlayComments}
                   onChange={(e) =>
                     setForm((prev) => ({
@@ -494,6 +644,7 @@ export function CoordinatorProjectRisks({
                   Actions
                 </label>
                 <input
+                  type="text"
                   value={form.actions}
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, actions: e.target.value }))
@@ -535,113 +686,116 @@ export function CoordinatorProjectRisks({
           onClick={closeUploadModal}
         >
           <div
-            className="w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-6 shadow-xl"
+            className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h2
               id="upload-risks-title"
-              className="text-base font-bold text-[#062763]"
+              className="shrink-0 border-b border-slate-100 px-5 py-3 text-base font-bold text-[#062763]"
             >
-              Upload Risks (CSV)
+              Upload risks (CSV)
             </h2>
-            <p className="mt-2 text-sm font-semibold text-slate-800">
-              CSV headers supported: Work Package, Risk Mitigation Measures,
-              State of the Play Period, Did You Apply Risk Mitigation Measures?,
-              Did Your Risk Materialise?, State of the Play Comments, Actions
-            </p>
-
-            <div className="mt-4">
-              <label className="block text-xs font-bold text-slate-800">
-                Select CSV file
-              </label>
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                disabled={uploading}
-                onChange={(e) => {
-                  const file = e.target.files?.[0] ?? null;
-                  setUploadFile(file);
-                  setUploadError(null);
-                  setUploadCreated(0);
-                  setUploadErrors([]);
-                  if (file) void loadCsvPreview(file);
-                  else {
-                    setCsvPreview(null);
-                    setCsvPreviewError(null);
-                  }
-                }}
-                className="mt-1 block w-full text-sm font-medium text-slate-800 file:mr-3 file:rounded-lg file:border-0 file:bg-[#062763] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
-              />
-            </div>
-
-            {csvPreviewLoading && (
-              <p className="mt-3 text-sm font-semibold text-slate-700">
-                Reading CSV preview…
+            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+              <p className="text-sm font-semibold text-slate-800">
+                CSV headers supported: Description, Work Package, Risk
+                Mitigation Measures, State of the Play Period, Did You Apply
+                Risk Mitigation Measures?, Did Your Risk Materialise?, State of
+                the Play Comments, Actions
               </p>
-            )}
-            {csvPreviewError && (
-              <p className="mt-3 text-sm font-semibold text-red-700" role="alert">
-                {csvPreviewError}
-              </p>
-            )}
-            {csvPreview && (
-              <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
-                <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
-                  Preview · {csvPreview.fileName} ·{" "}
-                  {csvPreview.totalRows <= CSV_PREVIEW_ROW_LIMIT
-                    ? `${csvPreview.totalRows} row${csvPreview.totalRows === 1 ? "" : "s"}`
-                    : `Showing first ${CSV_PREVIEW_ROW_LIMIT} of ${csvPreview.totalRows} rows`}
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-left text-xs">
-                    <thead className="bg-[#e8f0ff] text-[#062763]">
-                      <tr>
-                        {csvPreview.headers.map((header) => (
-                          <th key={header} className="px-3 py-2 font-bold">
-                            {header}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {csvPreview.rows.map((row, rowIndex) => (
-                        <tr key={`${csvPreview.fileName}-${rowIndex}`}>
-                          {csvPreview.headers.map((_, colIndex) => (
-                            <td
-                              key={`${rowIndex}-${colIndex}`}
-                              className="px-3 py-2 font-medium text-slate-800"
-                            >
-                              {row[colIndex] || "—"}
-                            </td>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800">
+                  Select CSV file
+                </label>
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  disabled={uploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setUploadFile(file);
+                    setUploadError(null);
+                    setUploadCreated(0);
+                    setUploadErrors([]);
+                    if (file) void loadCsvPreview(file);
+                    else {
+                      setCsvPreview(null);
+                      setCsvPreviewError(null);
+                    }
+                  }}
+                  className="mt-1 block w-full text-sm font-medium text-slate-800 file:mr-3 file:rounded-lg file:border-0 file:bg-[#062763] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
+                />
+              </div>
+
+              {csvPreviewLoading && (
+                <p className="text-sm font-semibold text-slate-700">
+                  Reading CSV preview…
+                </p>
+              )}
+              {csvPreviewError && (
+                <p className="text-sm font-semibold text-red-700" role="alert">
+                  {csvPreviewError}
+                </p>
+              )}
+              {csvPreview && (
+                <div className="overflow-hidden rounded-lg border border-slate-200">
+                  <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
+                    Preview · {csvPreview.fileName} ·{" "}
+                    {csvPreview.totalRows <= CSV_PREVIEW_ROW_LIMIT
+                      ? `${csvPreview.totalRows} row${csvPreview.totalRows === 1 ? "" : "s"}`
+                      : `Showing first ${CSV_PREVIEW_ROW_LIMIT} of ${csvPreview.totalRows} rows`}
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[640px] text-left text-xs">
+                      <thead className="bg-[#e8f0ff] text-[#062763]">
+                        <tr>
+                          {csvPreview.headers.map((header) => (
+                            <th key={header} className="px-3 py-2 font-bold">
+                              {header}
+                            </th>
                           ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {csvPreview.rows.map((row, rowIndex) => (
+                          <tr key={`${csvPreview.fileName}-${rowIndex}`}>
+                            {csvPreview.headers.map((_, colIndex) => (
+                              <td
+                                key={`${rowIndex}-${colIndex}`}
+                                className="px-3 py-2 font-medium text-slate-800"
+                              >
+                                {row[colIndex] || "—"}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {uploadCreated > 0 && (
-              <p className="mt-3 text-sm font-semibold text-emerald-800">
-                Imported {uploadCreated} risk
-                {uploadCreated === 1 ? "" : "s"}.
-              </p>
-            )}
-            {uploadError && (
-              <p className="mt-3 text-sm font-semibold text-red-700" role="alert">
-                {uploadError}
-              </p>
-            )}
-            {uploadErrors.length > 0 && (
-              <ul className="mt-2 max-h-32 list-disc space-y-1 overflow-y-auto pl-5 text-xs font-semibold text-amber-900">
-                {uploadErrors.map((error) => (
-                  <li key={error}>{error}</li>
-                ))}
-              </ul>
-            )}
+              {uploadCreated > 0 && (
+                <p className="text-sm font-semibold text-emerald-800">
+                  Imported {uploadCreated} risk
+                  {uploadCreated === 1 ? "" : "s"}.
+                </p>
+              )}
+              {uploadError && (
+                <p className="text-sm font-semibold text-red-700" role="alert">
+                  {uploadError}
+                </p>
+              )}
+              {uploadErrors.length > 0 && (
+                <ul className="max-h-32 list-disc space-y-1 overflow-y-auto pl-5 text-xs font-semibold text-amber-900">
+                  {uploadErrors.map((error) => (
+                    <li key={error}>{error}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 px-5 py-3">
               <button
                 type="button"
                 onClick={closeUploadModal}

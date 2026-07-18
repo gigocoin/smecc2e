@@ -1,17 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { parseCsv } from "@/lib/csv-parse";
 import {
-  clampCompletionRate,
+  calculateMandECompletionRate,
   createMandEId,
-  loadMandEFromStorage,
-  mandEFromCsv,
-  saveMandEToStorage,
   type ProjectMandEIndicator,
 } from "@/lib/project-m-and-e";
-
-const CSV_PREVIEW_ROW_LIMIT = 5;
 
 const inputClass =
   "mt-1 w-full rounded-lg border-2 border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-[#062763] focus:ring-2 focus:ring-[#062763]/15 disabled:opacity-50";
@@ -22,8 +16,8 @@ function emptyForm() {
     type: "",
     unitOfMeasurement: "",
     baselineValue: "",
+    targetValue: "",
     currentStatus: "",
-    completionRate: "",
   };
 }
 
@@ -33,42 +27,51 @@ export function CoordinatorProjectMandE({
   canManage?: boolean;
 }) {
   const [indicators, setIndicators] = useState<ProjectMandEIndicator[]>([]);
-  const [hydrated, setHydrated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [createError, setCreateError] = useState<string | null>(null);
   const [reminderMessage, setReminderMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadCreated, setUploadCreated] = useState(0);
-  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
-  const [csvPreview, setCsvPreview] = useState<{
-    fileName: string;
-    headers: string[];
-    rows: string[][];
-    totalRows: number;
-  } | null>(null);
-  const [csvPreviewLoading, setCsvPreviewLoading] = useState(false);
-  const [csvPreviewError, setCsvPreviewError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setIndicators(loadMandEFromStorage());
-    setHydrated(true);
+  const fetchIndicators = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await fetch("/api/project-m-and-e");
+      const data = (await res.json()) as {
+        indicators?: ProjectMandEIndicator[];
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to load M&E indicators");
+      }
+      setIndicators(data.indicators ?? []);
+    } catch (err) {
+      setLoadError(
+        err instanceof Error ? err.message : "Failed to load M&E indicators"
+      );
+      setIndicators([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
-    saveMandEToStorage(indicators);
-  }, [hydrated, indicators]);
+    void fetchIndicators();
+  }, [fetchIndicators]);
 
   useEffect(() => {
-    if (!reminderMessage) return;
-    const id = window.setTimeout(() => setReminderMessage(null), 4000);
+    if (!reminderMessage && !saveMessage) return;
+    const id = window.setTimeout(() => {
+      setReminderMessage(null);
+      setSaveMessage(null);
+    }, 4000);
     return () => window.clearTimeout(id);
-  }, [reminderMessage]);
+  }, [reminderMessage, saveMessage]);
 
   const sortedIndicators = useMemo(
     () =>
@@ -86,48 +89,11 @@ export function CoordinatorProjectMandE({
     resetCreateForm();
   };
 
-  const resetUploadForm = () => {
-    setUploadFile(null);
-    setUploadError(null);
-    setUploadCreated(0);
-    setUploadErrors([]);
-    setCsvPreview(null);
-    setCsvPreviewLoading(false);
-    setCsvPreviewError(null);
-  };
-
-  const closeUploadModal = () => {
-    if (uploading) return;
-    setUploadOpen(false);
-    resetUploadForm();
-  };
-
-  const loadCsvPreview = useCallback(async (file: File) => {
-    setCsvPreviewLoading(true);
-    setCsvPreviewError(null);
-    setCsvPreview(null);
-    try {
-      const text = await file.text();
-      const { headers, rows } = parseCsv(text);
-      const dataRows = rows.filter((row) =>
-        row.some((cell) => cell.trim() !== "")
-      );
-      if (!headers.length) {
-        setCsvPreviewError("CSV has no header row.");
-        return;
-      }
-      setCsvPreview({
-        fileName: file.name,
-        headers,
-        rows: dataRows.slice(0, CSV_PREVIEW_ROW_LIMIT),
-        totalRows: dataRows.length,
-      });
-    } catch {
-      setCsvPreviewError("Could not read CSV file for preview.");
-    } finally {
-      setCsvPreviewLoading(false);
-    }
-  }, []);
+  const previewCompletionRate = calculateMandECompletionRate(
+    form.currentStatus,
+    form.targetValue,
+    form.baselineValue
+  );
 
   const handleCreateIndicator = (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,27 +101,29 @@ export function CoordinatorProjectMandE({
       setCreateError("Enter the indicator.");
       return;
     }
-    let completionRate = 0;
-    if (form.completionRate.trim()) {
-      const parsed = Number.parseFloat(form.completionRate);
-      if (!Number.isFinite(parsed)) {
-        setCreateError("Enter a valid completion rate (0–100).");
-        return;
-      }
-      completionRate = clampCompletionRate(parsed);
-    }
+
+    const baselineValue = form.baselineValue.trim();
+    const targetValue = form.targetValue.trim();
+    const currentStatus = form.currentStatus.trim();
 
     const indicator: ProjectMandEIndicator = {
       id: createMandEId(),
       indicator: form.indicator.trim(),
       type: form.type.trim(),
       unitOfMeasurement: form.unitOfMeasurement.trim(),
-      baselineValue: form.baselineValue.trim(),
-      currentStatus: form.currentStatus.trim(),
-      completionRate,
+      baselineValue,
+      targetValue,
+      currentStatus,
+      completionRate: calculateMandECompletionRate(
+        currentStatus,
+        targetValue,
+        baselineValue
+      ),
     };
 
     setIndicators((prev) => [...prev, indicator]);
+    setSaveMessage(null);
+    setSaveError(null);
     closeCreateModal();
   };
 
@@ -163,39 +131,55 @@ export function CoordinatorProjectMandE({
     setReminderMessage(`Reminder sent for “${indicator.indicator}”.`);
   };
 
-  const handleUploadCsv = async () => {
-    if (!uploadFile) {
-      setUploadError("Select a CSV file to upload.");
-      return;
-    }
+  const handleCurrentStatusChange = (id: string, currentStatus: string) => {
+    setIndicators((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              currentStatus,
+              completionRate: calculateMandECompletionRate(
+                currentStatus,
+                item.targetValue,
+                item.baselineValue
+              ),
+            }
+          : item
+      )
+    );
+    setSaveMessage(null);
+    setSaveError(null);
+  };
 
-    setUploading(true);
-    setUploadError(null);
-    setUploadCreated(0);
-    setUploadErrors([]);
+  const handleSaveMandE = async () => {
+    setSaving(true);
+    setSaveError(null);
+    setSaveMessage(null);
     try {
-      const text = await uploadFile.text();
-      const { headers, rows } = parseCsv(text);
-      const dataRows = rows.filter((row) =>
-        row.some((cell) => cell.trim() !== "")
+      const res = await fetch("/api/project-m-and-e", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ indicators }),
+      });
+      const data = (await res.json()) as {
+        indicators?: ProjectMandEIndicator[];
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to save M&E indicators");
+      }
+      setIndicators(data.indicators ?? indicators);
+      setSaveMessage(
+        `Saved ${data.indicators?.length ?? indicators.length} indicator${
+          (data.indicators?.length ?? indicators.length) === 1 ? "" : "s"
+        }.`
       );
-      const { indicators: imported, errors } = mandEFromCsv(headers, dataRows);
-      if (errors.length > 0 && imported.length === 0) {
-        setUploadError(errors[0] ?? "Could not import M&E indicators from CSV.");
-        setUploadErrors(errors);
-        return;
-      }
-      if (imported.length === 0) {
-        setUploadError("No valid indicator rows found in the CSV.");
-        return;
-      }
-      setIndicators((prev) => [...prev, ...imported]);
-      setUploadCreated(imported.length);
-      setUploadErrors(errors);
-    } catch {
-      setUploadError("Could not import M&E indicators from CSV.");
+    } catch (err) {
+      setSaveError(
+        err instanceof Error ? err.message : "Failed to save M&E indicators"
+      );
     } finally {
-      setUploading(false);
+      setSaving(false);
     }
   };
 
@@ -206,6 +190,21 @@ export function CoordinatorProjectMandE({
           {reminderMessage && (
             <p className="text-sm font-semibold text-emerald-800">
               {reminderMessage}
+            </p>
+          )}
+          {saveMessage && (
+            <p className="text-sm font-semibold text-emerald-800">
+              {saveMessage}
+            </p>
+          )}
+          {saveError && (
+            <p className="text-sm font-semibold text-red-700" role="alert">
+              {saveError}
+            </p>
+          )}
+          {loadError && (
+            <p className="text-sm font-semibold text-red-700" role="alert">
+              {loadError}
             </p>
           )}
         </div>
@@ -220,46 +219,52 @@ export function CoordinatorProjectMandE({
             </button>
             <button
               type="button"
-              onClick={() => setUploadOpen(true)}
-              className="rounded-lg border-2 border-[#062763]/25 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5"
+              onClick={() => void handleSaveMandE()}
+              disabled={saving || loading}
+              className="rounded-lg border-2 border-[#062763] px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
             >
-              Upload M&amp;E CSV
+              {saving ? "Saving…" : "Save M&E"}
             </button>
           </div>
         )}
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-5 py-4">
+        <div className="shrink-0 border-b border-slate-100 px-5 py-4">
           <h2 className="text-base font-bold text-[#062763]">
             Monitoring &amp; Evaluation
           </h2>
           <p className="mt-1 text-sm font-semibold text-slate-800">
-            {sortedIndicators.length === 0
-              ? "No indicators yet."
-              : `${sortedIndicators.length} indicator${
-                  sortedIndicators.length === 1 ? "" : "s"
-                }.`}
+            {loading
+              ? "Loading indicators…"
+              : sortedIndicators.length === 0
+                ? "No indicators yet."
+                : `${sortedIndicators.length} indicator${
+                    sortedIndicators.length === 1 ? "" : "s"
+                  }.`}
           </p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-left text-sm">
-            <thead className="bg-[#e8f0ff] text-xs font-bold uppercase tracking-wide text-[#062763]">
+        <div className="h-[60vh] min-w-0 overflow-auto">
+          <table className="w-full min-w-[1200px] text-left text-sm">
+            <thead className="sticky top-0 z-10 bg-[#e8f0ff] text-xs font-bold uppercase tracking-wide text-[#062763]">
               <tr>
                 <th className="px-4 py-3">Indicator</th>
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Unit of Measurement</th>
                 <th className="px-4 py-3">Baseline Value</th>
+                <th className="px-4 py-3">
+                  Target Value (at the end of the project)
+                </th>
                 <th className="px-4 py-3">Current Status</th>
                 <th className="px-4 py-3">Completion Rate (%)</th>
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {!hydrated ? (
+              {loading ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-4 py-10 text-center font-semibold text-slate-700"
                   >
                     Loading indicators…
@@ -268,11 +273,11 @@ export function CoordinatorProjectMandE({
               ) : sortedIndicators.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-4 py-10 text-center font-semibold text-slate-700"
                   >
                     {canManage
-                      ? "No indicators yet. Add one or upload a CSV to get started."
+                      ? "No indicators yet. Add one, then Save M&E to store it."
                       : "No indicators yet."}
                   </td>
                 </tr>
@@ -292,29 +297,51 @@ export function CoordinatorProjectMandE({
                       {indicator.baselineValue || "—"}
                     </td>
                     <td className="px-4 py-3 font-medium text-slate-900">
-                      {indicator.currentStatus || "—"}
+                      {indicator.targetValue || "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-24 overflow-hidden rounded-full bg-slate-200">
+                      {canManage ? (
+                        <input
+                          value={indicator.currentStatus}
+                          onChange={(e) =>
+                            handleCurrentStatusChange(
+                              indicator.id,
+                              e.target.value
+                            )
+                          }
+                          className="w-full min-w-[10rem] rounded-lg border-2 border-slate-300 bg-white px-2 py-1.5 text-sm font-medium text-slate-900 outline-none focus:border-[#062763] focus:ring-2 focus:ring-[#062763]/15"
+                        />
+                      ) : (
+                        <span className="font-medium text-slate-900">
+                          {indicator.currentStatus || "—"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex min-w-[8rem] items-center gap-2">
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200">
                           <div
                             className="h-full rounded-full bg-[#062763]"
                             style={{ width: `${indicator.completionRate}%` }}
                           />
                         </div>
-                        <span className="text-xs font-bold tabular-nums text-[#062763]">
+                        <span className="w-10 text-right text-xs font-bold text-slate-800">
                           {indicator.completionRate}%
                         </span>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleSendReminder(indicator)}
-                        className="rounded-lg border-2 border-[#062763]/25 px-3 py-1.5 text-xs font-semibold text-[#062763] transition hover:bg-[#062763]/5"
-                      >
-                        Send Reminder
-                      </button>
+                      {canManage ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSendReminder(indicator)}
+                          className="rounded-lg border-2 border-[#062763]/25 px-3 py-1.5 text-xs font-semibold text-[#062763] transition hover:bg-[#062763]/5"
+                        >
+                          Send Reminder
+                        </button>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                   </tr>
                 ))
@@ -403,6 +430,21 @@ export function CoordinatorProjectMandE({
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-800">
+                  Target Value (at the end of the project)
+                </label>
+                <input
+                  value={form.targetValue}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      targetValue: e.target.value,
+                    }))
+                  }
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-800">
                   Current Status
                 </label>
                 <input
@@ -420,19 +462,12 @@ export function CoordinatorProjectMandE({
                 <label className="block text-xs font-bold text-slate-800">
                   Completion Rate (%)
                 </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={form.completionRate}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      completionRate: e.target.value,
-                    }))
-                  }
-                  className={inputClass}
-                />
+                <p className="mt-1 rounded-lg border-2 border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800">
+                  {previewCompletionRate}%
+                  <span className="ml-2 text-xs font-medium text-slate-500">
+                    (current × 100 ÷ (target − baseline))
+                  </span>
+                </p>
               </div>
               {createError && (
                 <p className="text-sm font-semibold text-red-700" role="alert">
@@ -455,142 +490,6 @@ export function CoordinatorProjectMandE({
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {canManage && uploadOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="upload-m-and-e-title"
-          onClick={closeUploadModal}
-        >
-          <div
-            className="w-full max-w-2xl rounded-xl border border-slate-200 bg-white p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2
-              id="upload-m-and-e-title"
-              className="text-base font-bold text-[#062763]"
-            >
-              Upload M&amp;E indicators (CSV)
-            </h2>
-            <p className="mt-2 text-sm font-semibold text-slate-800">
-              CSV headers supported: Indicator, Type, Unit of Measurement,
-              Baseline Value, Current Status, Completion Rate
-            </p>
-
-            <div className="mt-4">
-              <label className="block text-xs font-bold text-slate-800">
-                Select CSV file
-              </label>
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                disabled={uploading}
-                onChange={(e) => {
-                  const file = e.target.files?.[0] ?? null;
-                  setUploadFile(file);
-                  setUploadError(null);
-                  setUploadCreated(0);
-                  setUploadErrors([]);
-                  if (file) void loadCsvPreview(file);
-                  else {
-                    setCsvPreview(null);
-                    setCsvPreviewError(null);
-                  }
-                }}
-                className="mt-1 block w-full text-sm font-medium text-slate-800 file:mr-3 file:rounded-lg file:border-0 file:bg-[#062763] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
-              />
-            </div>
-
-            {csvPreviewLoading && (
-              <p className="mt-3 text-sm font-semibold text-slate-700">
-                Reading CSV preview…
-              </p>
-            )}
-            {csvPreviewError && (
-              <p className="mt-3 text-sm font-semibold text-red-700" role="alert">
-                {csvPreviewError}
-              </p>
-            )}
-            {csvPreview && (
-              <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
-                <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
-                  Preview · {csvPreview.fileName} ·{" "}
-                  {csvPreview.totalRows <= CSV_PREVIEW_ROW_LIMIT
-                    ? `${csvPreview.totalRows} row${csvPreview.totalRows === 1 ? "" : "s"}`
-                    : `Showing first ${CSV_PREVIEW_ROW_LIMIT} of ${csvPreview.totalRows} rows`}
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-left text-xs">
-                    <thead className="bg-[#e8f0ff] text-[#062763]">
-                      <tr>
-                        {csvPreview.headers.map((header) => (
-                          <th key={header} className="px-3 py-2 font-bold">
-                            {header}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {csvPreview.rows.map((row, rowIndex) => (
-                        <tr key={`${csvPreview.fileName}-${rowIndex}`}>
-                          {csvPreview.headers.map((_, colIndex) => (
-                            <td
-                              key={`${rowIndex}-${colIndex}`}
-                              className="px-3 py-2 font-medium text-slate-800"
-                            >
-                              {row[colIndex] || "—"}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {uploadCreated > 0 && (
-              <p className="mt-3 text-sm font-semibold text-emerald-800">
-                Imported {uploadCreated} indicator
-                {uploadCreated === 1 ? "" : "s"}.
-              </p>
-            )}
-            {uploadError && (
-              <p className="mt-3 text-sm font-semibold text-red-700" role="alert">
-                {uploadError}
-              </p>
-            )}
-            {uploadErrors.length > 0 && (
-              <ul className="mt-2 max-h-32 list-disc space-y-1 overflow-y-auto pl-5 text-xs font-semibold text-amber-900">
-                {uploadErrors.map((error) => (
-                  <li key={error}>{error}</li>
-                ))}
-              </ul>
-            )}
-
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={closeUploadModal}
-                disabled={uploading}
-                className="rounded-lg border-2 border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleUploadCsv()}
-                disabled={uploading || !uploadFile}
-                className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
-              >
-                {uploading ? "Importing…" : "Import CSV"}
-              </button>
-            </div>
           </div>
         </div>
       )}
