@@ -19,7 +19,7 @@ export function EvaluatorFinalEvaluationApplicants() {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await fetch("/api/applications");
+      const res = await fetch("/api/applications?forEvaluation=true");
       const data = (await res.json()) as {
         applications?: ApplicationRecord[];
         error?: string;

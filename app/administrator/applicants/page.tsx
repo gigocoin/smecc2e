@@ -1,6 +1,6 @@
 import { CoordinatorApplicants } from "../../components/coordinator-applicants";
-import { CoordinatorEvaluationApplicants } from "../../components/coordinator-evaluation-applicants";
-import { CoordinatorFinalEvaluationApplicants } from "../../components/coordinator-final-evaluation-applicants";
+import { EvaluatorEvaluationApplicants } from "../../components/evaluator-evaluation-applicants";
+import { EvaluatorFinalEvaluationApplicants } from "../../components/evaluator-final-evaluation-applicants";
 import { InterviewApplicants } from "../../components/interview-applicants";
 
 export const metadata = {
@@ -16,7 +16,7 @@ export default async function AdministratorApplicantsPage({
   const { status } = await searchParams;
 
   if (status === "evaluation") {
-    return <CoordinatorEvaluationApplicants />;
+    return <EvaluatorEvaluationApplicants />;
   }
 
   if (status === "interview") {
@@ -24,7 +24,7 @@ export default async function AdministratorApplicantsPage({
   }
 
   if (status === "final_evaluation") {
-    return <CoordinatorFinalEvaluationApplicants />;
+    return <EvaluatorFinalEvaluationApplicants />;
   }
 
   return <CoordinatorApplicants statusFromUrl={status ?? null} />;

@@ -17,16 +17,24 @@ import { sendApplicationConfirmationEmail } from "@/lib/send-application-confirm
 export async function GET(request: Request) {
   try {
     const user = await requireDashboardSessionUser();
-    const forInterview =
-      new URL(request.url).searchParams.get("forInterview") === "true";
+    const searchParams = new URL(request.url).searchParams;
+    const forInterview = searchParams.get("forInterview") === "true";
+    const forEvaluation = searchParams.get("forEvaluation") === "true";
+
+    const assignedToEvaluatorPublicId =
+      user.role === "Evaluator" && !forInterview
+        ? user.id
+        : user.role === "Administrator" && forEvaluation
+          ? user.id
+          : undefined;
 
     const applications = await listApplications({
       interviewQueueForPublicId:
         user.role === "Evaluator" && forInterview ? user.id : undefined,
-      assignedToEvaluatorPublicId:
-        user.role === "Evaluator" && !forInterview ? user.id : undefined,
+      assignedToEvaluatorPublicId,
       includeDrafts:
-        user.role === "Coordinator" || user.role === "Administrator",
+        (user.role === "Coordinator" || user.role === "Administrator") &&
+        !forEvaluation,
     });
     return NextResponse.json({ applications });
   } catch (err) {

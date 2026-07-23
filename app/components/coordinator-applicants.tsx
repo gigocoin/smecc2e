@@ -72,8 +72,7 @@ export function CoordinatorApplicants({
   const router = useRouter();
   const { basePath, portalKey } = useDashboardPortal();
   const showAcceptRejectActions = portalKey === "coordinator";
-  const showAssignEvaluator =
-    portalKey === "coordinator" || portalKey === "administrator";
+  const showAssignEvaluator = portalKey === "coordinator";
   const canDeleteApplications = portalKey === "coordinator";
   const pageSubtitle =
     portalKey === "evaluator"

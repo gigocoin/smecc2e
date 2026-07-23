@@ -17,7 +17,7 @@ const REVIEW_ACTIONS: EvaluatorReviewAction[] = [
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const user = await requireDashboardSessionUser();
-    if (user.role !== "Evaluator") {
+    if (user.role !== "Evaluator" && user.role !== "Administrator") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
