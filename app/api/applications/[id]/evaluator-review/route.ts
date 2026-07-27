@@ -11,6 +11,7 @@ const REVIEW_ACTIONS: EvaluatorReviewAction[] = [
   "accept",
   "reject",
   "evaluate",
+  "save_evaluation",
   "reset",
 ];
 

@@ -725,6 +725,46 @@ export async function getInterviewScoreSummary(
   };
 }
 
+function normalizeEvaluationDraft(
+  evaluation: EvaluatorEvaluationSubmission,
+  rubric: Awaited<ReturnType<typeof getActiveEvaluationRubric>>
+): EvaluatorEvaluationSubmission {
+  const requiredIds = rubricCriterionIds(rubric);
+  const assessorScores: Record<string, number> = {};
+
+  for (const id of requiredIds) {
+    const score = evaluation.assessorScores[id];
+    if (score === undefined) {
+      assessorScores[id] = 0;
+      continue;
+    }
+    if (!Number.isFinite(score) || score < 0 || score > ASSESSOR_SCORE_MAX) {
+      throw new Error(`Invalid score for criterion ${id}`);
+    }
+    assessorScores[id] = score;
+  }
+
+  const categoryTotals: Record<string, number> = {};
+  for (const category of rubric) {
+    categoryTotals[category.id] = computeCategoryTotal(
+      category,
+      assessorScores
+    );
+  }
+  const grandTotal = rubric.reduce(
+    (sum, category) =>
+      sum + computeCategoryTotal(category, assessorScores),
+    0
+  );
+
+  return {
+    assessorScores,
+    categoryTotals,
+    grandTotal,
+    submittedAt: new Date().toISOString(),
+  };
+}
+
 function validateEvaluationSubmission(
   evaluation: EvaluatorEvaluationSubmission,
   rubric: Awaited<ReturnType<typeof getActiveEvaluationRubric>>
@@ -808,6 +848,14 @@ export async function updateEvaluatorReview(
       throw new Error("Only rejected reviews can be reset");
     }
     nextStatus = "pending";
+  } else if (action === "save_evaluation") {
+    if (currentStatus !== "accepted") {
+      throw new Error("Applicant must be accepted before saving evaluation");
+    }
+    if (!evaluation) {
+      throw new Error("Evaluation scores are required");
+    }
+    nextStatus = "accepted";
   } else {
     if (currentStatus !== "accepted") {
       throw new Error("Applicant must be accepted before evaluation");
@@ -824,19 +872,28 @@ export async function updateEvaluatorReview(
           evaluation!,
           await getActiveEvaluationRubric(existing.typeOfMobility)
         )
-      : null;
+      : action === "save_evaluation"
+        ? normalizeEvaluationDraft(
+            evaluation!,
+            await getActiveEvaluationRubric(existing.typeOfMobility)
+          )
+        : null;
 
   const data =
     slot === 1
       ? {
-          evaluator1ReviewStatus: nextStatus,
+          ...(action === "save_evaluation"
+            ? {}
+            : { evaluator1ReviewStatus: nextStatus }),
           ...(validatedEvaluation
             ? { evaluator1EvaluationData: validatedEvaluation }
             : {}),
           updatedAt: new Date(),
         }
       : {
-          evaluator2ReviewStatus: nextStatus,
+          ...(action === "save_evaluation"
+            ? {}
+            : { evaluator2ReviewStatus: nextStatus }),
           ...(validatedEvaluation
             ? { evaluator2EvaluationData: validatedEvaluation }
             : {}),

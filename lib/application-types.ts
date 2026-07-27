@@ -20,7 +20,12 @@ export type EvaluatorReviewStatus =
   | "rejected"
   | "evaluated";
 
-export type EvaluatorReviewAction = "accept" | "reject" | "evaluate" | "reset";
+export type EvaluatorReviewAction =
+  | "accept"
+  | "reject"
+  | "evaluate"
+  | "save_evaluation"
+  | "reset";
 
 export type ApplicationPayload = {
   email: string;

@@ -29,14 +29,18 @@ const ASSESSOR_SCORE_OPTIONS = Array.from(
 export function EvaluatorEvaluationModal({
   application,
   open,
+  saving,
   submitting,
   onClose,
+  onSave,
   onSubmit,
 }: {
   application: ApplicationRecord | null;
   open: boolean;
+  saving: boolean;
   submitting: boolean;
   onClose: () => void;
+  onSave: (evaluation: EvaluatorEvaluationSubmission) => Promise<boolean>;
   onSubmit: (evaluation: EvaluatorEvaluationSubmission) => Promise<boolean>;
 }) {
   const [assessorScores, setAssessorScores] = useState<Record<string, number>>(
@@ -47,6 +51,9 @@ export function EvaluatorEvaluationModal({
   );
   const [rubricLoading, setRubricLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  const busy = saving || submitting;
 
   useEffect(() => {
     if (!open || !application) return;
@@ -54,6 +61,7 @@ export function EvaluatorEvaluationModal({
     let cancelled = false;
     setRubricLoading(true);
     setSubmitError(null);
+    setSaveMessage(null);
 
     void fetch(
       `/api/evaluation-rubric?mobilityType=${encodeURIComponent(application.typeOfMobility ?? "")}`
@@ -66,10 +74,15 @@ export function EvaluatorEvaluationModal({
         if (cancelled) return;
         const activeRubric = data.rubric ?? EVALUATOR_EVALUATION_RUBRIC;
         setRubric(activeRubric);
+        const saved = application.myEvaluatorEvaluationData;
         const initial: Record<string, number> = {};
         for (const category of activeRubric) {
           for (const criterion of category.criteria) {
-            initial[criterion.id] = 0;
+            const savedScore = saved?.assessorScores?.[criterion.id];
+            initial[criterion.id] =
+              savedScore !== undefined && Number.isFinite(savedScore)
+                ? normalizeAssessorScore(savedScore)
+                : 0;
           }
         }
         setAssessorScores(initial);
@@ -77,10 +90,15 @@ export function EvaluatorEvaluationModal({
       .catch(() => {
         if (cancelled) return;
         setRubric(EVALUATOR_EVALUATION_RUBRIC);
+        const saved = application.myEvaluatorEvaluationData;
         const initial: Record<string, number> = {};
         for (const category of EVALUATOR_EVALUATION_RUBRIC) {
           for (const criterion of category.criteria) {
-            initial[criterion.id] = 0;
+            const savedScore = saved?.assessorScores?.[criterion.id];
+            initial[criterion.id] =
+              savedScore !== undefined && Number.isFinite(savedScore)
+                ? normalizeAssessorScore(savedScore)
+                : 0;
           }
         }
         setAssessorScores(initial);
@@ -127,6 +145,24 @@ export function EvaluatorEvaluationModal({
     }));
   };
 
+  const buildEvaluation = (): EvaluatorEvaluationSubmission => ({
+    assessorScores,
+    categoryTotals,
+    grandTotal,
+    submittedAt: new Date().toISOString(),
+  });
+
+  const handleSave = async () => {
+    setSubmitError(null);
+    setSaveMessage(null);
+    const ok = await onSave(buildEvaluation());
+    if (ok) {
+      setSaveMessage("Evaluation saved. You can continue later.");
+    } else {
+      setSubmitError("Could not save evaluation. Please try again.");
+    }
+  };
+
   const handleSubmit = async () => {
     setSubmitError(null);
     const missing = rubric.flatMap((category) =>
@@ -141,12 +177,7 @@ export function EvaluatorEvaluationModal({
       return;
     }
 
-    const evaluation: EvaluatorEvaluationSubmission = {
-      assessorScores,
-      categoryTotals,
-      grandTotal,
-      submittedAt: new Date().toISOString(),
-    };
+    const evaluation = buildEvaluation();
 
     const ok = await onSubmit(evaluation);
     if (!ok) {
@@ -161,7 +192,7 @@ export function EvaluatorEvaluationModal({
       aria-modal="true"
       aria-labelledby="evaluator-evaluation-title"
       onClick={() => {
-        if (!submitting) onClose();
+        if (!busy) onClose();
       }}
     >
       <div
@@ -280,7 +311,7 @@ export function EvaluatorEvaluationModal({
                                 <td className="border border-black bg-[#d9d9d9] px-2 py-2 text-center">
                                   <select
                                     value={assessorScore}
-                                    disabled={submitting || rubricLoading}
+                                    disabled={busy || rubricLoading}
                                     onChange={(e) =>
                                       handleScoreChange(
                                         criterion.id,
@@ -340,6 +371,15 @@ export function EvaluatorEvaluationModal({
               </div>
               )}
 
+              {saveMessage && (
+                <p
+                  className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"
+                  role="status"
+                >
+                  {saveMessage}
+                </p>
+              )}
+
               {submitError && (
                 <p
                   className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800"
@@ -356,15 +396,23 @@ export function EvaluatorEvaluationModal({
           <button
             type="button"
             onClick={onClose}
-            disabled={submitting}
+            disabled={busy}
             className="rounded-lg border-2 border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             type="button"
+            onClick={() => void handleSave()}
+            disabled={busy || rubricLoading}
+            className="rounded-lg border-2 border-[#062763] px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
             onClick={() => void handleSubmit()}
-            disabled={submitting || rubricLoading}
+            disabled={busy || rubricLoading}
             className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
           >
             {submitting ? "Submitting…" : "Submit evaluation"}

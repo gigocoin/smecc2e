@@ -34,6 +34,7 @@ export function EvaluatorEvaluationApplicants() {
   const [evaluatingApplication, setEvaluatingApplication] =
     useState<ApplicationRecord | null>(null);
   const [submittingEvaluation, setSubmittingEvaluation] = useState(false);
+  const [savingEvaluation, setSavingEvaluation] = useState(false);
 
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -106,6 +107,45 @@ export function EvaluatorEvaluationApplicants() {
       setActionError("Could not update review.");
     } finally {
       setActingOnId(null);
+    }
+  };
+
+  const handleSaveEvaluation = async (
+    evaluation: EvaluatorEvaluationSubmission
+  ): Promise<boolean> => {
+    if (!evaluatingApplication) return false;
+
+    setSavingEvaluation(true);
+    setActionError(null);
+    try {
+      const res = await fetch(
+        `/api/applications/${encodeURIComponent(evaluatingApplication.id)}/evaluator-review`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "save_evaluation", evaluation }),
+        }
+      );
+      const data = (await res.json()) as {
+        application?: ApplicationRecord;
+        error?: string;
+      };
+      if (!res.ok || !data.application) {
+        setActionError(data.error ?? "Could not save evaluation.");
+        return false;
+      }
+      setApplications((prev) =>
+        prev.map((app) =>
+          app.id === evaluatingApplication.id ? data.application! : app
+        )
+      );
+      setEvaluatingApplication(data.application);
+      return true;
+    } catch {
+      setActionError("Could not save evaluation.");
+      return false;
+    } finally {
+      setSavingEvaluation(false);
     }
   };
 
@@ -285,10 +325,14 @@ export function EvaluatorEvaluationApplicants() {
       <EvaluatorEvaluationModal
         application={evaluatingApplication}
         open={evaluatingApplication !== null}
+        saving={savingEvaluation}
         submitting={submittingEvaluation}
         onClose={() => {
-          if (!submittingEvaluation) setEvaluatingApplication(null);
+          if (!submittingEvaluation && !savingEvaluation) {
+            setEvaluatingApplication(null);
+          }
         }}
+        onSave={handleSaveEvaluation}
         onSubmit={handleSubmitEvaluation}
       />
     </div>
