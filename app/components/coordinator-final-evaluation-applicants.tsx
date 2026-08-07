@@ -11,6 +11,7 @@ import {
   type ApplicationRecord,
   type ApplicationStatus,
 } from "@/lib/application-types";
+import { downloadFinalEvaluationExcel } from "@/lib/application-export";
 import {
   averagedEvaluatorEvaluation,
   isApplicantEvaluatorEvaluated,
@@ -99,6 +100,7 @@ export function CoordinatorFinalEvaluationApplicants() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [migratingId, setMigratingId] = useState<string | null>(null);
   const [migrateError, setMigrateError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -167,6 +169,18 @@ export function CoordinatorFinalEvaluationApplicants() {
     []
   );
 
+  const handleExportExcel = useCallback(async () => {
+    setExporting(true);
+    setLoadError(null);
+    try {
+      await downloadFinalEvaluationExcel(evaluatedApplicants);
+    } catch {
+      setLoadError("Could not export Excel file.");
+    } finally {
+      setExporting(false);
+    }
+  }, [evaluatedApplicants]);
+
   const columnCount = 3 + EVALUATION_CATEGORY_IDS.length + 4;
 
   return (
@@ -181,14 +195,24 @@ export function CoordinatorFinalEvaluationApplicants() {
             results
           </p>
         </div>
-        <button
-          type="button"
-          onClick={loadApplications}
-          disabled={loading}
-          className="shrink-0 rounded-lg border-2 border-[#062763]/25 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
-        >
-          {loading ? "Refreshing…" : "Refresh"}
-        </button>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => void handleExportExcel()}
+            disabled={loading || exporting || evaluatedApplicants.length === 0}
+            className="rounded-lg border-2 border-[#062763]/25 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
+          >
+            {exporting ? "Exporting…" : "Export Excel"}
+          </button>
+          <button
+            type="button"
+            onClick={loadApplications}
+            disabled={loading}
+            className="rounded-lg border-2 border-[#062763]/25 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
+          >
+            {loading ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 overflow-auto bg-slate-50 p-4 sm:p-6">
@@ -222,9 +246,9 @@ export function CoordinatorFinalEvaluationApplicants() {
               Reserved, or Approved.
             </p>
           </div>
-          <div className="overflow-x-auto">
+          <div className="max-h-[70vh] overflow-auto">
             <table className="w-full min-w-[1550px] text-left text-sm">
-              <thead className="bg-[#e8f0ff] text-xs font-bold uppercase tracking-wide text-[#062763]">
+              <thead className="sticky top-0 z-10 bg-[#e8f0ff] text-xs font-bold uppercase tracking-wide text-[#062763]">
                 <tr>
                   <th className="px-4 py-3">Application No</th>
                   <th className="px-4 py-3">Applicant Name</th>

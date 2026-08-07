@@ -6,6 +6,8 @@ import {
   type ApplicationPayload,
   type ApplicationRecord,
 } from "./application-types";
+import { averagedEvaluatorEvaluation } from "./coordinator-evaluation";
+import { EVALUATION_CATEGORY_IDS } from "./evaluator-evaluation-types";
 
 export type ApplicantExportRow = {
   applicationNo: string;
@@ -133,6 +135,197 @@ function downloadBlob(blob: Blob, filename: string) {
 function exportFilename(extension: string): string {
   const stamp = new Date().toISOString().slice(0, 10);
   return `smecc2e-applications-${stamp}.${extension}`;
+}
+
+function scoreCell(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return "";
+  }
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+/**
+ * Excel export for Evaluation applicants (evaluator scores and weighted averages).
+ */
+export async function downloadEvaluationExcel(
+  applications: ApplicationRecord[]
+): Promise<void> {
+  const EVALUATION_WEIGHT = 0.7;
+  const INTERVIEW_WEIGHT = 0.3;
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "SMECC2E";
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet("Evaluation", {
+    views: [{ state: "frozen", ySplit: 1 }],
+  });
+
+  const headers = [
+    { key: "applicationNo", label: "Application No.", width: 18 },
+    { key: "applicantName", label: "Applicant Name", width: 28 },
+    { key: "status", label: "Status", width: 18 },
+    { key: "mobilityType", label: "Mobility Type", width: 22 },
+    { key: "evaluator1Score", label: "Evaluator 1 Score (100%)", width: 22 },
+    { key: "evaluator2Score", label: "Evaluator 2 Score (100%)", width: 22 },
+    {
+      key: "evaluationAveWeighted",
+      label: "Evaluation Ave Score × 0.70",
+      width: 26,
+    },
+    {
+      key: "interviewScoreWeighted",
+      label: "Interview Score (30%)",
+      width: 20,
+    },
+    { key: "interviewer", label: "Assigned Interviewer", width: 26 },
+  ];
+
+  sheet.columns = headers.map((header) => ({
+    header: header.label,
+    key: header.key,
+    width: header.width,
+  }));
+
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: "FF062763" } };
+  headerRow.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFE8F0FF" },
+  };
+  headerRow.alignment = { vertical: "middle", wrapText: true };
+
+  for (const app of applications) {
+    const averaged = averagedEvaluatorEvaluation(app);
+    const evalWeighted =
+      averaged?.grandTotal !== undefined && Number.isFinite(averaged.grandTotal)
+        ? averaged.grandTotal * EVALUATION_WEIGHT
+        : null;
+    const interviewWeighted =
+      app.interviewScore !== null &&
+      app.interviewScore !== undefined &&
+      Number.isFinite(app.interviewScore)
+        ? app.interviewScore * INTERVIEW_WEIGHT
+        : null;
+
+    const excelRow = sheet.addRow({
+      applicationNo: app.id,
+      applicantName: applicantDisplayName(app) || "",
+      status: STATUS_LABELS[app.status] ?? app.status,
+      mobilityType: app.typeOfMobility || "",
+      evaluator1Score:
+        app.evaluator1ReviewStatus === "evaluated"
+          ? scoreCell(app.evaluator1EvaluationData?.grandTotal)
+          : "",
+      evaluator2Score:
+        app.evaluator2ReviewStatus === "evaluated"
+          ? scoreCell(app.evaluator2EvaluationData?.grandTotal)
+          : "",
+      evaluationAveWeighted: scoreCell(evalWeighted),
+      interviewScoreWeighted: scoreCell(interviewWeighted),
+      interviewer: app.interviewerName || "",
+    });
+    excelRow.alignment = { vertical: "top", wrapText: true };
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const stamp = new Date().toISOString().slice(0, 10);
+  downloadBlob(
+    new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }),
+    `smecc2e-evaluation-${stamp}.xlsx`
+  );
+}
+
+/**
+ * Excel export for Final Evaluation applicants (criteria averages,
+ * interview score, and overall score).
+ */
+export async function downloadFinalEvaluationExcel(
+  applications: ApplicationRecord[]
+): Promise<void> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "SMECC2E";
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet("Final Evaluation", {
+    views: [{ state: "frozen", ySplit: 1 }],
+  });
+
+  const headers = [
+    { key: "applicationNo", label: "Application No.", width: 18 },
+    { key: "applicantName", label: "Applicant Name", width: 28 },
+    { key: "status", label: "Status", width: 18 },
+    { key: "mobilityType", label: "Mobility Type", width: 22 },
+    ...EVALUATION_CATEGORY_IDS.map((id) => ({
+      key: `criteria${id}`,
+      label: `Criteria ${id}`,
+      width: 12,
+    })),
+    { key: "evalAvgTotal", label: "Eval Avg Total", width: 14 },
+    { key: "interviewScore", label: "Interview Score", width: 16 },
+    { key: "overallScore", label: "Overall Score", width: 14 },
+  ];
+
+  sheet.columns = headers.map((header) => ({
+    header: header.label,
+    key: header.key,
+    width: header.width,
+  }));
+
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true, color: { argb: "FF062763" } };
+  headerRow.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: "FFE8F0FF" },
+  };
+  headerRow.alignment = { vertical: "middle", wrapText: true };
+
+  for (const app of applications) {
+    const averaged = averagedEvaluatorEvaluation(app);
+    const evalAvg = averaged?.grandTotal;
+    const interview = app.interviewScore;
+    let overall: number | null = null;
+    if (
+      evalAvg !== undefined &&
+      Number.isFinite(evalAvg) &&
+      interview !== null &&
+      interview !== undefined &&
+      Number.isFinite(interview)
+    ) {
+      overall = Math.round(((evalAvg + interview) / 2) * 10) / 10;
+    }
+
+    const values: Record<string, string> = {
+      applicationNo: app.id,
+      applicantName: applicantDisplayName(app) || "",
+      status: STATUS_LABELS[app.status] ?? app.status,
+      mobilityType: app.typeOfMobility || "",
+      evalAvgTotal: scoreCell(evalAvg),
+      interviewScore: scoreCell(interview),
+      overallScore: scoreCell(overall),
+    };
+    for (const categoryId of EVALUATION_CATEGORY_IDS) {
+      values[`criteria${categoryId}`] = scoreCell(
+        averaged?.categoryTotals[categoryId]
+      );
+    }
+
+    const excelRow = sheet.addRow(values);
+    excelRow.alignment = { vertical: "top", wrapText: true };
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const stamp = new Date().toISOString().slice(0, 10);
+  downloadBlob(
+    new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }),
+    `smecc2e-final-evaluation-${stamp}.xlsx`
+  );
 }
 
 export async function downloadApplicationsExcel(
