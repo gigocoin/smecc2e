@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import {
+  isWorkPackageSection,
   PROJECT_MANAGEMENT_SECTION_LABELS,
   parseProjectManagementSection,
 } from "@/lib/coordinator-project-nav";
@@ -10,6 +11,7 @@ import { CoordinatorProjectDeliverables } from "./coordinator-project-deliverabl
 import { CoordinatorProjectMandE } from "./coordinator-project-m-and-e";
 import { CoordinatorProjectMilestones } from "./coordinator-project-milestones";
 import { CoordinatorProjectRisks } from "./coordinator-project-risks";
+import { CoordinatorProjectWorkPackages } from "./coordinator-project-work-packages";
 
 export function CoordinatorProject() {
   const searchParams = useSearchParams();
@@ -17,8 +19,9 @@ export function CoordinatorProject() {
   const sectionParam = searchParams.get("section");
   const activeSection = parseProjectManagementSection(sectionParam);
   const pageTitle = PROJECT_MANAGEMENT_SECTION_LABELS[activeSection];
-  const showTaskActions = portalKey === "coordinator" && activeSection === "tasks";
   const canManageProject = portalKey === "coordinator";
+  const canEditTaskStatus =
+    portalKey === "administrator" || portalKey === "evaluator";
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -31,26 +34,16 @@ export function CoordinatorProject() {
             Project management · SMECC2E coordination
           </p>
         </div>
-        {showTaskActions && (
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-            <button
-              type="button"
-              className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90"
-            >
-              Add Task
-            </button>
-            <button
-              type="button"
-              className="rounded-lg border-2 border-[#062763]/25 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5"
-            >
-              Upload Tasks CSV
-            </button>
-          </div>
-        )}
       </header>
 
       <main className="min-w-0 flex-1 overflow-auto bg-slate-50 p-4 sm:p-6">
-        {activeSection === "milestones" ? (
+        {isWorkPackageSection(activeSection) ? (
+          <CoordinatorProjectWorkPackages
+            workPackage={activeSection}
+            canManage={canManageProject}
+            canEditStatus={canEditTaskStatus}
+          />
+        ) : activeSection === "milestones" ? (
           <CoordinatorProjectMilestones canManage={canManageProject} />
         ) : activeSection === "deliverables" ? (
           <CoordinatorProjectDeliverables canManage={canManageProject} />

@@ -229,6 +229,7 @@ model User {
   assignedApplicationsAsEvaluator1 Applicant[] @relation("ApplicantEvaluator1")
   assignedApplicationsAsEvaluator2 Applicant[] @relation("ApplicantEvaluator2")
   assignedApplicationsAsInterviewer Applicant[] @relation("ApplicantInterviewer")
+  projectTaskLeadAssignments ProjectTaskLeadPartner[]
 
   @@map("users")
 }
@@ -397,6 +398,25 @@ enum YesNoAnswer {
   PARTIALLY
 }
 
+/// Work package sections under Project management → Work Packages.
+/// UI ids: project_management_coordination / scholarship_selection_management /
+/// communication_dissemination (see WorkPackageNavId in lib/coordinator-project-nav.ts)
+enum ProjectWorkPackage {
+  PROJECT_MANAGEMENT_COORDINATION
+  SCHOLARSHIP_SELECTION_MANAGEMENT
+  COMMUNICATION_DISSEMINATION
+}
+
+/// Progress status for work-package tasks.
+/// UI labels: "Not Started" / "On-going" / "Submitted" / "Completed" / "Rejected"
+enum ProjectTaskStatus {
+  NOT_STARTED
+  ON_GOING
+  SUBMITTED
+  COMPLETED
+  REJECTED
+}
+
 /// Project milestone (Project management → Milestones).
 model ProjectMilestone {
   id                  String             @id @default(cuid())
@@ -478,4 +498,47 @@ model ProjectRisk {
 
   @@index([workPackage])
   @@map("project_risks")
+}
+
+/// Work-package task (Project management → Work Packages).
+model ProjectTask {
+  id                  String             @id @default(cuid())
+  /// e.g. T1.1, T1.1.1
+  code                String             @default("")
+  description         String             @db.Text
+  meansOfVerification String             @default("") @map("means_of_verification") @db.Text
+  status              ProjectTaskStatus  @default(NOT_STARTED)
+  workPackage         ProjectWorkPackage @map("work_package")
+  /// True when created via Duplicate (drives tinted row in UI)
+  isDuplicate         Boolean            @default(false) @map("is_duplicate")
+  duplicatedFromId    String?            @map("duplicated_from_id")
+  duplicatedFrom      ProjectTask?       @relation("ProjectTaskDuplicates", fields: [duplicatedFromId], references: [id], onDelete: SetNull)
+  duplicates          ProjectTask[]      @relation("ProjectTaskDuplicates")
+  leadPartners        ProjectTaskLeadPartner[]
+  /// Set when an assignee submits the task for coordinator review
+  completionComment   String?            @map("completion_comment") @db.Text
+  completionFileName  String?            @map("completion_file_name")
+  completionFileUrl   String?            @map("completion_file_url")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  @@unique([workPackage, code])
+  @@index([workPackage])
+  @@index([status])
+  @@index([code])
+  @@index([duplicatedFromId])
+  @@map("project_tasks")
+}
+
+/// Many-to-many: users assigned as lead partners on a project task.
+model ProjectTaskLeadPartner {
+  taskId     String   @map("task_id")
+  userId     String   @map("user_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+  task       ProjectTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+  @@index([userId])
+  @@map("project_task_lead_partners")
 }

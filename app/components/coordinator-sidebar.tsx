@@ -35,8 +35,11 @@ import {
 } from "@/lib/coordinator-communication-nav";
 import {
   buildProjectManagementNav,
+  buildWorkPackagesNav,
   isProjectManagementGroupActive,
   isProjectManagementSubActive,
+  isWorkPackageSubActive,
+  isWorkPackagesGroupActive,
 } from "@/lib/coordinator-project-nav";
 import {
   buildScholarsManagementNav,
@@ -540,6 +543,10 @@ function ProjectManagementNav({
   onNavigate: () => void;
 }) {
   const items = buildProjectManagementNav(basePath);
+  const workPackageItems = buildWorkPackagesNav(basePath);
+  const workPackagesGroupActive =
+    pathname === `${basePath.replace(/\/$/, "")}/project` &&
+    isWorkPackagesGroupActive(sectionParam);
   const groupActive = isProjectManagementGroupActive(
     items,
     pathname,
@@ -547,9 +554,11 @@ function ProjectManagementNav({
     basePath
   );
   const [open, setOpen] = useState(false);
+  const [workPackagesOpen, setWorkPackagesOpen] = useState(false);
 
   useEffect(() => {
     setOpen(false);
+    setWorkPackagesOpen(false);
   }, [pathname, sectionParam]);
 
   return (
@@ -562,6 +571,42 @@ function ProjectManagementNav({
       onClose={() => setOpen(false)}
     >
       {items.map((item) => {
+        if (item.nestedMenu === "work_packages") {
+          return (
+            <FlyoutNestedSubmenu
+              key={item.id}
+              label={item.label}
+              groupActive={workPackagesGroupActive}
+              open={workPackagesOpen}
+              onToggle={() => setWorkPackagesOpen((prev) => !prev)}
+              onClose={() => setWorkPackagesOpen(false)}
+            >
+              {workPackageItems.map((wpItem) => {
+                const active = isWorkPackageSubActive(
+                  wpItem,
+                  pathname,
+                  sectionParam,
+                  basePath
+                );
+                return (
+                  <FlyoutSubmenuLink
+                    key={wpItem.id}
+                    href={wpItem.href}
+                    active={active}
+                    onNavigate={() => {
+                      setWorkPackagesOpen(false);
+                      setOpen(false);
+                      onNavigate();
+                    }}
+                  >
+                    {wpItem.label}
+                  </FlyoutSubmenuLink>
+                );
+              })}
+            </FlyoutNestedSubmenu>
+          );
+        }
+
         const active = isProjectManagementSubActive(
           item,
           pathname,
@@ -571,7 +616,7 @@ function ProjectManagementNav({
         return (
           <FlyoutSubmenuLink
             key={item.id}
-            href={item.href}
+            href={item.href!}
             active={active}
             onNavigate={() => {
               setOpen(false);
@@ -683,7 +728,7 @@ function FlyoutNestedSubmenu({
           role="menu"
           aria-label={label}
           style={{ top: panelPos.top, left: panelPos.left }}
-          className="fixed z-[80] w-56 max-h-[min(70vh,28rem)] overflow-x-hidden overflow-y-auto rounded-lg border border-white/15 bg-[#062763] py-2 shadow-2xl"
+          className="fixed z-[80] w-72 max-h-[min(70vh,28rem)] overflow-x-hidden overflow-y-auto rounded-lg border border-white/15 bg-[#062763] py-2 shadow-2xl"
         >
           {children}
         </div>
