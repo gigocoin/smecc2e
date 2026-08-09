@@ -34,6 +34,58 @@ function weightedInterviewScore(
   return interviewScore * INTERVIEW_WEIGHT;
 }
 
+function uniqueSortedValues(
+  values: Array<string | null | undefined>
+): string[] {
+  const set = new Set(
+    values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))
+  );
+  return Array.from(set).sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" })
+  );
+}
+
+const headerFilterSelectClass =
+  "mt-1.5 w-full max-w-[14rem] rounded-md border border-[#062763]/25 bg-white px-2 py-1 text-[11px] font-semibold normal-case tracking-normal text-[#062763] outline-none focus:border-[#062763] focus:ring-2 focus:ring-[#062763]/15";
+
+function HeaderFilterSelect({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+  allLabel,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  allLabel: string;
+}) {
+  return (
+    <div>
+      <span className="block">{label}</span>
+      <label className="sr-only" htmlFor={id}>
+        Filter by {label}
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={headerFilterSelectClass}
+      >
+        <option value="all">{allLabel}</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 export function CoordinatorEvaluationApplicants() {
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +95,9 @@ export function CoordinatorEvaluationApplicants() {
   >(null);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [mobilityFilter, setMobilityFilter] = useState("all");
+  const [hostInstitutionFilter, setHostInstitutionFilter] = useState("all");
+  const [nationalityFilter, setNationalityFilter] = useState("all");
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -81,6 +136,59 @@ export function CoordinatorEvaluationApplicants() {
     [applications]
   );
 
+  const mobilityOptions = useMemo(
+    () =>
+      uniqueSortedValues(evaluatedApplicants.map((app) => app.typeOfMobility)),
+    [evaluatedApplicants]
+  );
+
+  const hostInstitutionOptions = useMemo(
+    () =>
+      uniqueSortedValues(
+        evaluatedApplicants.map((app) => app.preferredHostInstitution)
+      ),
+    [evaluatedApplicants]
+  );
+
+  const nationalityOptions = useMemo(
+    () => uniqueSortedValues(evaluatedApplicants.map((app) => app.nationality)),
+    [evaluatedApplicants]
+  );
+
+  const filteredApplicants = useMemo(() => {
+    return evaluatedApplicants.filter((app) => {
+      if (
+        mobilityFilter !== "all" &&
+        (app.typeOfMobility || "") !== mobilityFilter
+      ) {
+        return false;
+      }
+      if (
+        hostInstitutionFilter !== "all" &&
+        (app.preferredHostInstitution || "") !== hostInstitutionFilter
+      ) {
+        return false;
+      }
+      if (
+        nationalityFilter !== "all" &&
+        (app.nationality || "") !== nationalityFilter
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [
+    evaluatedApplicants,
+    mobilityFilter,
+    hostInstitutionFilter,
+    nationalityFilter,
+  ]);
+
+  const hasActiveFilters =
+    mobilityFilter !== "all" ||
+    hostInstitutionFilter !== "all" ||
+    nationalityFilter !== "all";
+
   const handleAssignInterviewer = async (
     id: string,
     interviewerId: string | null
@@ -117,13 +225,13 @@ export function CoordinatorEvaluationApplicants() {
     setExporting(true);
     setLoadError(null);
     try {
-      await downloadEvaluationExcel(evaluatedApplicants);
+      await downloadEvaluationExcel(filteredApplicants);
     } catch {
       setLoadError("Could not export Excel file.");
     } finally {
       setExporting(false);
     }
-  }, [evaluatedApplicants]);
+  }, [filteredApplicants]);
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -140,7 +248,7 @@ export function CoordinatorEvaluationApplicants() {
           <button
             type="button"
             onClick={() => void handleExportExcel()}
-            disabled={loading || exporting || evaluatedApplicants.length === 0}
+            disabled={loading || exporting || filteredApplicants.length === 0}
             className="rounded-lg border-2 border-[#062763]/25 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
           >
             {exporting ? "Exporting…" : "Export Excel"}
@@ -178,7 +286,7 @@ export function CoordinatorEvaluationApplicants() {
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
             <h2 className="text-base font-bold text-[#062763]">
-              Evaluated applicants ({evaluatedApplicants.length})
+              Evaluated applicants ({filteredApplicants.length})
             </h2>
             <p className="mt-1 text-xs font-semibold text-slate-700">
               All applicants with at least one completed evaluator scorecard.
@@ -187,12 +295,44 @@ export function CoordinatorEvaluationApplicants() {
             </p>
           </div>
           <div className="max-h-[70vh] overflow-auto">
-            <table className="w-full min-w-[1100px] text-left text-sm">
+            <table className="w-full min-w-[1300px] text-left text-sm">
               <thead className="sticky top-0 z-10 bg-[#e8f0ff] text-xs font-bold uppercase tracking-wide text-[#062763]">
                 <tr>
                   <th className="px-4 py-3">Application No</th>
                   <th className="px-4 py-3">Applicant Name</th>
-                  <th className="px-4 py-3">Mobility Type</th>
+                  <th className="px-4 py-3 align-top">
+                    <HeaderFilterSelect
+                      id="evaluation-filter-mobility"
+                      label="Mobility Type"
+                      value={mobilityFilter}
+                      options={mobilityOptions}
+                      onChange={setMobilityFilter}
+                      allLabel="All types"
+                    />
+                  </th>
+                  <th className="px-4 py-3">Gender (Sex)</th>
+                  <th className="px-4 py-3 align-top">
+                    <HeaderFilterSelect
+                      id="evaluation-filter-host"
+                      label="Preferred Host Institution"
+                      value={hostInstitutionFilter}
+                      options={hostInstitutionOptions}
+                      onChange={setHostInstitutionFilter}
+                      allLabel="All institutions"
+                    />
+                  </th>
+                  <th className="px-4 py-3 align-top">
+                    <HeaderFilterSelect
+                      id="evaluation-filter-nationality"
+                      label="Nationality (Country of Origin)"
+                      value={nationalityFilter}
+                      options={nationalityOptions}
+                      onChange={setNationalityFilter}
+                      allLabel="All nationalities"
+                    />
+                  </th>
+                  <th className="px-4 py-3">Evaluator 1</th>
+                  <th className="px-4 py-3">Evaluator 2</th>
                   <th className="px-4 py-3 text-center">
                     Evaluator 1 Score (100%)
                   </th>
@@ -209,19 +349,21 @@ export function CoordinatorEvaluationApplicants() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {evaluatedApplicants.length === 0 ? (
+                {filteredApplicants.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={13}
                       className="px-4 py-10 text-center font-semibold text-slate-900"
                     >
                       {loading
                         ? "Loading evaluated applicants…"
-                        : "No evaluated applicants yet."}
+                        : hasActiveFilters
+                          ? "No evaluated applicants match the selected filters."
+                          : "No evaluated applicants yet."}
                     </td>
                   </tr>
                 ) : (
-                  evaluatedApplicants.map((app) => {
+                  filteredApplicants.map((app) => {
                     const averaged = averagedEvaluatorEvaluation(app);
                     const evalWeighted = weightedEvaluationAverage(
                       averaged?.grandTotal
@@ -240,6 +382,21 @@ export function CoordinatorEvaluationApplicants() {
                         </td>
                         <td className="px-4 py-3 font-medium text-slate-900">
                           {app.typeOfMobility || "—"}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-900">
+                          {app.gender || "—"}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-900">
+                          {app.preferredHostInstitution || "—"}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-900">
+                          {app.nationality || "—"}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-900">
+                          {app.evaluator1Name?.trim() || "—"}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-900">
+                          {app.evaluator2Name?.trim() || "—"}
                         </td>
                         <td className="px-4 py-3 text-center font-semibold text-slate-900">
                           {app.evaluator1ReviewStatus === "evaluated"

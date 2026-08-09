@@ -129,6 +129,101 @@ function statusBadgeClass(status: TaskStatus): string {
   }
 }
 
+function compareTasks(a: ProjectTask, b: ProjectTask): number {
+  return (a.code || a.description).localeCompare(
+    b.code || b.description,
+    undefined,
+    { sensitivity: "base", numeric: true }
+  );
+}
+
+type TaskTreeRow = {
+  task: ProjectTask;
+  depth: number;
+  isLast: boolean;
+  ancestorContinues: boolean[];
+};
+
+function buildTaskTreeRows(tasks: ProjectTask[]): TaskTreeRow[] {
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const childrenByParent = new Map<string, ProjectTask[]>();
+  const roots: ProjectTask[] = [];
+
+  for (const task of tasks) {
+    const parentId = task.duplicatedFromId;
+    if (parentId && byId.has(parentId)) {
+      const siblings = childrenByParent.get(parentId) ?? [];
+      siblings.push(task);
+      childrenByParent.set(parentId, siblings);
+    } else {
+      roots.push(task);
+    }
+  }
+
+  for (const siblings of childrenByParent.values()) {
+    siblings.sort(compareTasks);
+  }
+  roots.sort(compareTasks);
+
+  const rows: TaskTreeRow[] = [];
+
+  const walk = (
+    nodes: ProjectTask[],
+    depth: number,
+    ancestorContinues: boolean[]
+  ) => {
+    nodes.forEach((task, index) => {
+      const isLast = index === nodes.length - 1;
+      rows.push({
+        task,
+        depth,
+        isLast,
+        ancestorContinues: [...ancestorContinues],
+      });
+      const children = childrenByParent.get(task.id) ?? [];
+      if (children.length > 0) {
+        walk(children, depth + 1, [...ancestorContinues, !isLast]);
+      }
+    });
+  };
+
+  walk(roots, 0, []);
+  return rows;
+}
+
+function TaskCodeTreeLabel({
+  code,
+  depth,
+  isLast,
+  ancestorContinues,
+}: {
+  code: string;
+  depth: number;
+  isLast: boolean;
+  ancestorContinues: boolean[];
+}) {
+  const label = code || "—";
+  if (depth <= 0) {
+    return <span>{label}</span>;
+  }
+
+  const prefix = `${ancestorContinues
+    .map((continues) => (continues ? "│   " : "    "))
+    .join("")}${isLast ? "└── " : "├── "}`;
+
+  return (
+    <span className="inline-flex min-w-0 items-baseline gap-0">
+      <span
+        className="shrink-0 select-none whitespace-pre font-mono text-[13px] leading-5 text-pink-500"
+        aria-hidden
+      >
+        {prefix}
+      </span>
+      <span className="min-w-0 truncate">{label}</span>
+    </span>
+  );
+}
+
 export function CoordinatorProjectWorkPackages({
   workPackage,
   canManage = true,
@@ -194,17 +289,7 @@ export function CoordinatorProjectWorkPackages({
     return options;
   }, [statusOnlyEdit, form.status]);
 
-  const sortedTasks = useMemo(
-    () =>
-      [...tasks].sort((a, b) =>
-        (a.code || a.description).localeCompare(
-          b.code || b.description,
-          undefined,
-          { sensitivity: "base", numeric: true }
-        )
-      ),
-    [tasks]
-  );
+  const taskTreeRows = useMemo(() => buildTaskTreeRows(tasks), [tasks]);
 
   const activeUsers = useMemo(
     () =>
@@ -622,7 +707,7 @@ export function CoordinatorProjectWorkPackages({
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
           <h2 className="text-base font-bold text-[#062763]">
-            Tasks ({sortedTasks.length})
+            Tasks ({taskTreeRows.length})
           </h2>
           <p className="mt-1 text-xs font-semibold text-slate-700">
             {packageLabel}
@@ -641,7 +726,7 @@ export function CoordinatorProjectWorkPackages({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {sortedTasks.length === 0 ? (
+              {taskTreeRows.length === 0 ? (
                 <tr>
                   <td
                     colSpan={6}
@@ -657,17 +742,22 @@ export function CoordinatorProjectWorkPackages({
                   </td>
                 </tr>
               ) : (
-                sortedTasks.map((task) => (
+                taskTreeRows.map(({ task, depth, isLast, ancestorContinues }) => (
                   <tr
                     key={task.id}
                     className={
-                      task.isDuplicate
-                        ? "bg-[#eef5ff] hover:bg-[#e4effc]"
+                      task.isDuplicate || depth > 0
+                        ? "bg-pink-50 hover:bg-pink-100/80"
                         : "hover:bg-[#062763]/5"
                     }
                   >
                     <td className="px-4 py-3 font-semibold text-slate-900">
-                      {task.code || "—"}
+                      <TaskCodeTreeLabel
+                        code={task.code}
+                        depth={depth}
+                        isLast={isLast}
+                        ancestorContinues={ancestorContinues}
+                      />
                     </td>
                     <td className="px-4 py-3 font-semibold text-slate-900">
                       {task.description}
@@ -689,7 +779,7 @@ export function CoordinatorProjectWorkPackages({
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-nowrap items-center justify-end gap-1.5">
-                        {canManage && (
+                        {canManage && !task.isDuplicate && (
                           <button
                             type="button"
                             onClick={() => void handleDuplicateTask(task)}

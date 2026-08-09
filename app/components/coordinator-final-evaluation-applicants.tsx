@@ -49,6 +49,60 @@ function overallScore(
   return Math.round(((evalAvgTotal + interviewScore) / 2) * 10) / 10;
 }
 
+function uniqueSortedValues(
+  values: Array<string | null | undefined>
+): string[] {
+  const set = new Set(
+    values
+      .map((value) => value?.trim())
+      .filter((value): value is string => Boolean(value))
+  );
+  return Array.from(set).sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" })
+  );
+}
+
+const headerFilterSelectClass =
+  "mt-1.5 w-full max-w-[14rem] rounded-md border border-[#062763]/25 bg-white px-2 py-1 text-[11px] font-semibold normal-case tracking-normal text-[#062763] outline-none focus:border-[#062763] focus:ring-2 focus:ring-[#062763]/15";
+
+function HeaderFilterSelect({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+  allLabel,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  allLabel: string;
+}) {
+  return (
+    <div>
+      <span className="block">{label}</span>
+      <label className="sr-only" htmlFor={id}>
+        Filter by {label}
+      </label>
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={headerFilterSelectClass}
+      >
+        <option value="all">{allLabel}</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function MigrateApplicantSelect({
   application,
   migrating,
@@ -101,6 +155,7 @@ export function CoordinatorFinalEvaluationApplicants() {
   const [migratingId, setMigratingId] = useState<string | null>(null);
   const [migrateError, setMigrateError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [mobilityFilter, setMobilityFilter] = useState("all");
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -139,6 +194,19 @@ export function CoordinatorFinalEvaluationApplicants() {
     [applications]
   );
 
+  const mobilityOptions = useMemo(
+    () =>
+      uniqueSortedValues(evaluatedApplicants.map((app) => app.typeOfMobility)),
+    [evaluatedApplicants]
+  );
+
+  const filteredApplicants = useMemo(() => {
+    if (mobilityFilter === "all") return evaluatedApplicants;
+    return evaluatedApplicants.filter(
+      (app) => (app.typeOfMobility || "") === mobilityFilter
+    );
+  }, [evaluatedApplicants, mobilityFilter]);
+
   const handleMigrate = useCallback(
     async (id: string, status: ApplicationStatus) => {
       setMigratingId(id);
@@ -173,13 +241,13 @@ export function CoordinatorFinalEvaluationApplicants() {
     setExporting(true);
     setLoadError(null);
     try {
-      await downloadFinalEvaluationExcel(evaluatedApplicants);
+      await downloadFinalEvaluationExcel(filteredApplicants);
     } catch {
       setLoadError("Could not export Excel file.");
     } finally {
       setExporting(false);
     }
-  }, [evaluatedApplicants]);
+  }, [filteredApplicants]);
 
   const columnCount = 3 + EVALUATION_CATEGORY_IDS.length + 4;
 
@@ -199,7 +267,7 @@ export function CoordinatorFinalEvaluationApplicants() {
           <button
             type="button"
             onClick={() => void handleExportExcel()}
-            disabled={loading || exporting || evaluatedApplicants.length === 0}
+            disabled={loading || exporting || filteredApplicants.length === 0}
             className="rounded-lg border-2 border-[#062763]/25 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
           >
             {exporting ? "Exporting…" : "Export Excel"}
@@ -236,7 +304,7 @@ export function CoordinatorFinalEvaluationApplicants() {
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
             <h2 className="text-base font-bold text-[#062763]">
-              Evaluated applicants ({evaluatedApplicants.length})
+              Evaluated applicants ({filteredApplicants.length})
             </h2>
             <p className="mt-1 text-xs font-semibold text-slate-700">
               Applicants with at least one completed evaluator scorecard,
@@ -252,7 +320,16 @@ export function CoordinatorFinalEvaluationApplicants() {
                 <tr>
                   <th className="px-4 py-3">Application No</th>
                   <th className="px-4 py-3">Applicant Name</th>
-                  <th className="px-4 py-3">Mobility Type</th>
+                  <th className="px-4 py-3 align-top">
+                    <HeaderFilterSelect
+                      id="final-evaluation-filter-mobility"
+                      label="Mobility Type"
+                      value={mobilityFilter}
+                      options={mobilityOptions}
+                      onChange={setMobilityFilter}
+                      allLabel="All types"
+                    />
+                  </th>
                   {EVALUATION_CATEGORY_IDS.map((categoryId) => (
                     <th key={categoryId} className="px-3 py-3 text-center">
                       Criteria {categoryId}
@@ -265,7 +342,7 @@ export function CoordinatorFinalEvaluationApplicants() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {evaluatedApplicants.length === 0 ? (
+                {filteredApplicants.length === 0 ? (
                   <tr>
                     <td
                       colSpan={columnCount}
@@ -273,11 +350,13 @@ export function CoordinatorFinalEvaluationApplicants() {
                     >
                       {loading
                         ? "Loading evaluated applicants…"
-                        : "No evaluated applicants yet."}
+                        : mobilityFilter !== "all"
+                          ? "No evaluated applicants for this mobility type."
+                          : "No evaluated applicants yet."}
                     </td>
                   </tr>
                 ) : (
-                  evaluatedApplicants.map((app) => {
+                  filteredApplicants.map((app) => {
                     const averaged = averagedEvaluatorEvaluation(app);
                     const overall = overallScore(
                       averaged?.grandTotal,
