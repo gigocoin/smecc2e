@@ -295,7 +295,7 @@ export function CoordinatorEvaluationApplicants() {
             </p>
           </div>
           <div className="max-h-[70vh] overflow-auto">
-            <table className="w-full min-w-[1300px] text-left text-sm">
+            <table className="w-full min-w-[1450px] text-left text-sm">
               <thead className="sticky top-0 z-10 bg-[#e8f0ff] text-xs font-bold uppercase tracking-wide text-[#062763]">
                 <tr>
                   <th className="px-4 py-3">Application No</th>
@@ -339,6 +339,9 @@ export function CoordinatorEvaluationApplicants() {
                   <th className="px-4 py-3 text-center">
                     Evaluator 2 Score (100%)
                   </th>
+                  <th className="bg-yellow-200 px-4 py-3 text-center">
+                    Absolute Difference in Evaluator Score
+                  </th>
                   <th className="px-4 py-3 text-center">
                     Evaluation Ave Score × 0.70
                   </th>
@@ -352,7 +355,7 @@ export function CoordinatorEvaluationApplicants() {
                 {filteredApplicants.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={13}
+                      colSpan={14}
                       className="px-4 py-10 text-center font-semibold text-slate-900"
                     >
                       {loading
@@ -371,6 +374,21 @@ export function CoordinatorEvaluationApplicants() {
                     const interviewWeighted = weightedInterviewScore(
                       app.interviewScore
                     );
+                    const evaluator1Score =
+                      app.evaluator1ReviewStatus === "evaluated"
+                        ? app.evaluator1EvaluationData?.grandTotal
+                        : undefined;
+                    const evaluator2Score =
+                      app.evaluator2ReviewStatus === "evaluated"
+                        ? app.evaluator2EvaluationData?.grandTotal
+                        : undefined;
+                    const absoluteDifference =
+                      evaluator1Score !== undefined &&
+                      evaluator2Score !== undefined &&
+                      Number.isFinite(evaluator1Score) &&
+                      Number.isFinite(evaluator2Score)
+                        ? Math.abs(evaluator1Score - evaluator2Score)
+                        : null;
 
                     return (
                       <tr key={app.id} className="hover:bg-[#062763]/5">
@@ -399,18 +417,13 @@ export function CoordinatorEvaluationApplicants() {
                           {app.evaluator2Name?.trim() || "—"}
                         </td>
                         <td className="px-4 py-3 text-center font-semibold text-slate-900">
-                          {app.evaluator1ReviewStatus === "evaluated"
-                            ? formatEvaluationScore(
-                                app.evaluator1EvaluationData?.grandTotal
-                              )
-                            : "—"}
+                          {formatEvaluationScore(evaluator1Score)}
                         </td>
                         <td className="px-4 py-3 text-center font-semibold text-slate-900">
-                          {app.evaluator2ReviewStatus === "evaluated"
-                            ? formatEvaluationScore(
-                                app.evaluator2EvaluationData?.grandTotal
-                              )
-                            : "—"}
+                          {formatEvaluationScore(evaluator2Score)}
+                        </td>
+                        <td className="bg-yellow-100 px-4 py-3 text-center font-semibold text-slate-900">
+                          {formatEvaluationScore(absoluteDifference)}
                         </td>
                         <td className="px-4 py-3 text-center font-bold text-[#062763]">
                           {formatEvaluationScore(evalWeighted)}

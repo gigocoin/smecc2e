@@ -181,6 +181,11 @@ export async function downloadEvaluationExcel(
     { key: "evaluator1Score", label: "Evaluator 1 Score (100%)", width: 22 },
     { key: "evaluator2Score", label: "Evaluator 2 Score (100%)", width: 22 },
     {
+      key: "absoluteDifference",
+      label: "Absolute Difference in Evaluator Score",
+      width: 28,
+    },
+    {
       key: "evaluationAveWeighted",
       label: "Evaluation Ave Score × 0.70",
       width: 26,
@@ -221,6 +226,22 @@ export async function downloadEvaluationExcel(
         ? app.interviewScore * INTERVIEW_WEIGHT
         : null;
 
+    const evaluator1Score =
+      app.evaluator1ReviewStatus === "evaluated"
+        ? app.evaluator1EvaluationData?.grandTotal
+        : undefined;
+    const evaluator2Score =
+      app.evaluator2ReviewStatus === "evaluated"
+        ? app.evaluator2EvaluationData?.grandTotal
+        : undefined;
+    const absoluteDifference =
+      evaluator1Score !== undefined &&
+      evaluator2Score !== undefined &&
+      Number.isFinite(evaluator1Score) &&
+      Number.isFinite(evaluator2Score)
+        ? Math.abs(evaluator1Score - evaluator2Score)
+        : null;
+
     const excelRow = sheet.addRow({
       applicationNo: app.id,
       applicantName: applicantDisplayName(app) || "",
@@ -230,14 +251,9 @@ export async function downloadEvaluationExcel(
       nationality: app.nationality || "",
       evaluator1: app.evaluator1Name?.trim() || "",
       evaluator2: app.evaluator2Name?.trim() || "",
-      evaluator1Score:
-        app.evaluator1ReviewStatus === "evaluated"
-          ? scoreCell(app.evaluator1EvaluationData?.grandTotal)
-          : "",
-      evaluator2Score:
-        app.evaluator2ReviewStatus === "evaluated"
-          ? scoreCell(app.evaluator2EvaluationData?.grandTotal)
-          : "",
+      evaluator1Score: scoreCell(evaluator1Score),
+      evaluator2Score: scoreCell(evaluator2Score),
+      absoluteDifference: scoreCell(absoluteDifference),
       evaluationAveWeighted: scoreCell(evalWeighted),
       interviewScoreWeighted: scoreCell(interviewWeighted),
       interviewer: app.interviewerName || "",
