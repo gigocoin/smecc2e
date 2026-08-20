@@ -162,10 +162,22 @@ export async function downloadEvaluationExcel(
   });
 
   const headers = [
-    { key: "applicationNo", label: "Application No.", width: 18 },
+    { key: "applicationNo", label: "Application No", width: 18 },
     { key: "applicantName", label: "Applicant Name", width: 28 },
-    { key: "status", label: "Status", width: 18 },
     { key: "mobilityType", label: "Mobility Type", width: 22 },
+    { key: "gender", label: "Gender (Sex)", width: 14 },
+    {
+      key: "preferredHostInstitution",
+      label: "Preferred Host Institution",
+      width: 28,
+    },
+    {
+      key: "nationality",
+      label: "Nationality (Country of Origin)",
+      width: 26,
+    },
+    { key: "evaluator1", label: "Evaluator 1", width: 22 },
+    { key: "evaluator2", label: "Evaluator 2", width: 22 },
     { key: "evaluator1Score", label: "Evaluator 1 Score (100%)", width: 22 },
     { key: "evaluator2Score", label: "Evaluator 2 Score (100%)", width: 22 },
     {
@@ -178,7 +190,7 @@ export async function downloadEvaluationExcel(
       label: "Interview Score (30%)",
       width: 20,
     },
-    { key: "interviewer", label: "Assigned Interviewer", width: 26 },
+    { key: "interviewer", label: "Assign Interviewer", width: 26 },
   ];
 
   sheet.columns = headers.map((header) => ({
@@ -212,8 +224,12 @@ export async function downloadEvaluationExcel(
     const excelRow = sheet.addRow({
       applicationNo: app.id,
       applicantName: applicantDisplayName(app) || "",
-      status: STATUS_LABELS[app.status] ?? app.status,
       mobilityType: app.typeOfMobility || "",
+      gender: app.gender || "",
+      preferredHostInstitution: app.preferredHostInstitution || "",
+      nationality: app.nationality || "",
+      evaluator1: app.evaluator1Name?.trim() || "",
+      evaluator2: app.evaluator2Name?.trim() || "",
       evaluator1Score:
         app.evaluator1ReviewStatus === "evaluated"
           ? scoreCell(app.evaluator1EvaluationData?.grandTotal)
