@@ -9,8 +9,7 @@ const actionBtnClass =
   "rounded-lg border-2 px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50";
 
 const DEFAULT_INTERVIEWER_ROLES: DashboardUser["role"][] = [
-  "Evaluator",
-  "Coordinator",
+  "Administrator",
 ];
 
 export function AssignInterviewerControl({

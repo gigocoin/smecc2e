@@ -8,6 +8,7 @@ import {
   APPLICANT_SESSION_COOKIE,
   verifyApplicantSessionToken,
 } from "@/lib/applicant-session";
+import { isApplicationDeadlinePassed } from "@/lib/application-deadline";
 import {
   DASHBOARD_PORTALS,
   isDashboardPath,
@@ -25,8 +26,18 @@ const APPLICANT_PUBLIC_PATHS = new Set([
   "/application/reset-password",
 ]);
 
+const APPLICANT_DASHBOARD_PATH = "/applicant";
 const APPLICANT_CONTINUE_PATH = "/applicant/application?page=2";
-const APPLICANT_CHANGE_PASSWORD_PATH = `/applicant/change-password?redirect=${encodeURIComponent(APPLICANT_CONTINUE_PATH)}`;
+
+function applicantDefaultPath(): string {
+  return isApplicationDeadlinePassed()
+    ? APPLICANT_DASHBOARD_PATH
+    : APPLICANT_CONTINUE_PATH;
+}
+
+function applicantChangePasswordPath(): string {
+  return `/applicant/change-password?redirect=${encodeURIComponent(applicantDefaultPath())}`;
+}
 
 function isApplicantPublicPath(pathname: string): boolean {
   return APPLICANT_PUBLIC_PATHS.has(pathname);
@@ -54,6 +65,8 @@ export async function middleware(request: NextRequest) {
   const applicantToken = request.cookies.get(APPLICANT_SESSION_COOKIE)?.value;
   const applicantSession = await verifyApplicantSessionToken(applicantToken);
   const applicantLoggedIn = Boolean(applicantSession);
+  const applicantHome = applicantDefaultPath();
+  const applicantChangePassword = applicantChangePasswordPath();
 
   if (isApplicantPath(pathname)) {
     if (isApplicantPublicPath(pathname)) {
@@ -66,8 +79,8 @@ export async function middleware(request: NextRequest) {
         !shouldBypassApplicantLoginRedirect(pathname)
       ) {
         const target = applicantSession.mustChangePassword
-          ? APPLICANT_CHANGE_PASSWORD_PATH
-          : APPLICANT_CONTINUE_PATH;
+          ? applicantChangePassword
+          : applicantHome;
         return NextResponse.redirect(new URL(target, request.url));
       }
       return NextResponse.next();
@@ -84,7 +97,7 @@ export async function middleware(request: NextRequest) {
       pathname !== "/applicant/change-password"
     ) {
       return NextResponse.redirect(
-        new URL(APPLICANT_CHANGE_PASSWORD_PATH, request.url)
+        new URL(applicantChangePassword, request.url)
       );
     }
 
@@ -93,7 +106,17 @@ export async function middleware(request: NextRequest) {
       applicantSession &&
       !applicantSession.mustChangePassword
     ) {
-      return NextResponse.redirect(new URL(APPLICANT_CONTINUE_PATH, request.url));
+      return NextResponse.redirect(new URL(applicantHome, request.url));
+    }
+
+    if (
+      isApplicationDeadlinePassed() &&
+      (pathname === "/applicant/application" ||
+        pathname.startsWith("/applicant/application/"))
+    ) {
+      return NextResponse.redirect(
+        new URL(APPLICANT_DASHBOARD_PATH, request.url)
+      );
     }
 
     return NextResponse.next();
@@ -150,8 +173,8 @@ export async function middleware(request: NextRequest) {
       !shouldBypassApplicantLoginRedirect(pathname)
     ) {
       const target = applicantSession.mustChangePassword
-        ? APPLICANT_CHANGE_PASSWORD_PATH
-        : APPLICANT_CONTINUE_PATH;
+        ? applicantChangePassword
+        : applicantHome;
       return NextResponse.redirect(new URL(target, request.url));
     }
   }

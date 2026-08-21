@@ -13,6 +13,7 @@ import { isApplicantEvaluatorEvaluated } from "@/lib/coordinator-evaluation";
 import type { InterviewEvaluationSubmission } from "@/lib/interview-scoring-sheet";
 import { formatInterviewScore } from "@/lib/interview-scoring-sheet";
 import { AssignInterviewerControl } from "@/app/components/assign-interviewer-control";
+import { InterviewInvitationModal } from "@/app/components/interview-invitation-modal";
 import { InterviewModal } from "@/app/components/interview-modal";
 import { useDashboardPortal } from "./dashboard-portal-provider";
 
@@ -27,6 +28,7 @@ export function InterviewApplicants() {
   const filterToCurrentUser = portalKey === "evaluator";
   const showResetInterview =
     portalKey === "coordinator" || portalKey === "administrator";
+  const showInviteForInterview = portalKey === "administrator";
 
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -42,6 +44,13 @@ export function InterviewApplicants() {
   const [resetError, setResetError] = useState<string | null>(null);
   const [interviewingApplication, setInterviewingApplication] =
     useState<ApplicationRecord | null>(null);
+  const [invitingApplication, setInvitingApplication] =
+    useState<ApplicationRecord | null>(null);
+  const [sendingInvitation, setSendingInvitation] = useState(false);
+  const [invitationError, setInvitationError] = useState<string | null>(null);
+  const [invitationSuccess, setInvitationSuccess] = useState<string | null>(
+    null
+  );
   const [submittingInterview, setSubmittingInterview] = useState(false);
   const [interviewActionError, setInterviewActionError] = useState<
     string | null
@@ -218,8 +227,56 @@ export function InterviewApplicants() {
     }
   };
 
+  const handleSendInterviewInvitation = async (details: {
+    date: string;
+    time: string;
+    venue: string;
+  }): Promise<boolean> => {
+    if (!invitingApplication) return false;
+    setSendingInvitation(true);
+    setInvitationError(null);
+    setInvitationSuccess(null);
+    try {
+      const res = await fetch(
+        `/api/applications/${encodeURIComponent(invitingApplication.id)}/interview-invitation`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(details),
+        }
+      );
+      const data = (await res.json()) as {
+        sent?: boolean;
+        email?: string;
+        warning?: string | null;
+        error?: string;
+      };
+      if (!res.ok || !data.sent) {
+        setInvitationError(
+          data.error ?? "Could not send interview invitation."
+        );
+        return false;
+      }
+      setInvitingApplication(null);
+      setInvitationSuccess(
+        data.warning
+          ? `Invitation prepared for ${data.email ?? "applicant"} (email delivery not configured).`
+          : `Interview invitation sent to ${data.email ?? "applicant"}.`
+      );
+      return true;
+    } catch {
+      setInvitationError("Could not send interview invitation.");
+      return false;
+    } finally {
+      setSendingInvitation(false);
+    }
+  };
+
   const tableColSpan =
-    showAssignInterviewer || showConductInterview || showResetInterview
+    showAssignInterviewer ||
+    showConductInterview ||
+    showResetInterview ||
+    showInviteForInterview
       ? 6
       : 5;
   const pageSubtitle = filterToCurrentUser
@@ -286,6 +343,24 @@ export function InterviewApplicants() {
           </p>
         )}
 
+        {invitationError && (
+          <p
+            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800"
+            role="alert"
+          >
+            {invitationError}
+          </p>
+        )}
+
+        {invitationSuccess && (
+          <p
+            className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900"
+            role="status"
+          >
+            {invitationSuccess}
+          </p>
+        )}
+
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
             <h2 className="text-base font-bold text-[#062763]">
@@ -310,7 +385,8 @@ export function InterviewApplicants() {
                   <th className="px-4 py-3 text-center">Interview Score</th>
                   {(showAssignInterviewer ||
                     showConductInterview ||
-                    showResetInterview) && (
+                    showResetInterview ||
+                    showInviteForInterview) && (
                     <th className="px-4 py-3 text-right">Actions</th>
                   )}
                 </tr>
@@ -363,14 +439,34 @@ export function InterviewApplicants() {
                         </td>
                         {(showAssignInterviewer ||
                           showConductInterview ||
-                          showResetInterview) && (
+                          showResetInterview ||
+                          showInviteForInterview) && (
                           <td className="px-4 py-3">
                             <div className="flex flex-nowrap items-center justify-end gap-2">
+                              {showInviteForInterview && (
+                                <button
+                                  type="button"
+                                  disabled={
+                                    sendingInvitation ||
+                                    submittingInterview ||
+                                    resettingInterviewId === app.id
+                                  }
+                                  onClick={() => {
+                                    setInvitationError(null);
+                                    setInvitationSuccess(null);
+                                    setInvitingApplication(app);
+                                  }}
+                                  className={`${actionBtnClass} whitespace-nowrap border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
+                                >
+                                  Invite for interview
+                                </button>
+                              )}
                               {showAssignInterviewer && (
                                 <AssignInterviewerControl
                                   application={app}
                                   assigning={assigningInterviewerId === app.id}
                                   onAssign={handleAssignInterviewer}
+                                  allowedRoles={["Administrator"]}
                                   showAssignedName={false}
                                 />
                               )}
@@ -388,7 +484,8 @@ export function InterviewApplicants() {
                                     type="button"
                                     disabled={
                                       submittingInterview ||
-                                      resettingInterviewId === app.id
+                                      resettingInterviewId === app.id ||
+                                      sendingInvitation
                                     }
                                     onClick={() => {
                                       setInterviewActionError(null);
@@ -409,7 +506,8 @@ export function InterviewApplicants() {
                                   disabled={
                                     resettingInterviewId === app.id ||
                                     assigningInterviewerId === app.id ||
-                                    submittingInterview
+                                    submittingInterview ||
+                                    sendingInvitation
                                   }
                                   onClick={() =>
                                     void handleResetInterview(app.id)
@@ -442,6 +540,16 @@ export function InterviewApplicants() {
           if (!submittingInterview) setInterviewingApplication(null);
         }}
         onSubmit={handleSubmitInterview}
+      />
+
+      <InterviewInvitationModal
+        application={invitingApplication}
+        open={invitingApplication !== null}
+        sending={sendingInvitation}
+        onClose={() => {
+          if (!sendingInvitation) setInvitingApplication(null);
+        }}
+        onSend={handleSendInterviewInvitation}
       />
     </div>
   );

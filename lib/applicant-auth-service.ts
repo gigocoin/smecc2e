@@ -4,6 +4,7 @@ import {
   findApplicantSummaryByEmail,
   getApplicantAccount,
 } from "./applicant-account-service";
+import { isApplicationDeadlinePassed } from "./application-deadline";
 import { applicantVerifiedLoginPath } from "./applicant-login-paths";
 import {
   getApplicantSessionFromCookie,
@@ -86,6 +87,7 @@ export async function loginApplicant(
       applicantId: string | null;
       mustChangePassword: boolean;
       currentPage: number | null;
+      status: ApplicationStatus | null;
     }
   | { error: string }
 > {
@@ -100,10 +102,13 @@ export async function loginApplicant(
     applicantId,
     mustChangePassword: result.account.mustChangePassword,
     currentPage: application?.currentPage ?? null,
+    status: (application?.status as ApplicationStatus | undefined) ?? null,
   };
 }
 
 export { applicantVerifiedLoginPath } from "./applicant-login-paths";
+
+export const APPLICANT_DASHBOARD_PATH = "/applicant";
 
 export function applicantContinueApplicationPath(
   currentPage: number | null | undefined
@@ -112,10 +117,28 @@ export function applicantContinueApplicationPath(
   return `/applicant/application?page=${page}`;
 }
 
-export function safeApplicantApplicationRedirect(
-  redirect: string | null | undefined,
+/** Where applicants go after login / password change (form while open; dashboard when closed). */
+export function applicantPostLoginPath(
+  status?: ApplicationStatus | string | null,
   currentPage?: number | null
 ): string {
+  if (isApplicationDeadlinePassed()) {
+    return APPLICANT_DASHBOARD_PATH;
+  }
+  if (status && status !== "draft") {
+    return APPLICANT_DASHBOARD_PATH;
+  }
+  return applicantContinueApplicationPath(currentPage);
+}
+
+export function safeApplicantApplicationRedirect(
+  redirect: string | null | undefined,
+  currentPage?: number | null,
+  status?: ApplicationStatus | string | null
+): string {
+  if (isApplicationDeadlinePassed()) {
+    return APPLICANT_DASHBOARD_PATH;
+  }
   const fallback = applicantContinueApplicationPath(currentPage);
   if (!redirect) return fallback;
   if (
@@ -124,18 +147,25 @@ export function safeApplicantApplicationRedirect(
   ) {
     return redirect;
   }
-  return fallback;
+  if (
+    redirect === APPLICANT_DASHBOARD_PATH ||
+    redirect.startsWith("/applicant/")
+  ) {
+    return redirect;
+  }
+  return applicantPostLoginPath(status, currentPage);
 }
 
 export function applicantLoginRedirect(
   mustChangePassword: boolean,
-  currentPage?: number | null
+  currentPage?: number | null,
+  status?: ApplicationStatus | string | null
 ): string {
-  const appPath = applicantContinueApplicationPath(currentPage);
+  const dest = applicantPostLoginPath(status, currentPage);
   if (mustChangePassword) {
-    return `/applicant/change-password?redirect=${encodeURIComponent(appPath)}`;
+    return `/applicant/change-password?redirect=${encodeURIComponent(dest)}`;
   }
-  return appPath;
+  return dest;
 }
 
 export async function verifyApplicantSessionFromRequest(

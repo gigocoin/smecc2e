@@ -12,11 +12,46 @@ import {
   isApplicationDeadlinePassed,
 } from "@/lib/application-deadline";
 
-function statusTone(status: ApplicationStatus): string {
+/** Applicant-facing status labels on the portal dashboard. */
+function applicantPortalStatusLabel(
+  status: ApplicationStatus | null | undefined,
+  applicationsClosed: boolean
+): string {
+  if (!status || status === "draft") {
+    return applicationsClosed ? "Ineligible" : STATUS_LABELS.draft;
+  }
+
+  switch (status) {
+    case "pending":
+    case "under_review":
+    case "evaluation":
+    case "final_evaluation":
+      return "Evaluation Checks";
+    case "interview":
+      return "Invited for interview";
+    case "rejected":
+      return "Rejected";
+    case "offered":
+    case "approved":
+    case "pre_departure":
+      return "Offered";
+    case "reserved":
+      return "Reserved";
+    default:
+      return STATUS_LABELS[status] ?? status;
+  }
+}
+
+function statusTone(status: ApplicationStatus, applicationsClosed: boolean): string {
+  const label = applicantPortalStatusLabel(status, applicationsClosed);
+  if (label === "Ineligible" || label === "Rejected") {
+    return "bg-red-100 text-red-900";
+  }
+  if (label === "Offered") return "bg-emerald-100 text-emerald-900";
+  if (label === "Reserved") return "bg-amber-100 text-amber-950";
+  if (label === "Invited for interview") return "bg-violet-100 text-violet-950";
+  if (label === "Evaluation Checks") return "bg-sky-100 text-sky-900";
   if (status === "draft") return "bg-sky-100 text-sky-900";
-  if (status === "pending" || status === "under_review") return "bg-sky-100 text-sky-900";
-  if (status === "approved" || status === "offered") return "bg-emerald-100 text-emerald-900";
-  if (status === "rejected") return "bg-red-100 text-red-900";
   return "bg-slate-100 text-slate-800";
 }
 
@@ -95,12 +130,10 @@ export function ApplicantDashboard() {
   const continueHref = isDraft
     ? `/applicant/application?page=${continuePage}`
     : undefined;
-  const statusLabel =
-    app && (app.status === "pending" || app.status === "under_review")
-      ? STATUS_LABELS.under_review
-      : app
-        ? (STATUS_LABELS[app.status] ?? app.status)
-        : "";
+  const statusLabel = applicantPortalStatusLabel(
+    app?.status,
+    applicationsClosed
+  );
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -160,11 +193,9 @@ export function ApplicantDashboard() {
             </p>
             {applicationsClosed ? (
               <span
-                aria-disabled="true"
-                title={APPLICATION_DEADLINE_CLOSED_MESSAGE}
-                className="inline-flex cursor-not-allowed rounded-lg bg-[#062763]/40 px-5 py-2.5 text-sm font-semibold text-white"
+                className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${statusTone("draft", true)}`}
               >
-                Applications closed
+                {statusLabel}
               </span>
             ) : (
               <Link
@@ -184,7 +215,7 @@ export function ApplicantDashboard() {
                 </span>
               )}
               <span
-                className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${statusTone(app.status)}`}
+                className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${statusTone(app.status, applicationsClosed)}`}
               >
                 {statusLabel}
               </span>
@@ -202,15 +233,7 @@ export function ApplicantDashboard() {
                       }. Continue where you left off.`}
                 </p>
                 {continueHref &&
-                  (applicationsClosed ? (
-                    <span
-                      aria-disabled="true"
-                      title={APPLICATION_DEADLINE_CLOSED_MESSAGE}
-                      className="inline-flex cursor-not-allowed rounded-lg bg-[#062763]/40 px-5 py-2.5 text-sm font-semibold text-white"
-                    >
-                      Continue application
-                    </span>
-                  ) : (
+                  (applicationsClosed ? null : (
                     <Link
                       href={continueHref}
                       className="inline-flex rounded-lg bg-[#062763] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0a3580]"
@@ -222,7 +245,7 @@ export function ApplicantDashboard() {
             ) : isSubmitted ? (
               <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-4">
                 <p className="text-sm font-semibold text-[#062763]">
-                  Your Application has been received
+                  Application status: {statusLabel}
                 </p>
                 {app.submittedAt && (
                   <p className="mt-2 text-sm text-slate-700">

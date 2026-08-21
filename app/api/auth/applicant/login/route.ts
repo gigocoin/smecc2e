@@ -28,7 +28,8 @@ export async function POST(request: Request) {
       mustChangePassword: result.mustChangePassword,
       redirectTo: applicantLoginRedirect(
         result.mustChangePassword,
-        result.currentPage
+        result.currentPage,
+        result.status
       ),
     });
 

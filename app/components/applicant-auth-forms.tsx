@@ -52,7 +52,7 @@ function ApplicantLoginFormContent() {
         data.redirectTo ??
         (data.mustChangePassword
           ? "/applicant/change-password"
-          : "/applicant/application?page=2");
+          : "/applicant");
       router.replace(target);
       router.refresh();
     } catch {
@@ -66,7 +66,11 @@ function ApplicantLoginFormContent() {
     <div className="w-full max-w-md">
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl shadow-[#062763]/10">
         <div className="border-b border-slate-100 bg-[#062763] px-6 py-8 text-center text-white">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-white p-2">
+          <Link
+            href="/"
+            className="mx-auto flex h-16 w-16 items-center justify-center rounded-xl bg-white p-2 transition hover:bg-slate-50"
+            aria-label="SMECC2E home"
+          >
             <div className="relative h-full w-full">
               <Image
                 src="/images/logo1.png"
@@ -77,7 +81,7 @@ function ApplicantLoginFormContent() {
                 priority
               />
             </div>
-          </div>
+          </Link>
           <h1 className="mt-4 text-xl font-bold tracking-tight">
             Applicant dashboard
           </h1>
