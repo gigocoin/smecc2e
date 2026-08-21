@@ -32,6 +32,7 @@ export function InterviewApplicants() {
 
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [assigningInterviewerId, setAssigningInterviewerId] = useState<
@@ -63,8 +64,9 @@ export function InterviewApplicants() {
       const applicationsUrl = filterToCurrentUser
         ? "/api/applications?forInterview=true"
         : "/api/applications";
-      const requests = [fetch(applicationsUrl)];
-      if (filterToCurrentUser) {
+      const needsSessionUser = filterToCurrentUser || showInviteForInterview;
+      const requests: Promise<Response>[] = [fetch(applicationsUrl)];
+      if (needsSessionUser) {
         requests.push(fetch("/api/auth/me"));
       }
 
@@ -80,9 +82,9 @@ export function InterviewApplicants() {
         return;
       }
 
-      if (filterToCurrentUser && meRes) {
+      if (needsSessionUser && meRes) {
         const meData = (await meRes.json()) as {
-          user?: { id: string };
+          user?: { id: string; email?: string };
           error?: string;
         };
         if (!meRes.ok || !meData.user?.id) {
@@ -91,6 +93,7 @@ export function InterviewApplicants() {
           return;
         }
         setCurrentUserId(meData.user.id);
+        setCurrentUserEmail(meData.user.email?.trim() || null);
       }
 
       setApplications(applicationsData.applications ?? []);
@@ -100,7 +103,7 @@ export function InterviewApplicants() {
     } finally {
       setLoading(false);
     }
-  }, [filterToCurrentUser]);
+  }, [filterToCurrentUser, showInviteForInterview]);
 
   useEffect(() => {
     loadApplications();
@@ -546,6 +549,7 @@ export function InterviewApplicants() {
         application={invitingApplication}
         open={invitingApplication !== null}
         sending={sendingInvitation}
+        administratorEmail={currentUserEmail}
         onClose={() => {
           if (!sendingInvitation) setInvitingApplication(null);
         }}

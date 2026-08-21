@@ -16,7 +16,7 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, context: RouteContext) {
   try {
-    await requireCoordinatorOrAdministratorSessionUser();
+    const user = await requireCoordinatorOrAdministratorSessionUser();
     const { id } = await context.params;
     const body = (await request.json()) as {
       date?: string;
@@ -31,6 +31,8 @@ export async function POST(request: Request, context: RouteContext) {
         time: body.time ?? "",
         venue: body.venue ?? "",
       },
+      initiatorEmail: user.email,
+      initiatorName: user.name,
     });
 
     if (!result.sent) {

@@ -32,13 +32,16 @@ export function formatInterviewInvitationTime(timeValue: string): string {
 }
 
 export function buildInterviewInvitationMessage(
-  details: InterviewInvitationDetails
+  details: InterviewInvitationDetails,
+  administratorEmail?: string | null
 ): string {
   const dateLabel =
     formatInterviewInvitationDate(details.date) || "[Insert date]";
   const timeLabel =
     formatInterviewInvitationTime(details.time) || "[Insert time]";
   const venueLabel = details.venue.trim() || "[Insert details]";
+  const adminEmail =
+    administratorEmail?.trim() || "[administrator email]";
 
   return [
     "Dear Applicant,",
@@ -51,7 +54,7 @@ export function buildInterviewInvitationMessage(
     "",
     "Please join the interview at least 10 minutes early and have a valid means of identification and relevant supporting documents available.",
     "",
-    "Kindly confirm your availability upon receiving this message.",
+    `Kindly confirm your availability upon receiving this message by sending a message to ${adminEmail}`,
     "",
     "Best regards,",
     "SMECC2E Scholarship Selection Committee",

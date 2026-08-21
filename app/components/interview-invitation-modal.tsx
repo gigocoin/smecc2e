@@ -19,12 +19,15 @@ export function InterviewInvitationModal({
   application,
   open,
   sending,
+  administratorEmail,
   onClose,
   onSend,
 }: {
   application: ApplicationRecord | null;
   open: boolean;
   sending: boolean;
+  /** Email of the administrator sending the invitation (shown in the message). */
+  administratorEmail?: string | null;
   onClose: () => void;
   onSend: (details: {
     date: string;
@@ -47,12 +50,15 @@ export function InterviewInvitationModal({
 
   const previewMessage = useMemo(
     () =>
-      buildInterviewInvitationMessage({
-        date,
-        time,
-        venue,
-      }),
-    [date, time, venue]
+      buildInterviewInvitationMessage(
+        {
+          date,
+          time,
+          venue,
+        },
+        administratorEmail
+      ),
+    [date, time, venue, administratorEmail]
   );
 
   if (!open || !application) return null;

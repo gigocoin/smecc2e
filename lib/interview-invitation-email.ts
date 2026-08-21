@@ -34,7 +34,13 @@ export type InterviewInvitationSendResult = {
   error?: string;
 };
 
-const SUBJECT = "SMECC2E Scholarship Programme — Interview Invitation";
+const SUBJECT_BASE = "SMECC2E Scholarship Programme — Interview Invitation";
+
+function buildInterviewInvitationSubject(initiatorName?: string | null): string {
+  const name = initiatorName?.trim();
+  if (!name) return SUBJECT_BASE;
+  return `${SUBJECT_BASE} from ${name}`;
+}
 
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
@@ -83,6 +89,31 @@ async function listActiveCoordinatorEmails(
   return emails;
 }
 
+function buildCcEmails(options: {
+  applicantEmail: string;
+  coordinatorEmails: string[];
+  initiatorEmail?: string | null;
+}): string[] {
+  const exclude = normalizeEmail(options.applicantEmail);
+  const emails: string[] = [];
+  const seen = new Set<string>();
+
+  const add = (value: string | null | undefined) => {
+    const email = normalizeEmail(value ?? "");
+    if (!email || !isValidEmail(email) || email === exclude) return;
+    if (seen.has(email)) return;
+    seen.add(email);
+    emails.push(email);
+  };
+
+  for (const email of options.coordinatorEmails) {
+    add(email);
+  }
+  add(options.initiatorEmail);
+
+  return emails;
+}
+
 export function interviewInvitationConfigurationError(): string | null {
   if (isResendConfigured()) return null;
   return "Email delivery is not configured. Add RESEND_API_KEY to send interview invitations.";
@@ -91,9 +122,17 @@ export function interviewInvitationConfigurationError(): string | null {
 export async function sendInterviewInvitationEmail(options: {
   applicationRef: string;
   details: InterviewInvitationDetails;
+  /** Administrator (or coordinator) who sent the invitation — receives a CC copy. */
+  initiatorEmail?: string | null;
+  /** Full name of the administrator who sent the invitation (used in the email subject). */
+  initiatorName?: string | null;
 }): Promise<InterviewInvitationSendResult> {
   const details = validateInterviewInvitationDetails(options.details);
-  const message = buildInterviewInvitationMessage(details);
+  const message = buildInterviewInvitationMessage(
+    details,
+    options.initiatorEmail
+  );
+  const subject = buildInterviewInvitationSubject(options.initiatorName);
   const application = await getApplication(options.applicationRef);
 
   if (!application) {
@@ -106,7 +145,12 @@ export async function sendInterviewInvitationEmail(options: {
   }
 
   const to = normalizeEmail(email);
-  const ccEmails = await listActiveCoordinatorEmails(to);
+  const coordinatorEmails = await listActiveCoordinatorEmails(to);
+  const ccEmails = buildCcEmails({
+    applicantEmail: to,
+    coordinatorEmails,
+    initiatorEmail: options.initiatorEmail,
+  });
   const resend = getResendClient();
 
   if (!resend) {
@@ -114,7 +158,7 @@ export async function sendInterviewInvitationEmail(options: {
     console.log({
       to,
       cc: ccEmails,
-      subject: SUBJECT,
+      subject,
       applicant: applicantDisplayName(application),
       details,
     });
@@ -122,7 +166,7 @@ export async function sendInterviewInvitationEmail(options: {
       sent: true,
       email: to,
       ccEmails,
-      subject: SUBJECT,
+      subject,
       message,
       devMode: true,
     };
@@ -132,9 +176,9 @@ export async function sendInterviewInvitationEmail(options: {
     from: getEmailFrom(),
     to: [to],
     ...(ccEmails.length > 0 ? { cc: ccEmails } : {}),
-    subject: SUBJECT,
+    subject,
     text: message,
-    html: invitationHtml(message, SUBJECT),
+    html: invitationHtml(message, subject),
   });
 
   if (error) {
@@ -142,7 +186,7 @@ export async function sendInterviewInvitationEmail(options: {
       sent: false,
       email: to,
       ccEmails,
-      subject: SUBJECT,
+      subject,
       message,
       devMode: false,
       error: error.message ?? "Could not send interview invitation.",
@@ -153,7 +197,7 @@ export async function sendInterviewInvitationEmail(options: {
     sent: true,
     email: to,
     ccEmails,
-    subject: SUBJECT,
+    subject,
     message,
     devMode: false,
   };
