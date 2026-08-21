@@ -21,16 +21,14 @@ export function formatInterviewInvitationTime(timeValue: string): string {
   const trimmed = timeValue.trim();
   if (!trimmed) return "";
   const match = /^(\d{1,2}):(\d{2})$/.exec(trimmed);
-  if (!match) return trimmed;
+  if (!match) return trimmed.includes("GMT") ? trimmed : `${trimmed} GMT`;
   const hours = Number(match[1]);
   const minutes = match[2];
-  if (!Number.isFinite(hours) || hours < 0 || hours > 23) return trimmed;
-  const date = new Date();
-  date.setHours(hours, Number(minutes), 0, 0);
-  return date.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  if (!Number.isFinite(hours) || hours < 0 || hours > 23) {
+    return trimmed.includes("GMT") ? trimmed : `${trimmed} GMT`;
+  }
+  const hh = String(hours).padStart(2, "0");
+  return `${hh}:${minutes} GMT`;
 }
 
 export function buildInterviewInvitationMessage(

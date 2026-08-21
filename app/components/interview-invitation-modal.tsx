@@ -148,7 +148,7 @@ export function InterviewInvitationModal({
               htmlFor={`interview-invitation-time-${application.id}`}
               className="block text-xs font-bold text-slate-800"
             >
-              Time
+              Time (GMT)
             </label>
             <input
               id={`interview-invitation-time-${application.id}`}
