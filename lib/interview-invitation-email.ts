@@ -92,6 +92,7 @@ async function listActiveCoordinatorEmails(
 function buildCcEmails(options: {
   applicantEmail: string;
   coordinatorEmails: string[];
+  interviewerEmail?: string | null;
   initiatorEmail?: string | null;
 }): string[] {
   const exclude = normalizeEmail(options.applicantEmail);
@@ -109,6 +110,7 @@ function buildCcEmails(options: {
   for (const email of options.coordinatorEmails) {
     add(email);
   }
+  add(options.interviewerEmail);
   add(options.initiatorEmail);
 
   return emails;
@@ -139,6 +141,12 @@ export async function sendInterviewInvitationEmail(options: {
     throw new Error("Application not found");
   }
 
+  if (!application.interviewerId) {
+    throw new Error(
+      "Assign an interviewer before sending an interview invitation"
+    );
+  }
+
   const email = applicantPrimaryEmail(application).trim();
   if (!email || !isValidEmail(email)) {
     throw new Error("Applicant does not have a valid email address");
@@ -149,6 +157,7 @@ export async function sendInterviewInvitationEmail(options: {
   const ccEmails = buildCcEmails({
     applicantEmail: to,
     coordinatorEmails,
+    interviewerEmail: application.interviewerEmail,
     initiatorEmail: options.initiatorEmail,
   });
   const resend = getResendClient();

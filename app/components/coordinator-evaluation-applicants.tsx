@@ -10,12 +10,16 @@ import {
   averagedEvaluatorEvaluation,
   isApplicantEvaluatorEvaluated,
 } from "@/lib/coordinator-evaluation";
+import { isApplicantAssignedForInterview } from "@/lib/coordinator-interview";
 import { formatInterviewScore } from "@/lib/interview-scoring-sheet";
 import { formatEvaluationScore } from "@/lib/evaluator-evaluation-types";
 import { AssignInterviewerControl } from "@/app/components/assign-interviewer-control";
+import { InterviewInvitationModal } from "@/app/components/interview-invitation-modal";
 
 const EVALUATION_WEIGHT = 0.7;
 const INTERVIEW_WEIGHT = 0.3;
+const actionBtnClass =
+  "rounded-lg border-2 px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50";
 
 function weightedEvaluationAverage(
   averageGrandTotal: number | undefined
@@ -94,6 +98,14 @@ export function CoordinatorEvaluationApplicants() {
     string | null
   >(null);
   const [assignError, setAssignError] = useState<string | null>(null);
+  const [invitingApplication, setInvitingApplication] =
+    useState<ApplicationRecord | null>(null);
+  const [sendingInvitation, setSendingInvitation] = useState(false);
+  const [invitationError, setInvitationError] = useState<string | null>(null);
+  const [invitationSuccess, setInvitationSuccess] = useState<string | null>(
+    null
+  );
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [mobilityFilter, setMobilityFilter] = useState("all");
   const [hostInstitutionFilter, setHostInstitutionFilter] = useState("all");
@@ -103,17 +115,27 @@ export function CoordinatorEvaluationApplicants() {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await fetch("/api/applications");
-      const data = (await res.json()) as {
+      const [applicationsRes, meRes] = await Promise.all([
+        fetch("/api/applications"),
+        fetch("/api/auth/me"),
+      ]);
+      const data = (await applicationsRes.json()) as {
         applications?: ApplicationRecord[];
         error?: string;
       };
-      if (!res.ok) {
+      if (!applicationsRes.ok) {
         setLoadError(data.error ?? "Could not load applicants.");
         setApplications([]);
         return;
       }
       setApplications(data.applications ?? []);
+
+      if (meRes.ok) {
+        const meData = (await meRes.json()) as {
+          user?: { email?: string };
+        };
+        setCurrentUserEmail(meData.user?.email?.trim() || null);
+      }
     } catch {
       setLoadError("Could not load applicants.");
       setApplications([]);
@@ -221,6 +243,51 @@ export function CoordinatorEvaluationApplicants() {
     }
   };
 
+  const handleSendInterviewInvitation = async (details: {
+    date: string;
+    time: string;
+    venue: string;
+  }): Promise<boolean> => {
+    if (!invitingApplication) return false;
+    setSendingInvitation(true);
+    setInvitationError(null);
+    setInvitationSuccess(null);
+    try {
+      const res = await fetch(
+        `/api/applications/${encodeURIComponent(invitingApplication.id)}/interview-invitation`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(details),
+        }
+      );
+      const data = (await res.json()) as {
+        sent?: boolean;
+        email?: string;
+        warning?: string | null;
+        error?: string;
+      };
+      if (!res.ok || !data.sent) {
+        setInvitationError(
+          data.error ?? "Could not send interview invitation."
+        );
+        return false;
+      }
+      setInvitingApplication(null);
+      setInvitationSuccess(
+        data.warning
+          ? `Invitation prepared for ${data.email ?? "applicant"} (email delivery not configured).`
+          : `Interview invitation sent to ${data.email ?? "applicant"}.`
+      );
+      return true;
+    } catch {
+      setInvitationError("Could not send interview invitation.");
+      return false;
+    } finally {
+      setSendingInvitation(false);
+    }
+  };
+
   const handleExportExcel = useCallback(async () => {
     setExporting(true);
     setLoadError(null);
@@ -280,6 +347,24 @@ export function CoordinatorEvaluationApplicants() {
             role="alert"
           >
             {assignError}
+          </p>
+        )}
+
+        {invitationError && (
+          <p
+            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800"
+            role="alert"
+          >
+            {invitationError}
+          </p>
+        )}
+
+        {invitationSuccess && (
+          <p
+            className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900"
+            role="status"
+          >
+            {invitationSuccess}
           </p>
         )}
 
@@ -348,7 +433,7 @@ export function CoordinatorEvaluationApplicants() {
                   <th className="px-4 py-3 text-center">
                     Interview Score (30%)
                   </th>
-                  <th className="px-4 py-3 text-right">Assign Interviewer</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -432,12 +517,31 @@ export function CoordinatorEvaluationApplicants() {
                           {formatInterviewScore(interviewWeighted)}
                         </td>
                         <td className="px-4 py-3">
-                          <AssignInterviewerControl
-                            application={app}
-                            assigning={assigningInterviewerId === app.id}
-                            onAssign={handleAssignInterviewer}
-                            allowedRoles={["Administrator"]}
-                          />
+                          <div className="flex flex-nowrap items-center justify-end gap-2">
+                            <AssignInterviewerControl
+                              application={app}
+                              assigning={assigningInterviewerId === app.id}
+                              onAssign={handleAssignInterviewer}
+                              allowedRoles={["Administrator"]}
+                            />
+                            {isApplicantAssignedForInterview(app) && (
+                              <button
+                                type="button"
+                                disabled={
+                                  sendingInvitation ||
+                                  assigningInterviewerId === app.id
+                                }
+                                onClick={() => {
+                                  setInvitationError(null);
+                                  setInvitationSuccess(null);
+                                  setInvitingApplication(app);
+                                }}
+                                className={`${actionBtnClass} whitespace-nowrap border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
+                              >
+                                Invite for interview
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -448,6 +552,17 @@ export function CoordinatorEvaluationApplicants() {
           </div>
         </div>
       </main>
+
+      <InterviewInvitationModal
+        application={invitingApplication}
+        open={invitingApplication !== null}
+        sending={sendingInvitation}
+        administratorEmail={currentUserEmail}
+        onClose={() => {
+          if (!sendingInvitation) setInvitingApplication(null);
+        }}
+        onSend={handleSendInterviewInvitation}
+      />
     </div>
   );
 }

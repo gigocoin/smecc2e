@@ -60,7 +60,8 @@ export async function POST(request: Request, context: RouteContext) {
       if (
         message.includes("required") ||
         message.includes("valid email") ||
-        message.includes("not found")
+        message.includes("not found") ||
+        message.includes("Assign an interviewer")
       ) {
         return NextResponse.json({ error: message }, { status: 400 });
       }
