@@ -13,7 +13,6 @@ import { isApplicantEvaluatorEvaluated } from "@/lib/coordinator-evaluation";
 import type { InterviewEvaluationSubmission } from "@/lib/interview-scoring-sheet";
 import { formatInterviewScore } from "@/lib/interview-scoring-sheet";
 import { AssignInterviewerControl } from "@/app/components/assign-interviewer-control";
-import { InterviewInvitationModal } from "@/app/components/interview-invitation-modal";
 import { InterviewModal } from "@/app/components/interview-modal";
 import { useDashboardPortal } from "./dashboard-portal-provider";
 
@@ -25,14 +24,13 @@ export function InterviewApplicants() {
   const showAssignInterviewer = portalKey === "coordinator";
   const showConductInterview =
     portalKey === "evaluator" || portalKey === "administrator";
-  const filterToCurrentUser = portalKey === "evaluator";
+  const filterToCurrentUser =
+    portalKey === "evaluator" || portalKey === "administrator";
   const showResetInterview =
     portalKey === "coordinator" || portalKey === "administrator";
-  const showInviteForInterview = portalKey === "administrator";
 
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [assigningInterviewerId, setAssigningInterviewerId] = useState<
@@ -45,13 +43,6 @@ export function InterviewApplicants() {
   const [resetError, setResetError] = useState<string | null>(null);
   const [interviewingApplication, setInterviewingApplication] =
     useState<ApplicationRecord | null>(null);
-  const [invitingApplication, setInvitingApplication] =
-    useState<ApplicationRecord | null>(null);
-  const [sendingInvitation, setSendingInvitation] = useState(false);
-  const [invitationError, setInvitationError] = useState<string | null>(null);
-  const [invitationSuccess, setInvitationSuccess] = useState<string | null>(
-    null
-  );
   const [submittingInterview, setSubmittingInterview] = useState(false);
   const [interviewActionError, setInterviewActionError] = useState<
     string | null
@@ -64,9 +55,8 @@ export function InterviewApplicants() {
       const applicationsUrl = filterToCurrentUser
         ? "/api/applications?forInterview=true"
         : "/api/applications";
-      const needsSessionUser = filterToCurrentUser || showInviteForInterview;
       const requests: Promise<Response>[] = [fetch(applicationsUrl)];
-      if (needsSessionUser) {
+      if (filterToCurrentUser) {
         requests.push(fetch("/api/auth/me"));
       }
 
@@ -82,9 +72,9 @@ export function InterviewApplicants() {
         return;
       }
 
-      if (needsSessionUser && meRes) {
+      if (filterToCurrentUser && meRes) {
         const meData = (await meRes.json()) as {
-          user?: { id: string; email?: string };
+          user?: { id: string };
           error?: string;
         };
         if (!meRes.ok || !meData.user?.id) {
@@ -93,7 +83,6 @@ export function InterviewApplicants() {
           return;
         }
         setCurrentUserId(meData.user.id);
-        setCurrentUserEmail(meData.user.email?.trim() || null);
       }
 
       setApplications(applicationsData.applications ?? []);
@@ -103,7 +92,7 @@ export function InterviewApplicants() {
     } finally {
       setLoading(false);
     }
-  }, [filterToCurrentUser, showInviteForInterview]);
+  }, [filterToCurrentUser]);
 
   useEffect(() => {
     loadApplications();
@@ -212,7 +201,9 @@ export function InterviewApplicants() {
         error?: string;
       };
       if (!res.ok || !data.application) {
-        setInterviewActionError(data.error ?? "Could not submit interview score.");
+        setInterviewActionError(
+          data.error ?? "Could not submit interview score."
+        );
         return false;
       }
       setApplications((prev) =>
@@ -230,63 +221,13 @@ export function InterviewApplicants() {
     }
   };
 
-  const handleSendInterviewInvitation = async (details: {
-    date: string;
-    time: string;
-    venue: string;
-  }): Promise<boolean> => {
-    if (!invitingApplication) return false;
-    setSendingInvitation(true);
-    setInvitationError(null);
-    setInvitationSuccess(null);
-    try {
-      const res = await fetch(
-        `/api/applications/${encodeURIComponent(invitingApplication.id)}/interview-invitation`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(details),
-        }
-      );
-      const data = (await res.json()) as {
-        sent?: boolean;
-        email?: string;
-        warning?: string | null;
-        error?: string;
-      };
-      if (!res.ok || !data.sent) {
-        setInvitationError(
-          data.error ?? "Could not send interview invitation."
-        );
-        return false;
-      }
-      setInvitingApplication(null);
-      setInvitationSuccess(
-        data.warning
-          ? `Invitation prepared for ${data.email ?? "applicant"} (email delivery not configured).`
-          : `Interview invitation sent to ${data.email ?? "applicant"}.`
-      );
-      return true;
-    } catch {
-      setInvitationError("Could not send interview invitation.");
-      return false;
-    } finally {
-      setSendingInvitation(false);
-    }
-  };
-
   const tableColSpan =
-    showAssignInterviewer ||
-    showConductInterview ||
-    showResetInterview ||
-    showInviteForInterview
+    showAssignInterviewer || showConductInterview || showResetInterview
       ? 6
       : 5;
   const pageSubtitle = filterToCurrentUser
     ? "Evaluated applicants assigned to you for interview"
-    : portalKey === "administrator"
-      ? "Conduct interviews for evaluated applicants"
-      : "Applicants assigned to interviewers";
+    : "Applicants assigned to interviewers";
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -346,24 +287,6 @@ export function InterviewApplicants() {
           </p>
         )}
 
-        {invitationError && (
-          <p
-            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800"
-            role="alert"
-          >
-            {invitationError}
-          </p>
-        )}
-
-        {invitationSuccess && (
-          <p
-            className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900"
-            role="status"
-          >
-            {invitationSuccess}
-          </p>
-        )}
-
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
             <h2 className="text-base font-bold text-[#062763]">
@@ -388,8 +311,7 @@ export function InterviewApplicants() {
                   <th className="px-4 py-3 text-center">Interview Score</th>
                   {(showAssignInterviewer ||
                     showConductInterview ||
-                    showResetInterview ||
-                    showInviteForInterview) && (
+                    showResetInterview) && (
                     <th className="px-4 py-3 text-right">Actions</th>
                   )}
                 </tr>
@@ -442,28 +364,9 @@ export function InterviewApplicants() {
                         </td>
                         {(showAssignInterviewer ||
                           showConductInterview ||
-                          showResetInterview ||
-                          showInviteForInterview) && (
+                          showResetInterview) && (
                           <td className="px-4 py-3">
                             <div className="flex flex-nowrap items-center justify-end gap-2">
-                              {showInviteForInterview && (
-                                <button
-                                  type="button"
-                                  disabled={
-                                    sendingInvitation ||
-                                    submittingInterview ||
-                                    resettingInterviewId === app.id
-                                  }
-                                  onClick={() => {
-                                    setInvitationError(null);
-                                    setInvitationSuccess(null);
-                                    setInvitingApplication(app);
-                                  }}
-                                  className={`${actionBtnClass} whitespace-nowrap border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
-                                >
-                                  Invite for interview
-                                </button>
-                              )}
                               {showAssignInterviewer && (
                                 <AssignInterviewerControl
                                   application={app}
@@ -487,8 +390,7 @@ export function InterviewApplicants() {
                                     type="button"
                                     disabled={
                                       submittingInterview ||
-                                      resettingInterviewId === app.id ||
-                                      sendingInvitation
+                                      resettingInterviewId === app.id
                                     }
                                     onClick={() => {
                                       setInterviewActionError(null);
@@ -509,8 +411,7 @@ export function InterviewApplicants() {
                                   disabled={
                                     resettingInterviewId === app.id ||
                                     assigningInterviewerId === app.id ||
-                                    submittingInterview ||
-                                    sendingInvitation
+                                    submittingInterview
                                   }
                                   onClick={() =>
                                     void handleResetInterview(app.id)
@@ -543,17 +444,6 @@ export function InterviewApplicants() {
           if (!submittingInterview) setInterviewingApplication(null);
         }}
         onSubmit={handleSubmitInterview}
-      />
-
-      <InterviewInvitationModal
-        application={invitingApplication}
-        open={invitingApplication !== null}
-        sending={sendingInvitation}
-        administratorEmail={currentUserEmail}
-        onClose={() => {
-          if (!sendingInvitation) setInvitingApplication(null);
-        }}
-        onSend={handleSendInterviewInvitation}
       />
     </div>
   );
