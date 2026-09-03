@@ -16,9 +16,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     const body = (await request.json()) as {
       name?: string;
       email?: string;
+      address?: string;
       phoneNumber?: string;
       password?: string;
       institution?: string;
+      isFocalPerson?: boolean;
       profileImageUrl?: string | null;
       role?: DashboardUser["role"];
       status?: DashboardUser["status"];
@@ -41,8 +43,10 @@ export async function PATCH(request: Request, context: RouteContext) {
     const { users } = await updateUser(id, {
       name: body.name ?? "",
       email: body.email ?? "",
+      address: body.address ?? "",
       phoneNumber: body.phoneNumber ?? "",
       institution: body.institution ?? "",
+      isFocalPerson: Boolean(body.isFocalPerson),
       profileImageUrl: body.profileImageUrl ?? null,
       role,
       status,
@@ -67,7 +71,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     const status =
       message === "User not found"
         ? 404
-        : message.includes("already exists")
+        : message.includes("already exists") ||
+            message.includes("already the focal person") ||
+            message.includes("Only one focal person")
           ? 409
           : 400;
     return NextResponse.json({ error: message }, { status });

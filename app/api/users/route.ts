@@ -37,9 +37,11 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       name?: string;
       email?: string;
+      address?: string;
       phoneNumber?: string;
       password?: string;
       institution?: string;
+      isFocalPerson?: boolean;
       profileImageUrl?: string | null;
       role?: DashboardUser["role"];
       status?: DashboardUser["status"];
@@ -71,9 +73,11 @@ export async function POST(request: Request) {
     const { users } = await createUser({
       name: body.name ?? "",
       email: body.email ?? "",
+      address: body.address ?? "",
       phoneNumber: body.phoneNumber ?? "",
       password: body.password ?? "",
       institution: body.institution ?? "",
+      isFocalPerson: Boolean(body.isFocalPerson),
       profileImageUrl: body.profileImageUrl ?? null,
       role,
       status,
@@ -94,7 +98,12 @@ export async function POST(request: Request) {
     }
     const message =
       err instanceof Error ? err.message : "Failed to create user";
-    const status = message.includes("already exists") ? 409 : 400;
+    const status =
+      message.includes("already exists") ||
+      message.includes("already the focal person") ||
+      message.includes("Only one focal person")
+        ? 409
+        : 400;
     return NextResponse.json({ error: message }, { status });
   }
 }

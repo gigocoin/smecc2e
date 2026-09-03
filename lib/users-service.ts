@@ -24,6 +24,58 @@ async function nextPublicId(): Promise<string> {
   return `USR-${String(next).padStart(3, "0")}`;
 }
 
+function isPrismaUniqueViolation(err: unknown): boolean {
+  return (
+    !!err &&
+    typeof err === "object" &&
+    "code" in err &&
+    (err as { code: string }).code === "P2002"
+  );
+}
+
+function uniqueViolationMessage(err: unknown): string {
+  const target = (
+    err as { meta?: { target?: string | string[] } }
+  ).meta?.target;
+  const fields = Array.isArray(target)
+    ? target
+    : typeof target === "string"
+      ? [target]
+      : [];
+  if (
+    fields.some(
+      (f) =>
+        f.includes("institution") ||
+        f.includes("focal") ||
+        f === "users_institution_focal_person_unique"
+    )
+  ) {
+    return "Only one focal person is allowed per institution.";
+  }
+  return "A user with this email already exists";
+}
+
+async function assertFocalPersonAvailable(
+  institution: string,
+  isFocalPerson: boolean,
+  excludePublicId?: string
+) {
+  if (!isFocalPerson) return;
+  const existing = await prisma.user.findFirst({
+    where: {
+      institution,
+      isFocalPerson: true,
+      ...(excludePublicId ? { publicId: { not: excludePublicId } } : {}),
+    },
+    select: { name: true, publicId: true },
+  });
+  if (existing) {
+    throw new Error(
+      `${existing.name} (${existing.publicId}) is already the focal person for this institution.`
+    );
+  }
+}
+
 export async function listUsers(): Promise<DashboardUser[]> {
   const users = await prisma.user.findMany({
     orderBy: [{ publicId: "asc" }],
@@ -36,8 +88,10 @@ export async function createUser(
 ): Promise<{ user: DashboardUser; users: DashboardUser[] }> {
   const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
+  const address = (input.address ?? "").trim();
   const phoneNumber = input.phoneNumber.trim();
   const institution = input.institution.trim();
+  const isFocalPerson = Boolean(input.isFocalPerson);
 
   if (!name) throw new Error("Name is required");
   if (!email) throw new Error("Email is required");
@@ -47,6 +101,8 @@ export async function createUser(
   const passwordError = validatePassword(input.password);
   if (passwordError) throw new Error(passwordError);
 
+  await assertFocalPersonAvailable(institution, isFocalPerson);
+
   const passwordHash = await hashPassword(input.password);
 
   try {
@@ -55,9 +111,11 @@ export async function createUser(
         publicId: await nextPublicId(),
         name,
         email,
+        address,
         phoneNumber,
         passwordHash,
         institution,
+        isFocalPerson,
         profileImageUrl: input.profileImageUrl?.trim() || null,
         role: parseUserRole(input.role),
         status: parseUserStatus(input.status),
@@ -66,13 +124,8 @@ export async function createUser(
     const users = await listUsers();
     return { user: mapPrismaUser(created), users };
   } catch (err) {
-    const isPrismaUnique =
-      err &&
-      typeof err === "object" &&
-      "code" in err &&
-      (err as { code: string }).code === "P2002";
-    if (isPrismaUnique) {
-      throw new Error("A user with this email already exists");
+    if (isPrismaUniqueViolation(err)) {
+      throw new Error(uniqueViolationMessage(err));
     }
     throw err;
   }
@@ -87,13 +140,17 @@ export async function updateUser(
 
   const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
+  const address = (input.address ?? "").trim();
   const phoneNumber = input.phoneNumber.trim();
   const institution = input.institution.trim();
+  const isFocalPerson = Boolean(input.isFocalPerson);
 
   if (!name) throw new Error("Name is required");
   if (!email) throw new Error("Email is required");
   if (!phoneNumber) throw new Error("Phone number is required");
   if (!institution) throw new Error("Institution is required");
+
+  await assertFocalPersonAvailable(institution, isFocalPerson, publicId);
 
   const password = input.password?.trim() ?? "";
   let passwordHash: string | undefined;
@@ -109,8 +166,10 @@ export async function updateUser(
       data: {
         name,
         email,
+        address,
         phoneNumber,
         institution,
+        isFocalPerson,
         profileImageUrl: input.profileImageUrl?.trim() || null,
         role: parseUserRole(input.role),
         status: parseUserStatus(input.status),
@@ -120,13 +179,8 @@ export async function updateUser(
     const users = await listUsers();
     return { user: mapPrismaUser(updated), users };
   } catch (err) {
-    const isPrismaUnique =
-      err &&
-      typeof err === "object" &&
-      "code" in err &&
-      (err as { code: string }).code === "P2002";
-    if (isPrismaUnique) {
-      throw new Error("A user with this email already exists");
+    if (isPrismaUniqueViolation(err)) {
+      throw new Error(uniqueViolationMessage(err));
     }
     throw err;
   }

@@ -216,10 +216,13 @@ model User {
   publicId  String     @unique @map("public_id")
   name         String
   email        String     @unique
+  address      String     @default("")
   phoneNumber  String     @map("phone_number")
   /// Bcrypt hash — never expose via API
   passwordHash String     @map("password_hash")
   institution      String
+  /// At most one true per institution (enforced by partial unique index)
+  isFocalPerson    Boolean  @default(false) @map("is_focal_person")
   profileImageUrl  String?  @map("profile_image_url")
   role             UserRole   @default(COORDINATOR)
   status       UserStatus @default(ACTIVE)

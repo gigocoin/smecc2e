@@ -2,8 +2,10 @@ export type DashboardUser = {
   id: string;
   name: string;
   email: string;
+  address: string;
   phoneNumber: string;
   institution: string;
+  isFocalPerson: boolean;
   profileImageUrl: string | null;
   role: "Coordinator" | "Evaluator" | "Administrator";
   status: "Active" | "Inactive";
@@ -12,9 +14,11 @@ export type DashboardUser = {
 export type CreateUserInput = {
   name: string;
   email: string;
+  address?: string;
   phoneNumber: string;
   password: string;
   institution: string;
+  isFocalPerson?: boolean;
   profileImageUrl?: string | null;
   role: DashboardUser["role"];
   status: DashboardUser["status"];
@@ -23,8 +27,10 @@ export type CreateUserInput = {
 export type UpdateUserInput = {
   name: string;
   email: string;
+  address?: string;
   phoneNumber: string;
   institution: string;
+  isFocalPerson?: boolean;
   profileImageUrl?: string | null;
   role: DashboardUser["role"];
   status: DashboardUser["status"];

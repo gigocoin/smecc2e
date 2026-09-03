@@ -24,10 +24,12 @@ function defaultInstitution(options: string[]): string {
 type CoordinatorUserFormState = {
   name: string;
   email: string;
+  address: string;
   phoneNumber: string;
   password: string;
   confirmPassword: string;
   institution: string;
+  isFocalPerson: boolean;
   role: DashboardUser["role"];
   status: DashboardUser["status"];
 };
@@ -298,10 +300,12 @@ export function CoordinatorUsers({
   const [form, setForm] = useState<CoordinatorUserFormState>({
     name: "",
     email: "",
+    address: "",
     phoneNumber: "",
     password: "",
     confirmPassword: "",
     institution: defaultInstitution(initialInstitutions),
+    isFocalPerson: false,
     role: defaultCreateRole,
     status: "Active" as DashboardUser["status"],
   });
@@ -319,10 +323,12 @@ export function CoordinatorUsers({
   const [editForm, setEditForm] = useState<CoordinatorUserFormState>({
     name: "",
     email: "",
+    address: "",
     phoneNumber: "",
     password: "",
     confirmPassword: "",
     institution: defaultInstitution(initialInstitutions),
+    isFocalPerson: false,
     role: "Coordinator" as DashboardUser["role"],
     status: "Active" as DashboardUser["status"],
   });
@@ -368,10 +374,12 @@ export function CoordinatorUsers({
     setForm({
       name: "",
       email: "",
+      address: "",
       phoneNumber: "",
       password: "",
       confirmPassword: "",
       institution: defaultInstitution(initialInstitutions),
+      isFocalPerson: false,
       role: defaultCreateRole,
       status: "Active",
     });
@@ -464,10 +472,12 @@ export function CoordinatorUsers({
     setEditForm({
       name: "",
       email: "",
+      address: "",
       phoneNumber: "",
       password: "",
       confirmPassword: "",
       institution: defaultInstitution(initialInstitutions),
+      isFocalPerson: false,
       role: "Coordinator",
       status: "Active",
     });
@@ -487,10 +497,12 @@ export function CoordinatorUsers({
     setEditForm({
       name: user.name,
       email: user.email,
+      address: user.address ?? "",
       phoneNumber: user.phoneNumber,
       password: "",
       confirmPassword: "",
       institution: user.institution,
+      isFocalPerson: user.isFocalPerson ?? false,
       role: user.role,
       status: user.status,
     });
@@ -719,7 +731,14 @@ export function CoordinatorUsers({
                         {user.phoneNumber}
                       </td>
                       <td className="max-w-xs px-5 py-3 font-medium text-slate-900">
-                        {user.institution}
+                        <div>
+                          <p>{user.institution}</p>
+                          {user.isFocalPerson && (
+                            <p className="mt-0.5 text-xs font-semibold text-[#062763]">
+                              Focal person
+                            </p>
+                          )}
+                        </div>
                       </td>
                       <td className="px-5 py-3 font-medium text-slate-900">
                         {user.role}
@@ -840,6 +859,26 @@ export function CoordinatorUsers({
               </div>
               <div>
                 <label
+                  htmlFor="user-address"
+                  className="block text-xs font-bold text-slate-800"
+                >
+                  Address
+                </label>
+                <input
+                  id="user-address"
+                  type="text"
+                  value={form.address}
+                  onChange={(e) => {
+                    setForm((f) => ({ ...f, address: e.target.value }));
+                    setCreateError(null);
+                  }}
+                  placeholder="Street, city, country"
+                  disabled={creating}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label
                   htmlFor="user-phone"
                   className="block text-xs font-bold text-slate-800"
                 >
@@ -914,6 +953,27 @@ export function CoordinatorUsers({
                     </option>
                   ))}
                 </select>
+                <label className="mt-2 flex items-start gap-2 text-sm font-medium text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={form.isFocalPerson}
+                    onChange={(e) => {
+                      setForm((f) => ({
+                        ...f,
+                        isFocalPerson: e.target.checked,
+                      }));
+                      setCreateError(null);
+                    }}
+                    disabled={creating}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#062763] focus:ring-[#062763]"
+                  />
+                  <span>
+                    Institution&apos;s focal person
+                    <span className="mt-0.5 block text-xs font-semibold text-slate-600">
+                      Only one focal person is allowed per institution.
+                    </span>
+                  </span>
+                </label>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -1074,6 +1134,25 @@ export function CoordinatorUsers({
               </div>
               <div>
                 <label
+                  htmlFor="edit-user-address"
+                  className="block text-xs font-bold text-slate-800"
+                >
+                  Address
+                </label>
+                <input
+                  id="edit-user-address"
+                  type="text"
+                  value={editForm.address}
+                  onChange={(e) => {
+                    setEditForm((f) => ({ ...f, address: e.target.value }));
+                    setEditError(null);
+                  }}
+                  disabled={updating}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label
                   htmlFor="edit-user-phone"
                   className="block text-xs font-bold text-slate-800"
                 >
@@ -1156,6 +1235,27 @@ export function CoordinatorUsers({
                     </option>
                   )}
                 </select>
+                <label className="mt-2 flex items-start gap-2 text-sm font-medium text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={editForm.isFocalPerson}
+                    onChange={(e) => {
+                      setEditForm((f) => ({
+                        ...f,
+                        isFocalPerson: e.target.checked,
+                      }));
+                      setEditError(null);
+                    }}
+                    disabled={updating}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#062763] focus:ring-[#062763]"
+                  />
+                  <span>
+                    Institution&apos;s focal person
+                    <span className="mt-0.5 block text-xs font-semibold text-slate-600">
+                      Only one focal person is allowed per institution.
+                    </span>
+                  </span>
+                </label>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
