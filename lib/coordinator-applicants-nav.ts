@@ -90,21 +90,21 @@ export function buildApplicantsManagementNav(
     },
     {
       id: "final_evaluation",
-      label: "Final Scores",
+      label: "Final Score",
       href: `${root}/applicants?status=final_evaluation`,
       statusFilter: "final_evaluation",
+    },
+    {
+      id: "offered",
+      label: "Nominees",
+      href: `${root}/applicants?status=offered`,
+      statusFilter: "offered",
     },
     {
       id: "approved",
       label: "Approved",
       href: `${root}/applicants?status=approved`,
       statusFilter: "approved",
-    },
-    {
-      id: "offered",
-      label: "Offered",
-      href: `${root}/applicants?status=offered`,
-      statusFilter: "offered",
     },
     {
       id: "reserved",

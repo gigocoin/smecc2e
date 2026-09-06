@@ -26,7 +26,7 @@ function pipelineStatusLabel(status: ApplicationStatus): string {
   if (status === "under_review") return "Submitted applications";
   if (status === "evaluation") return "Evaluated applications";
   if (status === "interview") return "Interviewed applicants";
-  if (status === "final_evaluation") return "Final Scores";
+  if (status === "final_evaluation") return "Final Score";
   return STATUS_LABELS[status];
 }
 
@@ -250,7 +250,7 @@ export function CoordinatorDashboard() {
                 {portalKey !== "evaluator" ? (
                   <>
                     <StatCard
-                      label="Offered Applicants"
+                      label="Nominees"
                       value={stats.byStatus.offered ?? 0}
                       accent="sky"
                       href={`${basePath}/applicants?status=offered`}

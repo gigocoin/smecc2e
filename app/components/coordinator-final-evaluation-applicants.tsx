@@ -28,10 +28,8 @@ const MIGRATE_OPTIONS: {
   label: string;
   status: ApplicationStatus;
 }[] = [
-  { value: "under_review", label: "Eligibility Checks", status: "under_review" },
-  { value: "offered", label: "Offered", status: "offered" },
   { value: "reserved", label: "Reserved", status: "reserved" },
-  { value: "approved", label: "Approved", status: "approved" },
+  { value: "nominated", label: "Nominated", status: "offered" },
 ];
 
 function migrateSelectValue(status: ApplicationStatus): string {
@@ -106,13 +104,16 @@ function HeaderFilterSelect({
 function MigrateApplicantSelect({
   application,
   migrating,
+  hasFinalScore,
   onMigrate,
 }: {
   application: ApplicationRecord;
   migrating: boolean;
+  hasFinalScore: boolean;
   onMigrate: (id: string, status: ApplicationStatus) => void;
 }) {
   const selectedValue = migrateSelectValue(application.status);
+  const disabled = migrating || !hasFinalScore;
 
   return (
     <div className="inline-flex flex-col items-end gap-1">
@@ -123,7 +124,12 @@ function MigrateApplicantSelect({
       <select
         id={`migrate-applicant-${application.id}`}
         value={selectedValue}
-        disabled={migrating}
+        disabled={disabled}
+        title={
+          hasFinalScore
+            ? undefined
+            : "Final score is required before migrating this applicant"
+        }
         onChange={(e) => {
           const option = MIGRATE_OPTIONS.find(
             (item) => item.value === e.target.value
@@ -135,7 +141,11 @@ function MigrateApplicantSelect({
       >
         {selectedValue === "" && (
           <option value="" disabled>
-            {migrating ? "Migrating…" : "Select…"}
+            {migrating
+              ? "Migrating…"
+              : !hasFinalScore
+                ? "No final score"
+                : "Select…"}
           </option>
         )}
         {MIGRATE_OPTIONS.map((option) => (
@@ -256,7 +266,7 @@ export function CoordinatorFinalEvaluationApplicants() {
       <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-6 lg:pl-6">
         <div className="pl-12 lg:pl-0">
           <h1 className="text-base font-bold text-[#062763] sm:text-lg">
-            Final Evaluation
+            Final Score
           </h1>
           <p className="text-xs font-medium text-slate-600 sm:text-sm">
             Evaluated applicants with averaged criteria scores and interview
@@ -310,8 +320,7 @@ export function CoordinatorFinalEvaluationApplicants() {
               Applicants with at least one completed evaluator scorecard,
               regardless of pipeline stage. Criteria A–I and eval total are
               averaged when both evaluators have submitted. Use Migrate
-              Applicant to move someone to Eligibility Checks, Offered,
-              Reserved, or Approved.
+              Applicant to move someone to Reserved or Nominated.
             </p>
           </div>
           <div className="max-h-[70vh] overflow-auto">
@@ -397,6 +406,7 @@ export function CoordinatorFinalEvaluationApplicants() {
                           <MigrateApplicantSelect
                             application={app}
                             migrating={migratingId === app.id}
+                            hasFinalScore={overall !== null}
                             onMigrate={(id, status) => {
                               void handleMigrate(id, status);
                             }}

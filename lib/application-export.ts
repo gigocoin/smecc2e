@@ -272,7 +272,7 @@ export async function downloadEvaluationExcel(
 }
 
 /**
- * Excel export for Final Evaluation applicants (criteria averages,
+ * Excel export for Final Score applicants (criteria averages,
  * interview score, and overall score).
  */
 export async function downloadFinalEvaluationExcel(
@@ -282,7 +282,7 @@ export async function downloadFinalEvaluationExcel(
   workbook.creator = "SMECC2E";
   workbook.created = new Date();
 
-  const sheet = workbook.addWorksheet("Final Evaluation", {
+  const sheet = workbook.addWorksheet("Final Score", {
     views: [{ state: "frozen", ySplit: 1 }],
   });
 
