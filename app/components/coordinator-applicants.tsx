@@ -24,6 +24,7 @@ import {
   formatDate,
   StatusBadge,
 } from "./coordinator-shared";
+import { NomineeLetterModal } from "./nominee-letter-modal";
 
 const actionBtnClass =
   "rounded-lg border-2 px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50";
@@ -78,7 +79,6 @@ export function CoordinatorApplicants({
     portalKey === "evaluator"
       ? "Review assigned scholarship applications"
       : "SMECC2E mobility & scholarship coordination";
-  const tableColSpan = canDeleteApplications ? 8 : 7;
   const managementNav = useMemo(
     () => buildApplicantsManagementNav(basePath),
     [basePath]
@@ -92,6 +92,11 @@ export function CoordinatorApplicants({
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | "all">(
     () => statusFilterFromParam(statusFromUrl)
   );
+  const showNomineeLetter =
+    statusFilter === "offered" &&
+    (portalKey === "coordinator" || portalKey === "administrator");
+  const showActionsColumn = canDeleteApplications || showNomineeLetter;
+  const tableColSpan = showActionsColumn ? 8 : 7;
   const [mobilityFilter, setMobilityFilter] = useState("all");
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const [assigningEvaluatorSlot, setAssigningEvaluatorSlot] = useState<
@@ -102,6 +107,11 @@ export function CoordinatorApplicants({
     useState<ApplicationRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [nomineeLetterApplication, setNomineeLetterApplication] =
+    useState<ApplicationRecord | null>(null);
+  const [nomineeLetterSuccess, setNomineeLetterSuccess] = useState<
+    string | null
+  >(null);
 
   const tableBusy =
     assigningEvaluatorSlot !== null || deleting || updatingStatus;
@@ -372,6 +382,14 @@ export function CoordinatorApplicants({
       </header>
 
       <main className="flex-1 overflow-auto bg-slate-50 p-4 sm:p-6">
+        {nomineeLetterSuccess && (
+          <p
+            className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900"
+            role="status"
+          >
+            {nomineeLetterSuccess}
+          </p>
+        )}
         <div className="mb-6 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-end sm:p-5">
           <div className="min-w-48 flex-1">
             <label className="block text-xs font-bold text-slate-800">
@@ -425,7 +443,7 @@ export function CoordinatorApplicants({
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Current page</th>
                   <th className="px-4 py-3">Submitted</th>
-                  {canDeleteApplications && (
+                  {showActionsColumn && (
                     <th className="px-4 py-3 text-right">Actions</th>
                   )}
                 </tr>
@@ -505,20 +523,38 @@ export function CoordinatorApplicants({
                           <td className="px-4 py-3 font-semibold text-slate-900">
                             {formatDate(app.submittedAt)}
                           </td>
-                          {canDeleteApplications && (
+                          {showActionsColumn && (
                             <td className="px-4 py-3 text-right">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeletingApplication(app);
-                                  setDeleteError(null);
-                                }}
-                                disabled={tableBusy}
-                                className={`${actionBtnClass} border-red-200 text-red-700 hover:bg-red-50`}
-                              >
-                                Delete
-                              </button>
+                              <div className="flex flex-wrap justify-end gap-2">
+                                {showNomineeLetter && app.status === "offered" && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setNomineeLetterApplication(app);
+                                      setNomineeLetterSuccess(null);
+                                    }}
+                                    disabled={tableBusy}
+                                    className={`${actionBtnClass} border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
+                                  >
+                                    Generate Nominee Letter
+                                  </button>
+                                )}
+                                {canDeleteApplications && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeletingApplication(app);
+                                      setDeleteError(null);
+                                    }}
+                                    disabled={tableBusy}
+                                    className={`${actionBtnClass} border-red-200 text-red-700 hover:bg-red-50`}
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           )}
                         </tr>
@@ -620,6 +656,21 @@ export function CoordinatorApplicants({
             </div>
           </div>
         </div>
+      )}
+
+      {showNomineeLetter && nomineeLetterApplication && (
+        <NomineeLetterModal
+          applicationId={nomineeLetterApplication.id}
+          applicantName={
+            applicantDisplayName(nomineeLetterApplication) ||
+            nomineeLetterApplication.id
+          }
+          onClose={() => setNomineeLetterApplication(null)}
+          onSent={(message) => {
+            setNomineeLetterApplication(null);
+            setNomineeLetterSuccess(message);
+          }}
+        />
       )}
     </div>
   );
