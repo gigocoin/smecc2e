@@ -82,6 +82,14 @@ export async function POST(request: Request, context: RouteContext) {
       mobilityStartDate?: string;
       mobilityEndDate?: string;
       planDocument?: string;
+      learningDocument?: string;
+      changesDocument?: string;
+      staffPlanDocument?: string;
+      subsistenceAllowance?: string;
+      scholarshipHolderSignature?: string;
+      scholarshipHolderSignedDate?: string;
+      hostContactSignature?: string;
+      hostContactSignedDate?: string;
       letterDate?: string;
     };
     const action = body.action === "send" ? "send" : "share";
@@ -101,6 +109,14 @@ export async function POST(request: Request, context: RouteContext) {
           mobilityStartDate: body.mobilityStartDate ?? "",
           mobilityEndDate: body.mobilityEndDate ?? "",
           planDocument: body.planDocument ?? "",
+          learningDocument: body.learningDocument ?? "",
+          changesDocument: body.changesDocument ?? "",
+          staffPlanDocument: body.staffPlanDocument ?? "",
+          subsistenceAllowance: body.subsistenceAllowance ?? "",
+          scholarshipHolderSignature: body.scholarshipHolderSignature ?? "",
+          scholarshipHolderSignedDate: body.scholarshipHolderSignedDate ?? "",
+          hostContactSignature: body.hostContactSignature ?? "",
+          hostContactSignedDate: body.hostContactSignedDate ?? "",
         },
         initiatorEmail: user.email,
         initiatorName: user.name,

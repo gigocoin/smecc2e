@@ -1,13 +1,20 @@
 "use client";
 
+import Image from "next/image";
 import {
+  NOMINEE_CHANGES_DOCUMENT_OPTIONS,
   NOMINEE_HOLDER_TYPE_OPTIONS,
+  NOMINEE_LEARNING_DOCUMENT_OPTIONS,
   NOMINEE_MOBILITY_ACTIVITY_OPTIONS,
   NOMINEE_PLAN_DOCUMENT_OPTIONS,
+  NOMINEE_STAFF_PLAN_DOCUMENT_OPTIONS,
+  NOMINEE_SUBSISTENCE_ALLOWANCE_OPTIONS,
   NOMINEE_TARGET_GROUP_OPTIONS,
   PRIVACY_STATEMENT_URL,
   SMECC2E_PORTAL_URL,
   SMECC2E_PROJECT_EMAIL,
+  formatNomineeLetterDate,
+  formatNomineeSubsistenceAllowance,
   formatOptionalNomineeLetterDate,
   type NomineeLetterAutoFields,
   type NomineeLetterEditableFields,
@@ -69,11 +76,89 @@ function ProjectEmailLink() {
 }
 
 /** A signature line the parties complete when signing on the portal. */
-function SignatureLine({ label }: { label: string }) {
+function SignatureLine({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string;
+}) {
+  const text = value?.trim();
   return (
-    <span className="inline-block min-w-56 border-b border-slate-400 align-bottom text-xs font-semibold text-slate-500">
-      {label}
+    <span className="inline-block w-full min-w-0 border-b border-slate-400 align-bottom px-1 text-sm font-semibold text-slate-900">
+      {text ? (
+        <span className="font-[cursive] text-base italic text-[#062763]">
+          {text}
+        </span>
+      ) : (
+        <span className="text-xs font-semibold text-slate-500">{label}</span>
+      )}
     </span>
+  );
+}
+
+function DigitalSignatureBlock({
+  dateLabel,
+  signatureLabel,
+  signedDate,
+  signature,
+  canSign,
+  disabled,
+  onSign,
+  onClear,
+}: {
+  dateLabel: string;
+  signatureLabel: string;
+  signedDate: string;
+  signature: string;
+  canSign: boolean;
+  disabled: boolean;
+  onSign: () => void;
+  onClear: () => void;
+}) {
+  const isSigned = Boolean(signature.trim() || signedDate.trim());
+
+  return (
+    <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-3">
+      <div className="space-y-1">
+        <SignatureLine label={dateLabel} value={signedDate} />
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          Date
+        </p>
+      </div>
+      <div className="space-y-1">
+        <SignatureLine label={signatureLabel} value={signature} />
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          {signatureLabel}
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        {canSign ? (
+          <>
+            <button
+              type="button"
+              onClick={onSign}
+              disabled={disabled}
+              className="rounded-lg border-2 border-[#062763]/30 px-3 py-1.5 text-xs font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
+            >
+              {isSigned
+                ? "Update digital signature"
+                : "Append digital signature"}
+            </button>
+            {isSigned && (
+              <button
+                type="button"
+                onClick={onClear}
+                disabled={disabled}
+                className="rounded-lg border-2 border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                Clear signature
+              </button>
+            )}
+          </>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -106,6 +191,15 @@ export function NomineeScholarshipAgreement({
       {/* Agreement PDF page 1 / document page 2 */}
       <NomineeLetterPage pageNumber={2} totalPages={pages}>
       <div>
+        <div className="mb-6 flex items-center justify-center">
+          <Image
+            src="/images/letter-agreement-logo.jpg"
+            alt="SMECC2E Cross Regional Intra-Africa Mobility Project"
+            width={1024}
+            height={1024}
+            className="h-auto w-1/2"
+          />
+        </div>
         <p className="text-sm font-bold text-slate-900">
           Scholarship Agreement No: <AutoValue value={auto.applicantNo} />
         </p>
@@ -487,32 +581,32 @@ export function NomineeScholarshipAgreement({
 
       {/* Agreement PDF page 4 / document page 5 */}
       <NomineeLetterPage pageNumber={5} totalPages={pages}>
-      <ClauseList>
-        <li>
-          EUR 890 /month × <AutoValue value={fields.durationMonths} /> months
-          for Masters degree seeking mobility
-        </li>
-        <li>
-          EUR 890 /month × <AutoValue value={fields.durationMonths} /> months
-          for Masters credit seeking mobility
-        </li>
-        <li>
-          EUR 1,230 /month × <AutoValue value={fields.durationMonths} /> months
-          for Doctoral credit-seeking mobility
-        </li>
-        <li>
-          EUR 1,230 /month × <AutoValue value={fields.durationMonths} /> months
-          for Degree seeking mobility
-        </li>
-        <li>
-          EUR 1,230 /month × <AutoValue value={fields.durationMonths} /> months
-          for Trainee mobility
-        </li>
-        <li>
-          EUR 2,370 /month × <AutoValue value={fields.durationMonths} /> months
-          for Staff mobility
-        </li>
-      </ClauseList>
+      <Clause>
+        {readOnly ? (
+          <AutoValue
+            value={formatNomineeSubsistenceAllowance(
+              fields.subsistenceAllowance,
+              fields.durationMonths
+            )}
+            missingLabel="[select subsistence allowance]"
+          />
+        ) : (
+          <EditableSelect
+            id="agreement-subsistence-allowance"
+            label="Subsistence allowance"
+            value={fields.subsistenceAllowance}
+            options={NOMINEE_SUBSISTENCE_ALLOWANCE_OPTIONS.map((option) =>
+              formatNomineeSubsistenceAllowance(option.id, fields.durationMonths)
+            )}
+            optionValues={NOMINEE_SUBSISTENCE_ALLOWANCE_OPTIONS.map(
+              (option) => option.id
+            )}
+            onChange={(value) => onFieldChange("subsistenceAllowance", value)}
+            disabled={disabled}
+            placeholder="Select subsistence allowance"
+          />
+        )}
+      </Clause>
 
       <Clause>
         For partial months, a pro-rata unit cost of 1/30 will be reimbursed for
@@ -799,22 +893,50 @@ export function NomineeScholarshipAgreement({
         11.3 Research costs will not at any given time be paid directly to the
         scholarship holder.
       </Clause>
-
-      <ArticleHeading>12. Academic commitment</ArticleHeading>
       </NomineeLetterPage>
 
       {/* Agreement PDF page 7 / document page 8 */}
       <NomineeLetterPage pageNumber={8} totalPages={pages}>
+      <ArticleHeading>12. Academic commitment</ArticleHeading>
+
       <Clause>12.1 For Credit &amp; Degree Seeking Mobilities only:</Clause>
 
       <Clause>
-        The scholarship holder must sign a{" "}
-        <AutoValue
-          value={fields.planDocument}
-          missingLabel="Learning Agreement / Research Plan"
-        />
-        , as well as possible changes made to it. This document must be
-        countersigned by:
+        The scholarship holder must sign a Learning{" "}
+        {readOnly ? (
+          <AutoValue
+            value={fields.learningDocument}
+            missingLabel="[Agreement / Research Plan]"
+          />
+        ) : (
+          <EditableSelect
+            id="agreement-learning-document"
+            label="Learning document type"
+            value={fields.learningDocument}
+            options={NOMINEE_LEARNING_DOCUMENT_OPTIONS}
+            onChange={(value) => onFieldChange("learningDocument", value)}
+            disabled={disabled}
+            placeholder="Select document"
+          />
+        )}
+        , as well as possible changes made to the{" "}
+        {readOnly ? (
+          <AutoValue
+            value={fields.changesDocument}
+            missingLabel="[Learning Agreement / Study plan / Research plan / Traineeship Plan]"
+          />
+        ) : (
+          <EditableSelect
+            id="agreement-changes-document"
+            label="Document for possible changes"
+            value={fields.changesDocument}
+            options={NOMINEE_CHANGES_DOCUMENT_OPTIONS}
+            onChange={(value) => onFieldChange("changesDocument", value)}
+            disabled={disabled}
+            placeholder="Select document"
+          />
+        )}
+        . This document must be countersigned by:
       </Clause>
 
       <ClauseList>
@@ -833,14 +955,30 @@ export function NomineeScholarshipAgreement({
         the <PortalLink />.
       </Clause>
 
-      <Clause>12.2 For Staff/Trainee Mobilities only:</Clause>
+      <Clause>
+        <span className="font-bold text-slate-900">
+          12.2 For Staff/Trainee Mobilities only:
+        </span>
+      </Clause>
 
       <Clause>
         Staff scholarship holder must sign a{" "}
-        <AutoValue
-          value={fields.planDocument}
-          missingLabel="Work Plan/Traineeship Plan"
-        />{" "}
+        {readOnly ? (
+          <AutoValue
+            value={fields.staffPlanDocument}
+            missingLabel="[Work Plan / Traineeship Plan]"
+          />
+        ) : (
+          <EditableSelect
+            id="agreement-staff-plan-document"
+            label="Staff or trainee plan document"
+            value={fields.staffPlanDocument}
+            options={NOMINEE_STAFF_PLAN_DOCUMENT_OPTIONS}
+            onChange={(value) => onFieldChange("staffPlanDocument", value)}
+            disabled={disabled}
+            placeholder="Select plan"
+          />
+        )}{" "}
         (as applicable). This document must be countersigned by:
       </Clause>
 
@@ -866,7 +1004,9 @@ export function NomineeScholarshipAgreement({
       </Clause>
 
       <Clause>
-        13.1 Progress report (for mobility flows longer than one semester)
+        <span className="font-bold text-slate-900">
+          13.1 Progress report (for mobility flows longer than one semester)
+        </span>
       </Clause>
 
       <Clause>
@@ -880,7 +1020,9 @@ export function NomineeScholarshipAgreement({
         on the <PortalLink />.
       </Clause>
 
-      <Clause>13.2 Final report</Clause>
+      <Clause>
+        <span className="font-bold text-slate-900">13.2 Final report</span>
+      </Clause>
 
       <Clause>
         At the end of the mobility period at the Host University, each
@@ -1333,10 +1475,23 @@ export function NomineeScholarshipAgreement({
               missingLabel="[name of applicant]"
             />
           </p>
-          <div className="flex flex-wrap gap-x-10 gap-y-2">
-            <SignatureLine label="Date" />
-            <SignatureLine label="Signature of the scholarship holder" />
-          </div>
+          <DigitalSignatureBlock
+            dateLabel="Date"
+            signatureLabel="Signature of the scholarship holder"
+            signedDate={fields.scholarshipHolderSignedDate}
+            signature={fields.scholarshipHolderSignature}
+            canSign={!readOnly}
+            disabled={disabled || !applicantFullName.trim()}
+            onSign={() => {
+              const today = formatNomineeLetterDate(new Date());
+              onFieldChange("scholarshipHolderSignature", applicantFullName);
+              onFieldChange("scholarshipHolderSignedDate", today);
+            }}
+            onClear={() => {
+              onFieldChange("scholarshipHolderSignature", "");
+              onFieldChange("scholarshipHolderSignedDate", "");
+            }}
+          />
         </div>
 
         <div className="space-y-2">
@@ -1349,10 +1504,26 @@ export function NomineeScholarshipAgreement({
               missingLabel="[name of focal person]"
             />
           </p>
-          <div className="flex flex-wrap gap-x-10 gap-y-2">
-            <SignatureLine label="Date" />
-            <SignatureLine label="Signature of the contact person of the Host University" />
-          </div>
+          <DigitalSignatureBlock
+            dateLabel="Date"
+            signatureLabel="Signature of the contact person of the Host University"
+            signedDate={fields.hostContactSignedDate}
+            signature={fields.hostContactSignature}
+            canSign={!readOnly}
+            disabled={disabled || !auto.focalPersonName.trim()}
+            onSign={() => {
+              const today = formatNomineeLetterDate(new Date());
+              onFieldChange(
+                "hostContactSignature",
+                auto.focalPersonName.trim()
+              );
+              onFieldChange("hostContactSignedDate", today);
+            }}
+            onClear={() => {
+              onFieldChange("hostContactSignature", "");
+              onFieldChange("hostContactSignedDate", "");
+            }}
+          />
         </div>
       </div>
       </NomineeLetterPage>

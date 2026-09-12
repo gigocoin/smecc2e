@@ -91,6 +91,7 @@ export function EditableSelect({
   label,
   value,
   options,
+  optionValues,
   onChange,
   disabled,
   placeholder,
@@ -99,6 +100,8 @@ export function EditableSelect({
   label: string;
   value: string;
   options: readonly string[];
+  /** Optional stable values; defaults to using each option label as its value. */
+  optionValues?: readonly string[];
   onChange: (value: string) => void;
   disabled: boolean;
   placeholder: string;
@@ -118,11 +121,14 @@ export function EditableSelect({
         <option value="" disabled>
           {placeholder}
         </option>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
+        {options.map((option, index) => {
+          const optionValue = optionValues?.[index] ?? option;
+          return (
+            <option key={optionValue} value={optionValue}>
+              {option}
+            </option>
+          );
+        })}
       </select>
     </>
   );
