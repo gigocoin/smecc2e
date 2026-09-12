@@ -92,11 +92,17 @@ export function CoordinatorApplicants({
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | "all">(
     () => statusFilterFromParam(statusFromUrl)
   );
-  const showNomineeLetter =
-    statusFilter === "offered" &&
-    (portalKey === "coordinator" || portalKey === "administrator");
+  const showNomineeLetterShare =
+    statusFilter === "offered" && portalKey === "coordinator";
+  const showNomineeLetterSend =
+    statusFilter === "offered" && portalKey === "administrator";
+  const showNomineeLetter = showNomineeLetterShare || showNomineeLetterSend;
   const showActionsColumn = canDeleteApplications || showNomineeLetter;
-  const tableColSpan = showActionsColumn ? 8 : 7;
+  const showCurrentPageColumn = !(
+    portalKey === "administrator" && statusFilter === "offered"
+  );
+  const tableColSpan =
+    (showCurrentPageColumn ? 7 : 6) + (showActionsColumn ? 1 : 0);
   const [mobilityFilter, setMobilityFilter] = useState("all");
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const [assigningEvaluatorSlot, setAssigningEvaluatorSlot] = useState<
@@ -109,6 +115,8 @@ export function CoordinatorApplicants({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [nomineeLetterApplication, setNomineeLetterApplication] =
     useState<ApplicationRecord | null>(null);
+  const [nomineeLetterStartEditing, setNomineeLetterStartEditing] =
+    useState(false);
   const [nomineeLetterSuccess, setNomineeLetterSuccess] = useState<
     string | null
   >(null);
@@ -441,7 +449,9 @@ export function CoordinatorApplicants({
                   <th className="px-4 py-3">Mobility</th>
                   <th className="px-4 py-3">Host / Programme</th>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Current page</th>
+                  {showCurrentPageColumn && (
+                    <th className="px-4 py-3">Current page</th>
+                  )}
                   <th className="px-4 py-3">Submitted</th>
                   {showActionsColumn && (
                     <th className="px-4 py-3 text-right">Actions</th>
@@ -517,9 +527,11 @@ export function CoordinatorApplicants({
                           <td className="px-4 py-3">
                             <StatusBadge status={app.status} />
                           </td>
-                          <td className="px-4 py-3 font-semibold text-slate-900">
-                            {app.currentPage != null ? app.currentPage : "—"}
-                          </td>
+                          {showCurrentPageColumn && (
+                            <td className="px-4 py-3 font-semibold text-slate-900">
+                              {app.currentPage != null ? app.currentPage : "—"}
+                            </td>
+                          )}
                           <td className="px-4 py-3 font-semibold text-slate-900">
                             {formatDate(app.submittedAt)}
                           </td>
@@ -527,18 +539,49 @@ export function CoordinatorApplicants({
                             <td className="px-4 py-3 text-right">
                               <div className="flex flex-wrap justify-end gap-2">
                                 {showNomineeLetter && app.status === "offered" && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setNomineeLetterApplication(app);
-                                      setNomineeLetterSuccess(null);
-                                    }}
-                                    disabled={tableBusy}
-                                    className={`${actionBtnClass} border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
-                                  >
-                                    Generate Nominee Letter
-                                  </button>
+                                  <>
+                                    {showNomineeLetterShare &&
+                                    app.nomineeLetterShared ? (
+                                      <>
+                                        <button
+                                          type="button"
+                                          disabled
+                                          className={`${actionBtnClass} border-emerald-200 bg-emerald-50 text-emerald-800 disabled:opacity-100`}
+                                        >
+                                          Draft Shared
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setNomineeLetterStartEditing(true);
+                                            setNomineeLetterApplication(app);
+                                            setNomineeLetterSuccess(null);
+                                          }}
+                                          disabled={tableBusy}
+                                          className={`${actionBtnClass} border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
+                                        >
+                                          Edit
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setNomineeLetterStartEditing(false);
+                                          setNomineeLetterApplication(app);
+                                          setNomineeLetterSuccess(null);
+                                        }}
+                                        disabled={tableBusy}
+                                        className={`${actionBtnClass} border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
+                                      >
+                                        {showNomineeLetterSend
+                                          ? "View letter"
+                                          : "Generate Nominee Letter"}
+                                      </button>
+                                    )}
+                                  </>
                                 )}
                                 {canDeleteApplications && (
                                   <button
@@ -662,13 +705,27 @@ export function CoordinatorApplicants({
         <NomineeLetterModal
           applicationId={nomineeLetterApplication.id}
           applicantName={
-            applicantDisplayName(nomineeLetterApplication) ||
-            nomineeLetterApplication.id
+            [nomineeLetterApplication.firstName, nomineeLetterApplication.surname]
+              .map((part) => part?.trim())
+              .filter(Boolean)
+              .join(" ") || nomineeLetterApplication.id
           }
-          onClose={() => setNomineeLetterApplication(null)}
+          mode={showNomineeLetterSend ? "send" : "share"}
+          startEditing={nomineeLetterStartEditing}
+          onClose={() => {
+            setNomineeLetterApplication(null);
+            setNomineeLetterStartEditing(false);
+          }}
+          onDraftShared={(message) => {
+            setNomineeLetterSuccess(message);
+            setNomineeLetterStartEditing(false);
+            void loadApplications();
+          }}
           onSent={(message) => {
             setNomineeLetterApplication(null);
+            setNomineeLetterStartEditing(false);
             setNomineeLetterSuccess(message);
+            void loadApplications();
           }}
         />
       )}

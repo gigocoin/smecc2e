@@ -203,6 +203,11 @@ model Applicant {
   nextOfKinEmail            String @default("") @map("next_of_kin_email")
   nextOfKinRelationship     String @default("") @map("next_of_kin_relationship")
 
+  // --- Nomination letter (coordinator prepares; administrator dates + sends) ---
+  nomineeLetterSharedData Json?     @map("nominee_letter_shared_data")
+  nomineeLetterSharedAt   DateTime? @map("nominee_letter_shared_at")
+  nomineeLetterSentAt     DateTime? @map("nominee_letter_sent_at")
+
   @@index([email])
   @@index([status])
   @@index([submittedAt])

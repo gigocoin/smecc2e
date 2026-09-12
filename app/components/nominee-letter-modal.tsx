@@ -1,113 +1,79 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  NOMINEE_LETTER_PENDING,
   NOMINEE_TARGET_GROUP_OPTIONS,
   PRIVACY_STATEMENT_URL,
   PROJECT_COORDINATOR_SIGNATURE,
   SMECC2E_PROJECT_EMAIL,
+  SMECC2E_PORTAL_URL,
+  nomineeLetterDatesFromInput,
   type NomineeLetterAutoFields,
   type NomineeLetterEditableFields,
 } from "@/lib/nominee-letter-shared";
+import {
+  AutoValue,
+  EditableInput,
+  EditableSelect,
+  EmailLink,
+  detailLabelClass,
+  letterParagraphClass,
+} from "./nominee-letter-fields";
+import { NomineeLetterPage } from "./nominee-letter-page";
+import {
+  NOMINEE_DOCUMENT_TOTAL_PAGES,
+  NomineeScholarshipAgreement,
+} from "./nominee-scholarship-agreement";
+
+export type NomineeLetterMode = "share" | "send";
 
 export type NomineeLetterData = {
   auto: NomineeLetterAutoFields;
   editable: NomineeLetterEditableFields;
   applicantEmail: string;
   applicantName: string;
+  shared: boolean;
+  sent: boolean;
 };
-
-/** Read-only value merged in from the database. */
-function AutoValue({
-  value,
-  missingLabel = "—",
-}: {
-  value: string;
-  missingLabel?: string;
-}) {
-  const text = value?.trim();
-  if (!text) {
-    return (
-      <span className="rounded bg-red-50 px-1 font-semibold text-red-700">
-        {missingLabel}
-      </span>
-    );
-  }
-  return (
-    <span
-      className="rounded bg-amber-100 px-1 font-semibold text-slate-900"
-      title="Filled from the database"
-    >
-      {text}
-    </span>
-  );
-}
-
-function EditableInput({
-  id,
-  label,
-  value,
-  onChange,
-  disabled,
-  placeholder,
-  width = "12rem",
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  disabled: boolean;
-  placeholder?: string;
-  width?: string;
-}) {
-  return (
-    <>
-      <label className="sr-only" htmlFor={id}>
-        {label}
-      </label>
-      <input
-        id={id}
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        placeholder={placeholder}
-        style={{ width }}
-        className="rounded border-2 border-sky-400 bg-sky-50 px-2 py-0.5 align-baseline text-sm font-semibold text-[#062763] outline-none focus:border-[#062763] focus:ring-2 focus:ring-[#062763]/15 disabled:opacity-50"
-      />
-    </>
-  );
-}
-
-const letterParagraphClass = "text-sm leading-7 text-slate-800";
-const detailLabelClass = "text-sm font-bold text-slate-900";
 
 export function NomineeLetterModal({
   applicationId,
   applicantName,
+  mode = "share",
+  startEditing = false,
   onClose,
   onSent,
+  onDraftShared,
 }: {
   applicationId: string;
   applicantName: string;
+  mode?: NomineeLetterMode;
+  startEditing?: boolean;
   onClose: () => void;
   onSent: (message: string) => void;
+  onDraftShared?: (message: string) => void;
 }) {
+  const isSendMode = mode === "send";
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [letter, setLetter] = useState<NomineeLetterData | null>(null);
   const [fields, setFields] = useState<NomineeLetterEditableFields | null>(
     null
   );
+  const [letterDateInput, setLetterDateInput] = useState("");
+  const [editing, setEditing] = useState(true);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [shareSuccess, setShareSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
       setLoading(true);
       setLoadError(null);
+      setShareSuccess(null);
       try {
         const res = await fetch(
           `/api/applications/${encodeURIComponent(applicationId)}/nominee-letter`,
@@ -124,6 +90,9 @@ export function NomineeLetterModal({
         }
         setLetter(data.letter);
         setFields(data.letter.editable);
+        setEditing(
+          isSendMode ? false : startEditing || !data.letter.shared
+        );
       } catch {
         if (active) setLoadError("Could not load the nomination letter.");
       } finally {
@@ -134,7 +103,7 @@ export function NomineeLetterModal({
     return () => {
       active = false;
     };
-  }, [applicationId]);
+  }, [applicationId, isSendMode, startEditing]);
 
   const updateField = (
     key: keyof NomineeLetterEditableFields,
@@ -142,19 +111,55 @@ export function NomineeLetterModal({
   ) => {
     setFields((prev) => (prev ? { ...prev, [key]: value } : prev));
     setSendError(null);
+    setShareSuccess(null);
   };
 
-  const handleSend = async () => {
+  const fieldsReadOnly =
+    isSendMode || Boolean(letter?.shared && !editing);
+
+  const derivedDates = useMemo(() => {
+    if (!isSendMode || !letterDateInput.trim()) {
+      return {
+        letterDate: NOMINEE_LETTER_PENDING,
+        responseDeadline: NOMINEE_LETTER_PENDING,
+      };
+    }
+    try {
+      return nomineeLetterDatesFromInput(letterDateInput);
+    } catch {
+      return {
+        letterDate: NOMINEE_LETTER_PENDING,
+        responseDeadline: NOMINEE_LETTER_PENDING,
+      };
+    }
+  }, [isSendMode, letterDateInput]);
+
+  const displayAuto = useMemo(() => {
+    if (!letter) return null;
+    if (!isSendMode) return letter.auto;
+    return {
+      ...letter.auto,
+      letterDate: derivedDates.letterDate,
+      responseDeadline: derivedDates.responseDeadline,
+    };
+  }, [derivedDates, isSendMode, letter]);
+
+  const handleSubmit = async () => {
     if (!fields) return;
     setSending(true);
     setSendError(null);
+    setShareSuccess(null);
     try {
       const res = await fetch(
         `/api/applications/${encodeURIComponent(applicationId)}/nominee-letter`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(fields),
+          body: JSON.stringify(
+            isSendMode
+              ? { action: "send", letterDate: letterDateInput }
+              : { action: "share", ...fields }
+          ),
         }
       );
       const data = (await res.json()) as {
@@ -163,23 +168,49 @@ export function NomineeLetterModal({
         email?: string;
       };
       if (!res.ok) {
-        setSendError(data.error ?? "Could not send the nomination letter.");
+        setSendError(
+          data.error ??
+            (isSendMode
+              ? "Could not send the nomination letter."
+              : "Could not share the nomination letter.")
+        );
         return;
       }
-      const email = data.email ?? letter?.applicantEmail ?? "the applicant";
-      onSent(
-        data.warning
+      const email =
+        data.email ??
+        (isSendMode
+          ? letter?.applicantEmail
+          : letter?.auto.focalPersonEmail) ??
+        "the recipient";
+      const message = data.warning
+        ? isSendMode
           ? `Nomination letter prepared for ${email}. ${data.warning}`
-          : `Nomination letter sent to ${email}.`
-      );
+          : `Nomination letter shared with ${email}. ${data.warning}`
+        : isSendMode
+          ? `Nomination letter sent to ${email}.`
+          : `Nomination letter shared with ${email}.`;
+
+      if (isSendMode) {
+        onSent(message);
+        return;
+      }
+
+      setLetter((prev) => (prev ? { ...prev, shared: true } : prev));
+      setEditing(false);
+      setShareSuccess(message);
+      onDraftShared?.(message);
     } catch {
-      setSendError("Could not send the nomination letter.");
+      setSendError(
+        isSendMode
+          ? "Could not send the nomination letter."
+          : "Could not share the nomination letter."
+      );
     } finally {
       setSending(false);
     }
   };
 
-  const auto = letter?.auto;
+  const auto = displayAuto;
 
   return (
     <div
@@ -192,7 +223,7 @@ export function NomineeLetterModal({
       }}
     >
       <div
-        className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
+        className="flex max-h-[92dvh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
@@ -204,13 +235,12 @@ export function NomineeLetterModal({
               Nomination Letter
             </h2>
             <p className="mt-1 text-xs font-semibold text-slate-700">
-              {applicantName || applicationId} ·{" "}
-              <span className="rounded bg-amber-100 px-1">amber</span> values
-              come from the database,{" "}
-              <span className="rounded border border-sky-400 bg-sky-50 px-1 text-[#062763]">
-                blue
-              </span>{" "}
-              fields are editable.
+              {applicantName || applicationId}
+              {isSendMode
+                ? " · Review the coordinator-shared letter, set the date, then send."
+                : letter?.shared && !editing
+                  ? " · Draft shared with the host focal person. Edit to make changes."
+                  : " · Complete the editable fields, then share with the host focal person."}
             </p>
           </div>
           <button
@@ -239,7 +269,7 @@ export function NomineeLetterModal({
             </p>
           )}
 
-          {auto && !auto.focalPersonName.trim() && (
+          {auto && !isSendMode && !auto.focalPersonName.trim() && (
             <p className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
               No focal person is set for{" "}
               {letter?.editable.hostUniversity || "this host institution"}. Open
@@ -249,25 +279,42 @@ export function NomineeLetterModal({
             </p>
           )}
 
-          {auto && fields && (
-            <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="border-b border-slate-200 pb-4">
-                <Image
-                  src="/images/letter-header.jpg"
-                  alt="SMECC2E Cross Regional Intra-Africa Mobility Project, African Union, Co-funded by the European Union"
-                  width={1024}
-                  height={157}
-                  priority
-                  className="h-auto w-full"
-                />
-              </div>
+          {letter?.sent && isSendMode && (
+            <p className="mb-4 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-900">
+              This nomination letter was already sent. Sending again will email
+              the applicant with the new date.
+            </p>
+          )}
 
+          {auto && fields && (
+            <div className="space-y-6">
+              <NomineeLetterPage
+                pageNumber={1}
+                totalPages={NOMINEE_DOCUMENT_TOTAL_PAGES}
+                priorityHeader
+              >
               <div className="flex flex-wrap items-center justify-between gap-3 text-sm font-semibold text-slate-900">
                 <p>
                   Our Ref: SMECC2E/<AutoValue value={auto.applicantNo} />
                 </p>
                 <p>
-                  Date: <AutoValue value={auto.letterDate} />
+                  Date:{" "}
+                  {isSendMode ? (
+                    <EditableInput
+                      id="nominee-letter-date"
+                      label="Letter date"
+                      type="date"
+                      value={letterDateInput}
+                      onChange={(value) => {
+                        setLetterDateInput(value);
+                        setSendError(null);
+                      }}
+                      disabled={sending}
+                      width="11rem"
+                    />
+                  ) : (
+                    <AutoValue value={auto.letterDate} />
+                  )}
                 </p>
               </div>
 
@@ -276,8 +323,15 @@ export function NomineeLetterModal({
               </h3>
 
               <p className={letterParagraphClass}>
-                Dear <AutoValue value={auto.firstName} />{" "}
-                <AutoValue value={auto.surname} />,
+                Dear{" "}
+                <AutoValue
+                  value={[auto.firstName, auto.surname]
+                    .map((part) => part?.trim())
+                    .filter(Boolean)
+                    .join(" ")}
+                  missingLabel="[first name] [surname]"
+                />
+                ,
               </p>
 
               <p className={letterParagraphClass}>
@@ -287,15 +341,19 @@ export function NomineeLetterModal({
                 Climate Change, Energy Economics and Environment (SMECC2E)
                 Scholarship was successful and you were selected for a stay at
                 the{" "}
-                <EditableInput
-                  id="nominee-host-university"
-                  label="Host university"
-                  value={fields.hostUniversity}
-                  onChange={(value) => updateField("hostUniversity", value)}
-                  disabled={sending}
-                  placeholder="Host university"
-                  width="18rem"
-                />
+                {fieldsReadOnly ? (
+                  <AutoValue value={fields.hostUniversity} />
+                ) : (
+                  <EditableInput
+                    id="nominee-host-university"
+                    label="Host university"
+                    value={fields.hostUniversity}
+                    onChange={(value) => updateField("hostUniversity", value)}
+                    disabled={sending}
+                    placeholder="Host university"
+                    width="18rem"
+                  />
+                )}
                 . The details of the scholarship are as follows:
               </p>
 
@@ -313,15 +371,19 @@ export function NomineeLetterModal({
 
                 <p className={detailLabelClass}>Host University:</p>
                 <p className="text-sm text-slate-800">
-                  <EditableInput
-                    id="nominee-host-university-detail"
-                    label="Host university (details)"
-                    value={fields.hostUniversity}
-                    onChange={(value) => updateField("hostUniversity", value)}
-                    disabled={sending}
-                    placeholder="Host university"
-                    width="18rem"
-                  />
+                  {fieldsReadOnly ? (
+                    <AutoValue value={fields.hostUniversity} />
+                  ) : (
+                    <EditableInput
+                      id="nominee-host-university-detail"
+                      label="Host university (details)"
+                      value={fields.hostUniversity}
+                      onChange={(value) => updateField("hostUniversity", value)}
+                      disabled={sending}
+                      placeholder="Host university"
+                      width="18rem"
+                    />
+                  )}
                 </p>
 
                 <p className={detailLabelClass}>
@@ -336,7 +398,7 @@ export function NomineeLetterModal({
 
                 <p className={detailLabelClass}>Contact e-mail:</p>
                 <p className="text-sm text-slate-800">
-                  <AutoValue
+                  <EmailLink
                     value={auto.focalPersonEmail}
                     missingLabel="No focal person e-mail"
                   />
@@ -352,41 +414,53 @@ export function NomineeLetterModal({
 
                 <p className={detailLabelClass}>Type of Mobility:</p>
                 <p className="text-sm text-slate-800">
-                  <EditableInput
-                    id="nominee-mobility-type"
-                    label="Type of mobility"
-                    value={fields.mobilityType}
-                    onChange={(value) => updateField("mobilityType", value)}
-                    disabled={sending}
-                    placeholder="Type of mobility"
-                    width="18rem"
-                  />
+                  {fieldsReadOnly ? (
+                    <AutoValue value={fields.mobilityType} />
+                  ) : (
+                    <EditableInput
+                      id="nominee-mobility-type"
+                      label="Type of mobility"
+                      value={fields.mobilityType}
+                      onChange={(value) => updateField("mobilityType", value)}
+                      disabled={sending}
+                      placeholder="Type of mobility"
+                      width="18rem"
+                    />
+                  )}
                 </p>
 
                 <p className={detailLabelClass}>Area of study/work:</p>
                 <p className="text-sm text-slate-800">
-                  <EditableInput
-                    id="nominee-area-of-study"
-                    label="Area of study or work"
-                    value={fields.areaOfStudy}
-                    onChange={(value) => updateField("areaOfStudy", value)}
-                    disabled={sending}
-                    placeholder="Proposed programme"
-                    width="18rem"
-                  />
+                  {fieldsReadOnly ? (
+                    <AutoValue value={fields.areaOfStudy} />
+                  ) : (
+                    <EditableInput
+                      id="nominee-area-of-study"
+                      label="Area of study or work"
+                      value={fields.areaOfStudy}
+                      onChange={(value) => updateField("areaOfStudy", value)}
+                      disabled={sending}
+                      placeholder="Proposed programme"
+                      width="18rem"
+                    />
+                  )}
                 </p>
 
                 <p className={detailLabelClass}>Maximum duration:</p>
                 <p className="text-sm text-slate-800">
-                  <EditableInput
-                    id="nominee-duration"
-                    label="Maximum duration in months"
-                    value={fields.durationMonths}
-                    onChange={(value) => updateField("durationMonths", value)}
-                    disabled={sending}
-                    placeholder="e.g. 24"
-                    width="6rem"
-                  />{" "}
+                  {fieldsReadOnly ? (
+                    <AutoValue value={fields.durationMonths} />
+                  ) : (
+                    <EditableInput
+                      id="nominee-duration"
+                      label="Maximum duration in months"
+                      value={fields.durationMonths}
+                      onChange={(value) => updateField("durationMonths", value)}
+                      disabled={sending}
+                      placeholder="e.g. 24"
+                      width="6rem"
+                    />
+                  )}{" "}
                   months
                 </p>
 
@@ -394,25 +468,19 @@ export function NomineeLetterModal({
                   Target group (students only):
                 </p>
                 <p className="text-sm text-slate-800">
-                  <label className="sr-only" htmlFor="nominee-target-group">
-                    Target group
-                  </label>
-                  <select
-                    id="nominee-target-group"
-                    value={fields.targetGroup}
-                    onChange={(e) => updateField("targetGroup", e.target.value)}
-                    disabled={sending}
-                    className="rounded border-2 border-sky-400 bg-sky-50 px-2 py-0.5 text-sm font-semibold text-[#062763] outline-none focus:border-[#062763] focus:ring-2 focus:ring-[#062763]/15 disabled:opacity-50"
-                  >
-                    <option value="" disabled>
-                      Select target group
-                    </option>
-                    {NOMINEE_TARGET_GROUP_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
+                  {fieldsReadOnly ? (
+                    <AutoValue value={fields.targetGroup} />
+                  ) : (
+                    <EditableSelect
+                      id="nominee-target-group"
+                      label="Target group"
+                      value={fields.targetGroup}
+                      options={NOMINEE_TARGET_GROUP_OPTIONS}
+                      onChange={(value) => updateField("targetGroup", value)}
+                      disabled={sending}
+                      placeholder="Select target group"
+                    />
+                  )}
                 </p>
               </div>
 
@@ -439,19 +507,32 @@ export function NomineeLetterModal({
               </p>
 
               <p className={letterParagraphClass}>
-                If you accept the scholarship and agree with the terms of the
-                enclosed scholarship agreement on the SMECC2E Portal (please
-                login to the SMECC2E application portal to view the draft
-                agreement), sign it digitally and submit on the portal. Download
-                a copy of the signed agreement and send back to the Host
+                If you accept the scholarship nomination and agree with the
+                terms of the enclosed scholarship agreement, please login to the{" "}
+                <a
+                  href={SMECC2E_PORTAL_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-semibold text-blue-700 underline"
+                >
+                  SMECC2E Integrated portal
+                </a>{" "}
+                and sign the scholarship agreement on the portal. Download a
+                copy of the signed agreement and send back to the Host
                 University at <AutoValue value={auto.focalPersonName} /> (
-                <AutoValue value={auto.focalPersonEmail} />) and a copy to us at{" "}
-                {SMECC2E_PROJECT_EMAIL} on or before{" "}
-                <AutoValue value={auto.responseDeadline} />, so that we can
-                start taking the practical arrangements for your mobility.
-                Failure to sign and submit the scholarship agreement within the
-                stipulated period means that you have decided to forfeit/reject
-                the nomination.
+                <EmailLink value={auto.focalPersonEmail} />) and a copy to us at{" "}
+                <a
+                  href={`mailto:${SMECC2E_PROJECT_EMAIL}`}
+                  className="font-semibold text-blue-700 underline"
+                >
+                  {SMECC2E_PROJECT_EMAIL}
+                </a>{" "}
+                on or before 2 weeks from the date:{" "}
+                <AutoValue value={auto.letterDate} />, so that we can start
+                taking the practical arrangements for your mobility. Failure to
+                sign and submit the scholarship agreement within the stipulated
+                period means that you have decided to forfeit/reject the
+                nomination.
               </p>
 
               <p className={letterParagraphClass}>
@@ -475,36 +556,47 @@ export function NomineeLetterModal({
 
               <p className={letterParagraphClass}>
                 We wish you a successful stay at{" "}
-                <EditableInput
-                  id="nominee-host-university-closing"
-                  label="Host university (closing)"
-                  value={fields.hostUniversity}
-                  onChange={(value) => updateField("hostUniversity", value)}
-                  disabled={sending}
-                  placeholder="Host university"
-                  width="18rem"
-                />
+                {fieldsReadOnly ? (
+                  <AutoValue value={fields.hostUniversity} />
+                ) : (
+                  <EditableInput
+                    id="nominee-host-university-closing"
+                    label="Host university (closing)"
+                    value={fields.hostUniversity}
+                    onChange={(value) => updateField("hostUniversity", value)}
+                    disabled={sending}
+                    placeholder="Host university"
+                    width="18rem"
+                  />
+                )}
                 , in <AutoValue value={auto.hostCountry} />.
               </p>
 
               <div className="pt-2 text-sm leading-6 text-slate-800">
                 <p>Yours sincerely,</p>
-                <div className="mt-4 space-y-0.5 font-semibold">
+                <Image
+                  src="/images/letter-signature.png"
+                  alt="Signature of Dr. Patrick Udeme-obong Akpan"
+                  width={564}
+                  height={323}
+                  className="mt-2 h-auto w-full max-w-28"
+                />
+                <div className="mt-2 space-y-0.5 font-semibold">
                   {PROJECT_COORDINATOR_SIGNATURE.map((line) => (
                     <p key={line}>{line}</p>
                   ))}
                 </div>
               </div>
+              </NomineeLetterPage>
 
-              <div className="border-t border-slate-200 pt-4 text-left">
-                <Image
-                  src="/images/letter-footer.png"
-                  alt="Implemented by the SMECC2E partner universities — https://smecc2e.unn.edu.ng/"
-                  width={590}
-                  height={159}
-                  className="h-auto w-full max-w-147.5"
-                />
-              </div>
+              <NomineeScholarshipAgreement
+                auto={auto}
+                fields={fields}
+                readOnly={fieldsReadOnly}
+                disabled={sending}
+                onFieldChange={updateField}
+                totalPages={NOMINEE_DOCUMENT_TOTAL_PAGES}
+              />
             </div>
           )}
         </div>
@@ -518,11 +610,23 @@ export function NomineeLetterModal({
               {sendError}
             </p>
           )}
+          {shareSuccess && !sendError && (
+            <p
+              className="mb-3 text-sm font-semibold text-emerald-700"
+              role="status"
+            >
+              {shareSuccess}
+            </p>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs font-semibold text-slate-700">
-              {letter?.applicantEmail
-                ? `Sends to ${letter.applicantEmail}, copying coordinators and the host focal person.`
-                : "Sends to the applicant, copying coordinators."}
+              {isSendMode
+                ? letter?.applicantEmail
+                  ? `Sends to ${letter.applicantEmail}, copying coordinators and the host focal person.`
+                  : "Sends to the applicant, copying coordinators and the host focal person."
+                : letter?.auto.focalPersonEmail
+                  ? `Shares with ${letter.auto.focalPersonEmail}, copying coordinators.`
+                  : "Shares with the host focal person, copying coordinators."}
             </p>
             <div className="flex gap-2">
               <button
@@ -531,16 +635,55 @@ export function NomineeLetterModal({
                 disabled={sending}
                 className="rounded-lg border-2 border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"
               >
-                Cancel
+                {letter?.shared && !isSendMode && !editing ? "Close" : "Cancel"}
               </button>
-              <button
-                type="button"
-                onClick={() => void handleSend()}
-                disabled={sending || loading || !fields}
-                className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
-              >
-                {sending ? "Sending…" : "Send letter"}
-              </button>
+              {!isSendMode && letter?.shared && !editing && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditing(true);
+                    setShareSuccess(null);
+                    setSendError(null);
+                  }}
+                  disabled={sending}
+                  className="rounded-lg border-2 border-[#062763]/30 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
+                >
+                  Edit
+                </button>
+              )}
+              {isSendMode ? (
+                <button
+                  type="button"
+                  onClick={() => void handleSubmit()}
+                  disabled={
+                    sending ||
+                    loading ||
+                    !fields ||
+                    Boolean(loadError) ||
+                    !letterDateInput.trim()
+                  }
+                  className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
+                >
+                  {sending ? "Sending…" : "Send nominee letter"}
+                </button>
+              ) : letter?.shared && !editing ? (
+                <button
+                  type="button"
+                  disabled
+                  className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-100"
+                >
+                  Draft Shared
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void handleSubmit()}
+                  disabled={sending || loading || !fields || Boolean(loadError)}
+                  className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
+                >
+                  {sending ? "Sharing…" : "Share with focal person"}
+                </button>
+              )}
             </div>
           </div>
         </div>

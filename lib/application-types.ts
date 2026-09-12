@@ -147,6 +147,10 @@ export type ApplicationRecord = ApplicationPayload & {
   interviewerEmail?: string | null;
   interviewScore?: number | null;
   interviewEvaluationData?: InterviewEvaluationSubmission | null;
+  /** Coordinator has shared a nomination-letter draft with the host focal person */
+  nomineeLetterShared?: boolean;
+  /** Administrator has sent the dated nomination letter to the applicant */
+  nomineeLetterSent?: boolean;
   /** Populated for evaluator sessions: this user's review on the application */
   myEvaluatorReviewStatus?: EvaluatorReviewStatus | null;
   /** Populated for evaluator sessions: this user's submitted evaluation scores */

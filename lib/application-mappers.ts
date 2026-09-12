@@ -162,6 +162,8 @@ export function mapPrismaApplicant(
     interviewEvaluationData: parseInterviewEvaluationSubmission(
       row.interviewEvaluationData
     ),
+    nomineeLetterShared: row.nomineeLetterSharedAt != null,
+    nomineeLetterSent: row.nomineeLetterSentAt != null,
     email: row.email,
     nationality: row.nationality,
     countryOfResidence: row.countryOfResidence,

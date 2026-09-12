@@ -7,11 +7,13 @@ import { getApplication } from "./applications-service";
 import { emailLayout, escapeHtml } from "./email-layout";
 import {
   buildNomineeLetterMessage,
-  formatNomineeLetterDate,
-  nomineeLetterResponseDeadline,
+  NOMINEE_LETTER_PENDING,
+  nomineeLetterDatesFromInput,
+  parseNomineeLetterSharedSnapshot,
   validateNomineeLetterFields,
   type NomineeLetterAutoFields,
   type NomineeLetterEditableFields,
+  type NomineeLetterSharedSnapshot,
 } from "./nominee-letter-shared";
 import { prisma } from "./prisma";
 import {
@@ -23,14 +25,19 @@ import {
 export type {
   NomineeLetterAutoFields,
   NomineeLetterEditableFields,
+  NomineeLetterSharedSnapshot,
 } from "./nominee-letter-shared";
 export { buildNomineeLetterMessage } from "./nominee-letter-shared";
+
+export type NomineeLetterMode = "share" | "send";
 
 export type NomineeLetterData = {
   auto: NomineeLetterAutoFields;
   editable: NomineeLetterEditableFields;
   applicantEmail: string;
   applicantName: string;
+  shared: boolean;
+  sent: boolean;
 };
 
 export type NomineeLetterSendResult = {
@@ -43,12 +50,20 @@ export type NomineeLetterSendResult = {
   error?: string;
 };
 
-const SUBJECT_BASE = "SMECC2E Scholarship Programme — Nomination Letter";
+const SUBJECT_BASE =
+  "SMECC2E Scholarship Programme - Nomination Letter/Scholarship Agreement";
+const SHARE_SUBJECT_BASE =
+  "SMECC2E Scholarship Programme - Nomination Letter (for review)";
 
-function buildNomineeLetterSubject(initiatorName?: string | null): string {
+function buildNomineeLetterSubject(
+  base: string,
+  initiatorName?: string | null
+): string {
+  // Official nominee send always uses the fixed subject.
+  if (base === SUBJECT_BASE) return SUBJECT_BASE;
   const name = initiatorName?.trim();
-  if (!name) return SUBJECT_BASE;
-  return `${SUBJECT_BASE} from ${name}`;
+  if (!name) return base;
+  return `${base} from ${name}`;
 }
 
 function normalizeEmail(value: string): string {
@@ -69,6 +84,24 @@ function nomineeLetterHtml(message: string, subject: string): string {
       </div>
     `,
   });
+}
+
+function applicantDisplayFirstSurname(application: ApplicationRecord): string {
+  return [application.firstName, application.surname]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
+/** Scholarship-holder details the agreement names as parties to the contract. */
+function applicantAgreementIdentity(application: ApplicationRecord) {
+  return {
+    dateOfBirth: application.dateOfBirth ?? "",
+    nationality: application.nationality ?? "",
+    homeAddress: application.homeAddress ?? "",
+    phoneNumber: application.phoneNumber ?? "",
+    applicantEmail: applicantPrimaryEmail(application),
+  };
 }
 
 /** Focal person recorded for the applicant's preferred host institution. */
@@ -108,11 +141,30 @@ async function findHostCountry(institution: string): Promise<string> {
   return program?.country ?? "";
 }
 
-async function buildLetterData(
+async function loadApplicantRow(applicationRef: string) {
+  const row = await prisma.applicant.findFirst({
+    where: {
+      OR: [{ publicId: applicationRef }, { id: applicationRef }],
+    },
+    select: {
+      id: true,
+      nomineeLetterSharedData: true,
+      nomineeLetterSharedAt: true,
+      nomineeLetterSentAt: true,
+    },
+  });
+  if (!row) throw new Error("Application not found");
+  return row;
+}
+
+async function buildPrepareLetterData(
   application: ApplicationRecord,
-  letterDate: Date
+  shared: NomineeLetterSharedSnapshot | null
 ): Promise<NomineeLetterData> {
-  const institution = application.preferredHostInstitution ?? "";
+  const institution =
+    shared?.editable.hostUniversity ||
+    application.preferredHostInstitution ||
+    "";
   const [focalPerson, hostCountry] = await Promise.all([
     findHostFocalPerson(institution),
     findHostCountry(institution),
@@ -121,26 +173,59 @@ async function buildLetterData(
   return {
     auto: {
       applicantNo: application.id,
-      letterDate: formatNomineeLetterDate(letterDate),
+      letterDate: NOMINEE_LETTER_PENDING,
       firstName: application.firstName ?? "",
       surname: application.surname ?? "",
       focalPersonName: focalPerson?.name ?? "",
       focalPersonEmail: focalPerson?.email ?? "",
       focalPersonAddress: focalPerson?.address ?? "",
-      responseDeadline: formatNomineeLetterDate(
-        nomineeLetterResponseDeadline(letterDate)
-      ),
+      responseDeadline: NOMINEE_LETTER_PENDING,
       hostCountry,
+      ...applicantAgreementIdentity(application),
     },
-    editable: {
+    editable: shared?.editable ?? {
       hostUniversity: institution,
       mobilityType: application.typeOfMobility ?? "",
       areaOfStudy: application.proposedAcademicProgramme ?? "",
       durationMonths: "",
       targetGroup: "",
+      holderType: "",
+      mobilityActivity: "",
+      mobilityStartDate: "",
+      mobilityEndDate: "",
+      planDocument: "",
     },
     applicantEmail: applicantPrimaryEmail(application),
-    applicantName: applicantDisplayName(application),
+    applicantName: applicantDisplayFirstSurname(application),
+    shared: Boolean(shared),
+    sent: false,
+  };
+}
+
+function buildSendLetterData(
+  application: ApplicationRecord,
+  shared: NomineeLetterSharedSnapshot,
+  sent: boolean
+): NomineeLetterData {
+  return {
+    auto: {
+      applicantNo: application.id,
+      letterDate: shared.letterDate?.trim() || NOMINEE_LETTER_PENDING,
+      firstName: application.firstName ?? "",
+      surname: application.surname ?? "",
+      focalPersonName: shared.focalPersonName,
+      focalPersonEmail: shared.focalPersonEmail,
+      focalPersonAddress: shared.focalPersonAddress,
+      responseDeadline:
+        shared.responseDeadline?.trim() || NOMINEE_LETTER_PENDING,
+      hostCountry: shared.hostCountry,
+      ...applicantAgreementIdentity(application),
+    },
+    editable: shared.editable,
+    applicantEmail: applicantPrimaryEmail(application),
+    applicantName: applicantDisplayFirstSurname(application),
+    shared: true,
+    sent,
   };
 }
 
@@ -172,12 +257,11 @@ async function listActiveCoordinatorEmails(
 }
 
 function buildCcEmails(options: {
-  applicantEmail: string;
+  primaryEmail: string;
   coordinatorEmails: string[];
-  focalPersonEmail?: string | null;
-  initiatorEmail?: string | null;
+  extraEmails?: Array<string | null | undefined>;
 }): string[] {
-  const exclude = normalizeEmail(options.applicantEmail);
+  const exclude = normalizeEmail(options.primaryEmail);
   const emails: string[] = [];
   const seen = new Set<string>();
 
@@ -192,8 +276,9 @@ function buildCcEmails(options: {
   for (const email of options.coordinatorEmails) {
     add(email);
   }
-  add(options.focalPersonEmail);
-  add(options.initiatorEmail);
+  for (const email of options.extraEmails ?? []) {
+    add(email);
+  }
 
   return emails;
 }
@@ -212,15 +297,89 @@ function assertNominated(application: ApplicationRecord): void {
 }
 
 export async function getNomineeLetterData(
-  applicationRef: string
+  applicationRef: string,
+  mode: NomineeLetterMode = "share"
 ): Promise<NomineeLetterData> {
   const application = await getApplication(applicationRef);
   if (!application) throw new Error("Application not found");
   assertNominated(application);
-  return buildLetterData(application, new Date());
+
+  const row = await loadApplicantRow(applicationRef);
+  const shared = parseNomineeLetterSharedSnapshot(row.nomineeLetterSharedData);
+  const sent = Boolean(row.nomineeLetterSentAt);
+
+  if (mode === "send") {
+    if (!shared) {
+      throw new Error(
+        "The coordinator has not shared a nomination letter for this applicant yet"
+      );
+    }
+    return buildSendLetterData(application, shared, sent);
+  }
+
+  return buildPrepareLetterData(application, shared);
 }
 
-export async function sendNomineeLetterEmail(options: {
+async function deliverNomineeLetterEmail(options: {
+  to: string;
+  ccEmails: string[];
+  subject: string;
+  message: string;
+  applicantLabel: string;
+}): Promise<NomineeLetterSendResult> {
+  const resend = getResendClient();
+
+  if (!resend) {
+    console.log("[SMECC2E] Nomination letter (Resend not configured):");
+    console.log({
+      to: options.to,
+      cc: options.ccEmails,
+      subject: options.subject,
+      applicant: options.applicantLabel,
+    });
+    return {
+      sent: true,
+      email: options.to,
+      ccEmails: options.ccEmails,
+      subject: options.subject,
+      message: options.message,
+      devMode: true,
+    };
+  }
+
+  const { error } = await resend.emails.send({
+    from: getEmailFrom(),
+    to: [options.to],
+    ...(options.ccEmails.length > 0 ? { cc: options.ccEmails } : {}),
+    subject: options.subject,
+    text: options.message,
+    html: nomineeLetterHtml(options.message, options.subject),
+  });
+
+  if (error) {
+    return {
+      sent: false,
+      email: options.to,
+      ccEmails: options.ccEmails,
+      subject: options.subject,
+      message: options.message,
+      devMode: false,
+      error: error.message ?? "Could not send nomination letter.",
+    };
+  }
+
+  return {
+    sent: true,
+    email: options.to,
+    ccEmails: options.ccEmails,
+    subject: options.subject,
+    message: options.message,
+    devMode: false,
+  };
+}
+
+/** Coordinator: persist letter fields and email the host focal person. */
+export async function shareNomineeLetterEmail(options: {
   applicationRef: string;
   fields: NomineeLetterEditableFields;
   initiatorEmail?: string | null;
@@ -231,9 +390,118 @@ export async function sendNomineeLetterEmail(options: {
   assertNominated(application);
 
   const editable = validateNomineeLetterFields(options.fields);
-  const { auto } = await buildLetterData(application, new Date());
+  const [focalPerson, hostCountry] = await Promise.all([
+    findHostFocalPerson(editable.hostUniversity),
+    findHostCountry(editable.hostUniversity),
+  ]);
+
+  const snapshot: NomineeLetterSharedSnapshot = {
+    editable,
+    focalPersonName: focalPerson?.name ?? "",
+    focalPersonEmail: focalPerson?.email ?? "",
+    focalPersonAddress: focalPerson?.address ?? "",
+    hostCountry,
+  };
+
+  const row = await loadApplicantRow(options.applicationRef);
+  await prisma.applicant.update({
+    where: { id: row.id },
+    data: {
+      nomineeLetterSharedData: snapshot,
+      nomineeLetterSharedAt: new Date(),
+      nomineeLetterSentAt: null,
+    },
+  });
+
+  const auto: NomineeLetterAutoFields = {
+    applicantNo: application.id,
+    letterDate: NOMINEE_LETTER_PENDING,
+    firstName: application.firstName ?? "",
+    surname: application.surname ?? "",
+    focalPersonName: snapshot.focalPersonName,
+    focalPersonEmail: snapshot.focalPersonEmail,
+    focalPersonAddress: snapshot.focalPersonAddress,
+    responseDeadline: NOMINEE_LETTER_PENDING,
+    hostCountry: snapshot.hostCountry,
+    ...applicantAgreementIdentity(application),
+  };
   const message = buildNomineeLetterMessage(auto, editable);
-  const subject = buildNomineeLetterSubject(options.initiatorName);
+  const subject = buildNomineeLetterSubject(
+    SHARE_SUBJECT_BASE,
+    options.initiatorName
+  );
+
+  const focalEmail = normalizeEmail(snapshot.focalPersonEmail);
+  if (!focalEmail || !isValidEmail(focalEmail)) {
+    throw new Error(
+      "Host focal person email is required before sharing the nomination letter"
+    );
+  }
+
+  const coordinatorEmails = await listActiveCoordinatorEmails(focalEmail);
+  const ccEmails = buildCcEmails({
+    primaryEmail: focalEmail,
+    coordinatorEmails,
+    extraEmails: [options.initiatorEmail],
+  });
+
+  return deliverNomineeLetterEmail({
+    to: focalEmail,
+    ccEmails,
+    subject,
+    message,
+    applicantLabel: applicantDisplayName(application),
+  });
+}
+
+/** Administrator: set letter date on the shared draft and email the applicant. */
+export async function sendNomineeLetterEmail(options: {
+  applicationRef: string;
+  letterDateInput: string;
+  initiatorEmail?: string | null;
+  initiatorName?: string | null;
+}): Promise<NomineeLetterSendResult> {
+  const application = await getApplication(options.applicationRef);
+  if (!application) throw new Error("Application not found");
+  assertNominated(application);
+
+  const row = await loadApplicantRow(options.applicationRef);
+  const shared = parseNomineeLetterSharedSnapshot(row.nomineeLetterSharedData);
+  if (!shared) {
+    throw new Error(
+      "The coordinator has not shared a nomination letter for this applicant yet"
+    );
+  }
+
+  const dates = nomineeLetterDatesFromInput(options.letterDateInput);
+  const updatedSnapshot: NomineeLetterSharedSnapshot = {
+    ...shared,
+    letterDate: dates.letterDate,
+    responseDeadline: dates.responseDeadline,
+  };
+
+  await prisma.applicant.update({
+    where: { id: row.id },
+    data: {
+      nomineeLetterSharedData: updatedSnapshot,
+      nomineeLetterSentAt: new Date(),
+    },
+  });
+
+  const auto: NomineeLetterAutoFields = {
+    applicantNo: application.id,
+    letterDate: dates.letterDate,
+    firstName: application.firstName ?? "",
+    surname: application.surname ?? "",
+    focalPersonName: updatedSnapshot.focalPersonName,
+    focalPersonEmail: updatedSnapshot.focalPersonEmail,
+    focalPersonAddress: updatedSnapshot.focalPersonAddress,
+    responseDeadline: dates.responseDeadline,
+    hostCountry: updatedSnapshot.hostCountry,
+    ...applicantAgreementIdentity(application),
+  };
+  const message = buildNomineeLetterMessage(auto, updatedSnapshot.editable);
+  const subject = buildNomineeLetterSubject(SUBJECT_BASE, options.initiatorName);
 
   const email = applicantPrimaryEmail(application).trim();
   if (!email || !isValidEmail(email)) {
@@ -243,58 +511,16 @@ export async function sendNomineeLetterEmail(options: {
   const to = normalizeEmail(email);
   const coordinatorEmails = await listActiveCoordinatorEmails(to);
   const ccEmails = buildCcEmails({
-    applicantEmail: to,
+    primaryEmail: to,
     coordinatorEmails,
-    focalPersonEmail: auto.focalPersonEmail,
-    initiatorEmail: options.initiatorEmail,
-  });
-  const resend = getResendClient();
-
-  if (!resend) {
-    console.log("[SMECC2E] Nomination letter (Resend not configured):");
-    console.log({
-      to,
-      cc: ccEmails,
-      subject,
-      applicant: applicantDisplayName(application),
-    });
-    return {
-      sent: true,
-      email: to,
-      ccEmails,
-      subject,
-      message,
-      devMode: true,
-    };
-  }
-
-  const { error } = await resend.emails.send({
-    from: getEmailFrom(),
-    to: [to],
-    ...(ccEmails.length > 0 ? { cc: ccEmails } : {}),
-    subject,
-    text: message,
-    html: nomineeLetterHtml(message, subject),
+    extraEmails: [updatedSnapshot.focalPersonEmail, options.initiatorEmail],
   });
 
-  if (error) {
-    return {
-      sent: false,
-      email: to,
-      ccEmails,
-      subject,
-      message,
-      devMode: false,
-      error: error.message ?? "Could not send nomination letter.",
-    };
-  }
-
-  return {
-    sent: true,
-    email: to,
+  return deliverNomineeLetterEmail({
+    to,
     ccEmails,
     subject,
     message,
-    devMode: false,
-  };
+    applicantLabel: applicantDisplayName(application),
+  });
 }

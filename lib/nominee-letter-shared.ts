@@ -4,6 +4,33 @@ export const NOMINEE_TARGET_GROUP_OPTIONS = [
   "Not Applicable",
 ] as const;
 
+/** Scholarship agreement title — [Student/Staff/Trainee] Scholarship Agreement. */
+export const NOMINEE_HOLDER_TYPE_OPTIONS = [
+  "Student",
+  "Staff",
+  "Trainee",
+] as const;
+
+/** Agreement Art. 1.1 — the mobility activity the host institution supports. */
+export const NOMINEE_MOBILITY_ACTIVITY_OPTIONS = [
+  "Studies for degree seeking",
+  "Research for credit seeking",
+  "Teaching",
+  "Training for Staff",
+  "Training for trainees",
+] as const;
+
+/** Agreement Art. 9 & 12 — the plan the scholarship holder signs on arrival. */
+export const NOMINEE_PLAN_DOCUMENT_OPTIONS = [
+  "Learning Agreement",
+  "Study Plan",
+  "Research Plan",
+  "Work Plan",
+  "Traineeship Plan",
+] as const;
+
+export const NOMINEE_LETTER_PENDING = "[pending]";
+
 /** Values pulled from the database — shown read-only in the letter modal. */
 export type NomineeLetterAutoFields = {
   applicantNo: string;
@@ -13,18 +40,41 @@ export type NomineeLetterAutoFields = {
   focalPersonName: string;
   focalPersonEmail: string;
   focalPersonAddress: string;
-  /** Two weeks after the letter date. */
+  /** Response deadline — pending until administrator sets the letter date. */
   responseDeadline: string;
   hostCountry: string;
+  /** Scholarship agreement — identity of the scholarship holder. */
+  dateOfBirth: string;
+  nationality: string;
+  homeAddress: string;
+  phoneNumber: string;
+  applicantEmail: string;
 };
 
-/** Values the coordinator can edit before sending. */
+/** Values the coordinator can edit before sharing. */
 export type NomineeLetterEditableFields = {
   hostUniversity: string;
   mobilityType: string;
   areaOfStudy: string;
   durationMonths: string;
   targetGroup: string;
+  /** Scholarship agreement fields. */
+  holderType: string;
+  mobilityActivity: string;
+  mobilityStartDate: string;
+  mobilityEndDate: string;
+  planDocument: string;
+};
+
+/** Snapshot persisted when the coordinator shares with the focal person. */
+export type NomineeLetterSharedSnapshot = {
+  editable: NomineeLetterEditableFields;
+  focalPersonName: string;
+  focalPersonEmail: string;
+  focalPersonAddress: string;
+  hostCountry: string;
+  letterDate?: string;
+  responseDeadline?: string;
 };
 
 export const PROJECT_COORDINATOR_SIGNATURE = [
@@ -36,6 +86,8 @@ export const PROJECT_COORDINATOR_SIGNATURE = [
 ];
 
 export const SMECC2E_PROJECT_EMAIL = "smecc2e@unn.edu.ng";
+
+export const SMECC2E_PORTAL_URL = "https://smecc2e.online/";
 
 export const PRIVACY_STATEMENT_URL =
   "https://ec.europa.eu/info/law/better-regulation/privacy-statement_en";
@@ -52,6 +104,54 @@ export function nomineeLetterResponseDeadline(from: Date): Date {
   const deadline = new Date(from.getTime());
   deadline.setDate(deadline.getDate() + 14);
   return deadline;
+}
+
+/** Parse an HTML date input value (`YYYY-MM-DD`) into a local Date. */
+export function parseNomineeLetterDateInput(value: string): Date {
+  const trimmed = value?.trim() ?? "";
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (!match) {
+    throw new Error("Letter date is required");
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    throw new Error("Letter date is invalid");
+  }
+  return date;
+}
+
+export function nomineeLetterDatesFromInput(value: string): {
+  letterDate: string;
+  responseDeadline: string;
+} {
+  const date = parseNomineeLetterDateInput(value);
+  return {
+    letterDate: formatNomineeLetterDate(date),
+    responseDeadline: formatNomineeLetterDate(
+      nomineeLetterResponseDeadline(date)
+    ),
+  };
+}
+
+/**
+ * Format an optional `YYYY-MM-DD` value for display, falling back to the
+ * pending placeholder while the date has not been chosen yet.
+ */
+export function formatOptionalNomineeLetterDate(value: string): string {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) return NOMINEE_LETTER_PENDING;
+  try {
+    return formatNomineeLetterDate(parseNomineeLetterDateInput(trimmed));
+  } catch {
+    return trimmed;
+  }
 }
 
 function fallback(value: string, placeholder: string): string {
@@ -80,7 +180,54 @@ export function validateNomineeLetterFields(
     areaOfStudy,
     durationMonths,
     targetGroup,
+    // Agreement fields stay optional so drafts shared before the agreement
+    // was added to the letter keep loading.
+    holderType: fields.holderType?.trim() ?? "",
+    mobilityActivity: fields.mobilityActivity?.trim() ?? "",
+    mobilityStartDate: fields.mobilityStartDate?.trim() ?? "",
+    mobilityEndDate: fields.mobilityEndDate?.trim() ?? "",
+    planDocument: fields.planDocument?.trim() ?? "",
   };
+}
+
+export function parseNomineeLetterSharedSnapshot(
+  value: unknown
+): NomineeLetterSharedSnapshot | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const editableRaw = record.editable;
+  if (!editableRaw || typeof editableRaw !== "object") return null;
+  const editableRecord = editableRaw as Record<string, unknown>;
+
+  try {
+    const editable = validateNomineeLetterFields({
+      hostUniversity: String(editableRecord.hostUniversity ?? ""),
+      mobilityType: String(editableRecord.mobilityType ?? ""),
+      areaOfStudy: String(editableRecord.areaOfStudy ?? ""),
+      durationMonths: String(editableRecord.durationMonths ?? ""),
+      targetGroup: String(editableRecord.targetGroup ?? ""),
+      holderType: String(editableRecord.holderType ?? ""),
+      mobilityActivity: String(editableRecord.mobilityActivity ?? ""),
+      mobilityStartDate: String(editableRecord.mobilityStartDate ?? ""),
+      mobilityEndDate: String(editableRecord.mobilityEndDate ?? ""),
+      planDocument: String(editableRecord.planDocument ?? ""),
+    });
+    return {
+      editable,
+      focalPersonName: String(record.focalPersonName ?? ""),
+      focalPersonEmail: String(record.focalPersonEmail ?? ""),
+      focalPersonAddress: String(record.focalPersonAddress ?? ""),
+      hostCountry: String(record.hostCountry ?? ""),
+      letterDate:
+        typeof record.letterDate === "string" ? record.letterDate : undefined,
+      responseDeadline:
+        typeof record.responseDeadline === "string"
+          ? record.responseDeadline
+          : undefined,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function buildNomineeLetterMessage(
@@ -102,7 +249,7 @@ export function buildNomineeLetterMessage(
 
   return [
     `Our Ref: SMECC2E/${applicantNo}`,
-    `Date: ${fallback(auto.letterDate, "[date]")}`,
+    `Date: ${fallback(auto.letterDate, NOMINEE_LETTER_PENDING)}`,
     "",
     "Nomination Letter",
     "",
@@ -129,7 +276,7 @@ export function buildNomineeLetterMessage(
     "",
     "You will need to establish your place of stay at the location of the Host University. The welcome and housing services of the Host University will assist you to find suitable accommodation.",
     "",
-    `If you accept the scholarship and agree with the terms of the enclosed scholarship agreement on the SMECC2E Portal (please login to the SMECC2E application portal to view the draft agreement), sign it digitally and submit on the portal. Download a copy of the signed agreement and send back to the Host University at ${focalPerson} (${focalEmail}) and a copy to us at ${SMECC2E_PROJECT_EMAIL} on or before ${fallback(auto.responseDeadline, "[response deadline]")}, so that we can start taking the practical arrangements for your mobility. Failure to sign and submit the scholarship agreement within the stipulated period means that you have decided to forfeit/reject the nomination.`,
+    `If you accept the scholarship nomination and agree with the terms of the enclosed scholarship agreement, please login to the SMECC2E Integrated portal (${SMECC2E_PORTAL_URL}) and sign the scholarship agreement on the portal. Download a copy of the signed agreement and send back to the Host University at ${focalPerson} (${focalEmail}) and a copy to us at ${SMECC2E_PROJECT_EMAIL} on or before 2 weeks from the date: ${fallback(auto.letterDate, NOMINEE_LETTER_PENDING)}, so that we can start taking the practical arrangements for your mobility. Failure to sign and submit the scholarship agreement within the stipulated period means that you have decided to forfeit/reject the nomination.`,
     "",
     "The European Education and Culture Executive Agency (EACEA), in the context of managing the Intra-Africa Academic Mobility Scheme, collects and processes the personal data of some of the candidates. In particular, certain data of the scholarship holders is shared with the Agency through the mobility tool under EU Funding and Tenders Portal and treated according to the following privacy statement.",
     "",
