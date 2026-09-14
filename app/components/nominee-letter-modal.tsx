@@ -27,7 +27,7 @@ import {
   NomineeScholarshipAgreement,
 } from "./nominee-scholarship-agreement";
 
-export type NomineeLetterMode = "share" | "send";
+export type NomineeLetterMode = "share" | "send" | "sign";
 
 export type NomineeLetterData = {
   auto: NomineeLetterAutoFields;
@@ -46,6 +46,7 @@ export function NomineeLetterModal({
   onClose,
   onSent,
   onDraftShared,
+  onSigned,
 }: {
   applicationId: string;
   applicantName: string;
@@ -54,8 +55,10 @@ export function NomineeLetterModal({
   onClose: () => void;
   onSent: (message: string) => void;
   onDraftShared?: (message: string) => void;
+  onSigned?: (message: string) => void;
 }) {
   const isSendMode = mode === "send";
+  const isSignMode = mode === "sign";
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [letter, setLetter] = useState<NomineeLetterData | null>(null);
@@ -67,6 +70,8 @@ export function NomineeLetterModal({
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [shareSuccess, setShareSuccess] = useState<string | null>(null);
+  const [persistedNomineeSigned, setPersistedNomineeSigned] = useState(false);
+  const [persistedHostSigned, setPersistedHostSigned] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -75,10 +80,10 @@ export function NomineeLetterModal({
       setLoadError(null);
       setShareSuccess(null);
       try {
-        const res = await fetch(
-          `/api/applications/${encodeURIComponent(applicationId)}/nominee-letter`,
-          { cache: "no-store" }
-        );
+        const endpoint = isSignMode
+          ? "/api/applicant/nominee-letter"
+          : `/api/applications/${encodeURIComponent(applicationId)}/nominee-letter`;
+        const res = await fetch(endpoint, { cache: "no-store" });
         const data = (await res.json()) as {
           letter?: NomineeLetterData;
           error?: string;
@@ -90,8 +95,20 @@ export function NomineeLetterModal({
         }
         setLetter(data.letter);
         setFields(data.letter.editable);
+        setPersistedNomineeSigned(
+          Boolean(
+            data.letter.editable.scholarshipHolderSignature?.trim() &&
+              data.letter.editable.scholarshipHolderSignedDate?.trim()
+          )
+        );
+        setPersistedHostSigned(
+          Boolean(
+            data.letter.editable.hostContactSignature?.trim() &&
+              data.letter.editable.hostContactSignedDate?.trim()
+          )
+        );
         setEditing(
-          isSendMode ? false : startEditing || !data.letter.shared
+          isSendMode || isSignMode ? false : startEditing || !data.letter.shared
         );
       } catch {
         if (active) setLoadError("Could not load the nomination letter.");
@@ -103,7 +120,7 @@ export function NomineeLetterModal({
     return () => {
       active = false;
     };
-  }, [applicationId, isSendMode, startEditing]);
+  }, [applicationId, isSendMode, isSignMode, startEditing]);
 
   const updateField = (
     key: keyof NomineeLetterEditableFields,
@@ -115,7 +132,24 @@ export function NomineeLetterModal({
   };
 
   const fieldsReadOnly =
-    isSendMode || Boolean(letter?.shared && !editing);
+    isSendMode || isSignMode || Boolean(letter?.shared && !editing);
+
+  const nomineeSignatureReady = Boolean(
+    fields?.scholarshipHolderSignature?.trim() &&
+      fields?.scholarshipHolderSignedDate?.trim()
+  );
+  const hostSignatureReady = Boolean(
+    fields?.hostContactSignature?.trim() &&
+      fields?.hostContactSignedDate?.trim()
+  );
+
+  // Signing workflow:
+  // - Coordinator: never
+  // - Nominee (/applicant): scholarship holder only, until saved
+  // - Administrator: host contact only, after nominee has saved, until host saved
+  const canSignScholarshipHolder = isSignMode && !persistedNomineeSigned;
+  const canSignHostContact =
+    isSendMode && persistedNomineeSigned && !persistedHostSigned;
 
   const derivedDates = useMemo(() => {
     if (!isSendMode || !letterDateInput.trim()) {
@@ -144,12 +178,66 @@ export function NomineeLetterModal({
     };
   }, [derivedDates, isSendMode, letter]);
 
+  const handleSaveHostSignature = async () => {
+    if (!fields) return;
+    setSending(true);
+    setSendError(null);
+    setShareSuccess(null);
+    try {
+      const res = await fetch(
+        `/api/applications/${encodeURIComponent(applicationId)}/nominee-letter`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "sign-host",
+            hostContactSignature: fields.hostContactSignature,
+            hostContactSignedDate: fields.hostContactSignedDate,
+          }),
+        }
+      );
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setSendError(data.error ?? "Could not save the host contact signature.");
+        return;
+      }
+      setShareSuccess("Host contact signature saved.");
+      setPersistedHostSigned(true);
+    } catch {
+      setSendError("Could not save the host contact signature.");
+    } finally {
+      setSending(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!fields) return;
     setSending(true);
     setSendError(null);
     setShareSuccess(null);
     try {
+      if (isSignMode) {
+        const res = await fetch("/api/applicant/nominee-letter", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "sign",
+            scholarshipHolderSignature: fields.scholarshipHolderSignature,
+            scholarshipHolderSignedDate: fields.scholarshipHolderSignedDate,
+          }),
+        });
+        const data = (await res.json()) as { error?: string };
+        if (!res.ok) {
+          setSendError(data.error ?? "Could not save your signature.");
+          return;
+        }
+        const message = "Scholarship agreement signature saved.";
+        setPersistedNomineeSigned(true);
+        setShareSuccess(message);
+        onSigned?.(message);
+        return;
+      }
+
       const res = await fetch(
         `/api/applications/${encodeURIComponent(applicationId)}/nominee-letter`,
         {
@@ -201,9 +289,11 @@ export function NomineeLetterModal({
       onDraftShared?.(message);
     } catch {
       setSendError(
-        isSendMode
-          ? "Could not send the nomination letter."
-          : "Could not share the nomination letter."
+        isSignMode
+          ? "Could not save your signature."
+          : isSendMode
+            ? "Could not send the nomination letter."
+            : "Could not share the nomination letter."
       );
     } finally {
       setSending(false);
@@ -232,15 +322,19 @@ export function NomineeLetterModal({
               id="nominee-letter-title"
               className="text-base font-bold text-[#062763]"
             >
-              Nomination Letter
+              {isSignMode
+                ? "Scholarship Agreement"
+                : "Nomination Letter"}
             </h2>
             <p className="mt-1 text-xs font-semibold text-slate-700">
               {applicantName || applicationId}
-              {isSendMode
-                ? " · Review the coordinator-shared letter, set the date, then send."
-                : letter?.shared && !editing
-                  ? " · Draft shared with the host focal person. Edit to make changes."
-                  : " · Complete the editable fields, then share with the host focal person."}
+              {isSignMode
+                ? " · Review your nomination letter and scholarship agreement, then append your digital signature."
+                : isSendMode
+                  ? " · Review the coordinator-shared letter, set the date, then send."
+                  : letter?.shared && !editing
+                    ? " · Draft shared with the host focal person. Edit to make changes."
+                    : " · Complete the editable fields, then share with the host focal person."}
             </p>
           </div>
           <button
@@ -596,6 +690,8 @@ export function NomineeLetterModal({
                 disabled={sending}
                 onFieldChange={updateField}
                 totalPages={NOMINEE_DOCUMENT_TOTAL_PAGES}
+                canSignScholarshipHolder={canSignScholarshipHolder}
+                canSignHostContact={canSignHostContact}
               />
             </div>
           )}
@@ -620,13 +716,21 @@ export function NomineeLetterModal({
           )}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs font-semibold text-slate-700">
-              {isSendMode
-                ? letter?.applicantEmail
-                  ? `Sends to ${letter.applicantEmail}, copying coordinators and the host focal person.`
-                  : "Sends to the applicant, copying coordinators and the host focal person."
-                : letter?.auto.focalPersonEmail
-                  ? `Shares with ${letter.auto.focalPersonEmail}, copying coordinators.`
-                  : "Shares with the host focal person, copying coordinators."}
+              {isSignMode
+                ? persistedNomineeSigned
+                  ? "Your digital signature is saved."
+                  : "Append your digital signature on the last page, then save."
+                : isSendMode
+                  ? !persistedNomineeSigned
+                    ? "Waiting for the nominee to sign the scholarship agreement before the host contact can sign."
+                    : persistedHostSigned
+                      ? letter?.applicantEmail
+                        ? `Host contact has signed. Sends to ${letter.applicantEmail}, copying coordinators and the host focal person.`
+                        : "Host contact has signed. Sends to the applicant, copying coordinators and the host focal person."
+                      : "Nominee has signed. Append the host contact digital signature on the last page, then save it."
+                  : letter?.auto.focalPersonEmail
+                    ? `Shares with ${letter.auto.focalPersonEmail}, copying coordinators.`
+                    : "Shares with the host focal person, copying coordinators."}
             </p>
             <div className="flex gap-2">
               <button
@@ -635,9 +739,13 @@ export function NomineeLetterModal({
                 disabled={sending}
                 className="rounded-lg border-2 border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"
               >
-                {letter?.shared && !isSendMode && !editing ? "Close" : "Cancel"}
+                {letter?.shared && !isSendMode && !isSignMode && !editing
+                  ? "Close"
+                  : isSignMode
+                    ? "Close"
+                    : "Cancel"}
               </button>
-              {!isSendMode && letter?.shared && !editing && (
+              {!isSendMode && !isSignMode && letter?.shared && !editing && (
                 <button
                   type="button"
                   onClick={() => {
@@ -651,7 +759,7 @@ export function NomineeLetterModal({
                   Edit
                 </button>
               )}
-              {isSendMode ? (
+              {isSignMode ? (
                 <button
                   type="button"
                   onClick={() => void handleSubmit()}
@@ -660,12 +768,50 @@ export function NomineeLetterModal({
                     loading ||
                     !fields ||
                     Boolean(loadError) ||
-                    !letterDateInput.trim()
+                    persistedNomineeSigned ||
+                    !nomineeSignatureReady
                   }
                   className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
                 >
-                  {sending ? "Sending…" : "Send nominee letter"}
+                  {persistedNomineeSigned
+                    ? "Signature saved"
+                    : sending
+                      ? "Saving…"
+                      : "Save signature"}
                 </button>
+              ) : isSendMode ? (
+                <>
+                  {persistedNomineeSigned && !persistedHostSigned && (
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveHostSignature()}
+                      disabled={
+                        sending ||
+                        loading ||
+                        !fields ||
+                        Boolean(loadError) ||
+                        !hostSignatureReady
+                      }
+                      className="rounded-lg border-2 border-[#062763]/30 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
+                    >
+                      {sending ? "Saving…" : "Save host signature"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void handleSubmit()}
+                    disabled={
+                      sending ||
+                      loading ||
+                      !fields ||
+                      Boolean(loadError) ||
+                      !letterDateInput.trim()
+                    }
+                    className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
+                  >
+                    {sending ? "Sending…" : "Send nominee letter"}
+                  </button>
+                </>
               ) : letter?.shared && !editing ? (
                 <button
                   type="button"

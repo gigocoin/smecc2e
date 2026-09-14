@@ -397,7 +397,20 @@ export async function shareNomineeLetterEmail(options: {
   if (!application) throw new Error("Application not found");
   assertNominated(application);
 
-  const editable = validateNomineeLetterFields(options.fields);
+  const row = await loadApplicantRow(options.applicationRef);
+  const existing = parseNomineeLetterSharedSnapshot(row.nomineeLetterSharedData);
+  const editableBase = validateNomineeLetterFields(options.fields);
+  // Coordinators cannot sign; keep any signatures already captured by nominee/admin.
+  const editable: NomineeLetterEditableFields = {
+    ...editableBase,
+    scholarshipHolderSignature:
+      existing?.editable.scholarshipHolderSignature ?? "",
+    scholarshipHolderSignedDate:
+      existing?.editable.scholarshipHolderSignedDate ?? "",
+    hostContactSignature: existing?.editable.hostContactSignature ?? "",
+    hostContactSignedDate: existing?.editable.hostContactSignedDate ?? "",
+  };
+
   const [focalPerson, hostCountry] = await Promise.all([
     findHostFocalPerson(editable.hostUniversity),
     findHostCountry(editable.hostUniversity),
@@ -411,7 +424,6 @@ export async function shareNomineeLetterEmail(options: {
     hostCountry,
   };
 
-  const row = await loadApplicantRow(options.applicationRef);
   await prisma.applicant.update({
     where: { id: row.id },
     data: {
@@ -531,4 +543,115 @@ export async function sendNomineeLetterEmail(options: {
     message,
     applicantLabel: applicantDisplayName(application),
   });
+}
+
+/** Applicant: persist scholarship-holder digital signature on the shared agreement. */
+export async function signNomineeLetterAsScholarshipHolder(options: {
+  applicationRef: string;
+  signature: string;
+  signedDate: string;
+}): Promise<{ signed: boolean; signature: string; signedDate: string }> {
+  const application = await getApplication(options.applicationRef);
+  if (!application) throw new Error("Application not found");
+  if (
+    application.status !== "offered" &&
+    application.status !== "approved" &&
+    application.status !== "pre_departure"
+  ) {
+    throw new Error(
+      "Scholarship agreements can only be signed by nominated applicants"
+    );
+  }
+
+  const row = await loadApplicantRow(options.applicationRef);
+  const shared = parseNomineeLetterSharedSnapshot(row.nomineeLetterSharedData);
+  if (!shared) {
+    throw new Error(
+      "Your nomination letter and scholarship agreement are not available yet"
+    );
+  }
+
+  if (
+    shared.editable.scholarshipHolderSignature?.trim() &&
+    shared.editable.scholarshipHolderSignedDate?.trim()
+  ) {
+    throw new Error("The scholarship holder has already signed this agreement");
+  }
+
+  const signature = options.signature?.trim() ?? "";
+  const signedDate = options.signedDate?.trim() ?? "";
+  if (!signature) throw new Error("Signature is required");
+  if (!signedDate) throw new Error("Signature date is required");
+
+  const updatedSnapshot: NomineeLetterSharedSnapshot = {
+    ...shared,
+    editable: {
+      ...shared.editable,
+      scholarshipHolderSignature: signature,
+      scholarshipHolderSignedDate: signedDate,
+    },
+  };
+
+  await prisma.applicant.update({
+    where: { id: row.id },
+    data: { nomineeLetterSharedData: updatedSnapshot },
+  });
+
+  return { signed: true, signature, signedDate };
+}
+
+/** Administrator: persist host-contact digital signature after the nominee has signed. */
+export async function signNomineeLetterAsHostContact(options: {
+  applicationRef: string;
+  signature: string;
+  signedDate: string;
+}): Promise<{ signed: boolean; signature: string; signedDate: string }> {
+  const application = await getApplication(options.applicationRef);
+  if (!application) throw new Error("Application not found");
+  assertNominated(application);
+
+  const row = await loadApplicantRow(options.applicationRef);
+  const shared = parseNomineeLetterSharedSnapshot(row.nomineeLetterSharedData);
+  if (!shared) {
+    throw new Error(
+      "The coordinator has not shared a nomination letter for this applicant yet"
+    );
+  }
+
+  if (
+    !shared.editable.scholarshipHolderSignature?.trim() ||
+    !shared.editable.scholarshipHolderSignedDate?.trim()
+  ) {
+    throw new Error(
+      "The scholarship holder must sign the agreement before the host contact can sign"
+    );
+  }
+
+  if (
+    shared.editable.hostContactSignature?.trim() &&
+    shared.editable.hostContactSignedDate?.trim()
+  ) {
+    throw new Error("The host contact person has already signed this agreement");
+  }
+
+  const signature = options.signature?.trim() || shared.focalPersonName.trim();
+  const signedDate = options.signedDate?.trim() ?? "";
+  if (!signature) throw new Error("Host contact signature is required");
+  if (!signedDate) throw new Error("Signature date is required");
+
+  const updatedSnapshot: NomineeLetterSharedSnapshot = {
+    ...shared,
+    editable: {
+      ...shared.editable,
+      hostContactSignature: signature,
+      hostContactSignedDate: signedDate,
+    },
+  };
+
+  await prisma.applicant.update({
+    where: { id: row.id },
+    data: { nomineeLetterSharedData: updatedSnapshot },
+  });
+
+  return { signed: true, signature, signedDate };
 }

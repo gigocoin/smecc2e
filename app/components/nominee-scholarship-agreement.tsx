@@ -169,6 +169,8 @@ export function NomineeScholarshipAgreement({
   disabled,
   onFieldChange,
   totalPages,
+  canSignScholarshipHolder,
+  canSignHostContact,
 }: {
   auto: NomineeLetterAutoFields;
   fields: NomineeLetterEditableFields;
@@ -179,12 +181,16 @@ export function NomineeScholarshipAgreement({
     value: string
   ) => void;
   totalPages?: number;
+  canSignScholarshipHolder?: boolean;
+  canSignHostContact?: boolean;
 }) {
   const pages = totalPages ?? NOMINEE_DOCUMENT_TOTAL_PAGES;
   const applicantFullName = [auto.firstName, auto.surname]
     .map((part) => part?.trim())
     .filter(Boolean)
     .join(" ");
+  const allowHolderSign = canSignScholarshipHolder ?? !readOnly;
+  const allowHostSign = canSignHostContact ?? !readOnly;
 
   return (
     <>
@@ -1480,7 +1486,7 @@ export function NomineeScholarshipAgreement({
             signatureLabel="Signature of the scholarship holder"
             signedDate={fields.scholarshipHolderSignedDate}
             signature={fields.scholarshipHolderSignature}
-            canSign={!readOnly}
+            canSign={allowHolderSign}
             disabled={disabled || !applicantFullName.trim()}
             onSign={() => {
               const today = formatNomineeLetterDate(new Date());
@@ -1509,7 +1515,7 @@ export function NomineeScholarshipAgreement({
             signatureLabel="Signature of the contact person of the Host University"
             signedDate={fields.hostContactSignedDate}
             signature={fields.hostContactSignature}
-            canSign={!readOnly}
+            canSign={allowHostSign}
             disabled={disabled || !auto.focalPersonName.trim()}
             onSign={() => {
               const today = formatNomineeLetterDate(new Date());

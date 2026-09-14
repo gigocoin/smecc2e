@@ -10,6 +10,7 @@ import {
   nomineeLetterConfigurationError,
   sendNomineeLetterEmail,
   shareNomineeLetterEmail,
+  signNomineeLetterAsHostContact,
   type NomineeLetterMode,
 } from "@/lib/nominee-letter-email";
 import { isResendConfigured } from "@/lib/resend-client";
@@ -34,7 +35,9 @@ function errorResponse(err: unknown, action: string) {
       message.includes("is invalid") ||
       message.includes("valid email") ||
       message.includes("not found") ||
-      message.includes("has not shared")
+      message.includes("has not shared") ||
+      message.includes("already signed") ||
+      message.includes("must sign")
     ) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
@@ -92,7 +95,12 @@ export async function POST(request: Request, context: RouteContext) {
       hostContactSignedDate?: string;
       letterDate?: string;
     };
-    const action = body.action === "send" ? "send" : "share";
+    const action =
+      body.action === "send"
+        ? "send"
+        : body.action === "sign-host"
+          ? "sign-host"
+          : "share";
 
     if (action === "share") {
       const user = await requireCoordinatorSessionUser();
@@ -113,10 +121,10 @@ export async function POST(request: Request, context: RouteContext) {
           changesDocument: body.changesDocument ?? "",
           staffPlanDocument: body.staffPlanDocument ?? "",
           subsistenceAllowance: body.subsistenceAllowance ?? "",
-          scholarshipHolderSignature: body.scholarshipHolderSignature ?? "",
-          scholarshipHolderSignedDate: body.scholarshipHolderSignedDate ?? "",
-          hostContactSignature: body.hostContactSignature ?? "",
-          hostContactSignedDate: body.hostContactSignedDate ?? "",
+          scholarshipHolderSignature: "",
+          scholarshipHolderSignedDate: "",
+          hostContactSignature: "",
+          hostContactSignedDate: "",
         },
         initiatorEmail: user.email,
         initiatorName: user.name,
@@ -135,6 +143,16 @@ export async function POST(request: Request, context: RouteContext) {
           ? { warning: nomineeLetterConfigurationError() }
           : {}),
       });
+    }
+
+    if (action === "sign-host") {
+      await requireAdministratorSessionUser();
+      const result = await signNomineeLetterAsHostContact({
+        applicationRef: id,
+        signature: body.hostContactSignature ?? "",
+        signedDate: body.hostContactSignedDate ?? "",
+      });
+      return NextResponse.json(result);
     }
 
     const user = await requireAdministratorSessionUser();

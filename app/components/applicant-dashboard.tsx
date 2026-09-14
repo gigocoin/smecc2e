@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ApplicantResetPasswordModal } from "./applicant-reset-password-modal";
+import { NomineeLetterModal } from "./nominee-letter-modal";
 import { STATUS_LABELS, type ApplicationStatus } from "@/lib/application-types";
 import type { ApplicantSessionUser } from "@/lib/applicant-auth-service";
 import { APPLICANT_LOGIN_PATH } from "@/lib/applicant-login-paths";
@@ -32,9 +33,11 @@ function applicantPortalStatusLabel(
     case "rejected":
       return "Rejected";
     case "offered":
+      return "Nominated";
     case "approved":
+      return STATUS_LABELS.approved;
     case "pre_departure":
-      return "Offered";
+      return STATUS_LABELS.pre_departure;
     case "reserved":
       return "Reserved";
     default:
@@ -47,7 +50,9 @@ function statusTone(status: ApplicationStatus, applicationsClosed: boolean): str
   if (label === "Ineligible" || label === "Rejected") {
     return "bg-red-100 text-red-900";
   }
-  if (label === "Offered") return "bg-emerald-100 text-emerald-900";
+  if (label === "Nominated" || label === "Approved" || label === "Pre-departure") {
+    return "bg-emerald-100 text-emerald-900";
+  }
   if (label === "Reserved") return "bg-amber-100 text-amber-950";
   if (label === "Invited for interview") return "bg-violet-100 text-violet-950";
   if (label === "Evaluation Checks") return "bg-sky-100 text-sky-900";
@@ -61,6 +66,8 @@ export function ApplicantDashboard() {
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
+  const [agreementOpen, setAgreementOpen] = useState(false);
+  const [agreementMessage, setAgreementMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadUser = useCallback(async () => {
@@ -172,6 +179,20 @@ export function ApplicantDashboard() {
         onClose={() => setResetPasswordOpen(false)}
       />
 
+      {agreementOpen && app && (
+        <NomineeLetterModal
+          applicationId={app.id}
+          applicantName={displayName}
+          mode="sign"
+          onClose={() => setAgreementOpen(false)}
+          onSent={() => undefined}
+          onSigned={(message) => {
+            setAgreementMessage(message);
+            setAgreementOpen(false);
+          }}
+        />
+      )}
+
       {applicationsClosed && isDraft && (
         <p
           className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950"
@@ -219,7 +240,28 @@ export function ApplicantDashboard() {
               >
                 {statusLabel}
               </span>
+              {app.status === "offered" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAgreementMessage(null);
+                    setAgreementOpen(true);
+                  }}
+                  className="inline-flex rounded-lg bg-[#062763] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#0a3580]"
+                >
+                  View/Sign Agreement
+                </button>
+              )}
             </div>
+
+            {agreementMessage && (
+              <p
+                className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800"
+                role="status"
+              >
+                {agreementMessage}
+              </p>
+            )}
 
             {isDraft ? (
               <>
