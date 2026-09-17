@@ -171,6 +171,10 @@ export function NomineeScholarshipAgreement({
   totalPages,
   canSignScholarshipHolder,
   canSignHostContact,
+  showNomineeDecision = false,
+  agreementDecision = "",
+  deciding = false,
+  onAgreementDecision,
 }: {
   auto: NomineeLetterAutoFields;
   fields: NomineeLetterEditableFields;
@@ -183,6 +187,10 @@ export function NomineeScholarshipAgreement({
   totalPages?: number;
   canSignScholarshipHolder?: boolean;
   canSignHostContact?: boolean;
+  showNomineeDecision?: boolean;
+  agreementDecision?: string;
+  deciding?: boolean;
+  onAgreementDecision?: (decision: "accepted" | "rejected") => void;
 }) {
   const pages = totalPages ?? NOMINEE_DOCUMENT_TOTAL_PAGES;
   const applicantFullName = [auto.firstName, auto.surname]
@@ -1467,6 +1475,46 @@ export function NomineeScholarshipAgreement({
         carefully read, be fully aware of and accept the provisions laid down in
         the present agreement.
       </Clause>
+
+      {showNomineeDecision && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4">
+          <p className="text-sm font-bold text-slate-900">
+            Scholarship agreement decision
+          </p>
+          <p className="mt-1 text-sm text-slate-700">
+            Accept the scholarship agreement to enable your digital signature, or
+            reject the nomination.
+          </p>
+          {agreementDecision === "accepted" ? (
+            <p className="mt-3 text-sm font-semibold text-emerald-800">
+              You accepted this scholarship agreement.
+            </p>
+          ) : agreementDecision === "rejected" ? (
+            <p className="mt-3 text-sm font-semibold text-red-800">
+              You rejected this scholarship agreement.
+            </p>
+          ) : (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => onAgreementDecision?.("accepted")}
+                disabled={disabled || deciding}
+                className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-50"
+              >
+                {deciding ? "Saving…" : "Accept"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onAgreementDecision?.("rejected")}
+                disabled={disabled || deciding}
+                className="rounded-lg border-2 border-red-300 px-4 py-2 text-sm font-semibold text-red-800 transition hover:bg-red-50 disabled:opacity-50"
+              >
+                Reject
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <ArticleHeading>Signatures</ArticleHeading>
 

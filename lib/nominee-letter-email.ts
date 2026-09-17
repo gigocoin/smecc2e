@@ -202,6 +202,7 @@ async function buildPrepareLetterData(
       scholarshipHolderSignedDate: "",
       hostContactSignature: "",
       hostContactSignedDate: "",
+      agreementDecision: "",
     },
     applicantEmail: applicantPrimaryEmail(application),
     applicantName: applicantDisplayFirstSurname(application),
@@ -409,6 +410,7 @@ export async function shareNomineeLetterEmail(options: {
       existing?.editable.scholarshipHolderSignedDate ?? "",
     hostContactSignature: existing?.editable.hostContactSignature ?? "",
     hostContactSignedDate: existing?.editable.hostContactSignedDate ?? "",
+    agreementDecision: existing?.editable.agreementDecision ?? "",
   };
 
   const [focalPerson, hostCountry] = await Promise.all([
@@ -572,6 +574,14 @@ export async function signNomineeLetterAsScholarshipHolder(options: {
   }
 
   if (
+    shared.editable.agreementDecision?.trim().toLowerCase() !== "accepted"
+  ) {
+    throw new Error(
+      "You must accept the scholarship agreement before signing"
+    );
+  }
+
+  if (
     shared.editable.scholarshipHolderSignature?.trim() &&
     shared.editable.scholarshipHolderSignedDate?.trim()
   ) {
@@ -654,4 +664,65 @@ export async function signNomineeLetterAsHostContact(options: {
   });
 
   return { signed: true, signature, signedDate };
+}
+
+/** Nominee: accept or reject the scholarship agreement. Reject sets status to rejected. */
+export async function decideNomineeLetterAgreement(options: {
+  applicationRef: string;
+  decision: "accepted" | "rejected";
+}): Promise<{
+  decision: "accepted" | "rejected";
+  status: string;
+}> {
+  const application = await getApplication(options.applicationRef);
+  if (!application) throw new Error("Application not found");
+  if (
+    application.status !== "offered" &&
+    application.status !== "approved" &&
+    application.status !== "pre_departure"
+  ) {
+    throw new Error(
+      "Scholarship agreements can only be decided by nominated applicants"
+    );
+  }
+
+  const row = await loadApplicantRow(options.applicationRef);
+  const shared = parseNomineeLetterSharedSnapshot(row.nomineeLetterSharedData);
+  if (!shared) {
+    throw new Error(
+      "Your nomination letter and scholarship agreement are not available yet"
+    );
+  }
+
+  if (shared.editable.agreementDecision?.trim()) {
+    throw new Error("You have already responded to this scholarship agreement");
+  }
+
+  if (
+    shared.editable.scholarshipHolderSignature?.trim() ||
+    shared.editable.scholarshipHolderSignedDate?.trim()
+  ) {
+    throw new Error("You have already signed this scholarship agreement");
+  }
+
+  const updatedSnapshot: NomineeLetterSharedSnapshot = {
+    ...shared,
+    editable: {
+      ...shared.editable,
+      agreementDecision: options.decision,
+    },
+  };
+
+  await prisma.applicant.update({
+    where: { id: row.id },
+    data: {
+      nomineeLetterSharedData: updatedSnapshot,
+      ...(options.decision === "rejected" ? { status: "rejected" } : {}),
+    },
+  });
+
+  return {
+    decision: options.decision,
+    status: options.decision === "rejected" ? "rejected" : application.status,
+  };
 }

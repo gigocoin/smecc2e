@@ -188,7 +188,11 @@ export function ApplicantDashboard() {
           onSent={() => undefined}
           onSigned={(message) => {
             setAgreementMessage(message);
+          }}
+          onRejected={(message) => {
+            setAgreementMessage(message);
             setAgreementOpen(false);
+            void loadUser();
           }}
         />
       )}

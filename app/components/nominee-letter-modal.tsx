@@ -13,6 +13,7 @@ import {
   type NomineeLetterAutoFields,
   type NomineeLetterEditableFields,
 } from "@/lib/nominee-letter-shared";
+import { downloadNomineeAgreementHtml } from "@/lib/nominee-letter-download";
 import {
   AutoValue,
   EditableInput,
@@ -47,6 +48,7 @@ export function NomineeLetterModal({
   onSent,
   onDraftShared,
   onSigned,
+  onRejected,
 }: {
   applicationId: string;
   applicantName: string;
@@ -56,6 +58,7 @@ export function NomineeLetterModal({
   onSent: (message: string) => void;
   onDraftShared?: (message: string) => void;
   onSigned?: (message: string) => void;
+  onRejected?: (message: string) => void;
 }) {
   const isSendMode = mode === "send";
   const isSignMode = mode === "sign";
@@ -68,6 +71,7 @@ export function NomineeLetterModal({
   const [letterDateInput, setLetterDateInput] = useState("");
   const [editing, setEditing] = useState(true);
   const [sending, setSending] = useState(false);
+  const [deciding, setDeciding] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [shareSuccess, setShareSuccess] = useState<string | null>(null);
   const [persistedNomineeSigned, setPersistedNomineeSigned] = useState(false);
@@ -145,9 +149,14 @@ export function NomineeLetterModal({
 
   // Signing workflow:
   // - Coordinator: never
-  // - Nominee (/applicant): scholarship holder only, until saved
+  // - Nominee (/applicant): only after Accept, until saved
   // - Administrator: host contact only, after nominee has saved, until host saved
-  const canSignScholarshipHolder = isSignMode && !persistedNomineeSigned;
+  const agreementAccepted =
+    fields?.agreementDecision?.trim().toLowerCase() === "accepted";
+  const agreementRejected =
+    fields?.agreementDecision?.trim().toLowerCase() === "rejected";
+  const canSignScholarshipHolder =
+    isSignMode && agreementAccepted && !persistedNomineeSigned;
   const canSignHostContact =
     isSendMode && persistedNomineeSigned && !persistedHostSigned;
 
@@ -208,6 +217,55 @@ export function NomineeLetterModal({
     } finally {
       setSending(false);
     }
+  };
+
+  const handleAgreementDecision = async (
+    decision: "accepted" | "rejected"
+  ) => {
+    setDeciding(true);
+    setSendError(null);
+    setShareSuccess(null);
+    try {
+      const res = await fetch("/api/applicant/nominee-letter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "decide", decision }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setSendError(
+          data.error ??
+            (decision === "rejected"
+              ? "Could not reject the scholarship agreement."
+              : "Could not accept the scholarship agreement.")
+        );
+        return;
+      }
+      updateField("agreementDecision", decision);
+      if (decision === "rejected") {
+        const message =
+          "You rejected the scholarship agreement. Your application status is now Rejected.";
+        setShareSuccess(message);
+        onRejected?.(message);
+        return;
+      }
+      setShareSuccess(
+        "You accepted the scholarship agreement. You can now append your digital signature."
+      );
+    } catch {
+      setSendError(
+        decision === "rejected"
+          ? "Could not reject the scholarship agreement."
+          : "Could not accept the scholarship agreement."
+      );
+    } finally {
+      setDeciding(false);
+    }
+  };
+
+  const handleDownloadAgreement = () => {
+    if (!displayAuto || !fields) return;
+    downloadNomineeAgreementHtml(displayAuto, fields);
   };
 
   const handleSubmit = async () => {
@@ -687,11 +745,17 @@ export function NomineeLetterModal({
                 auto={auto}
                 fields={fields}
                 readOnly={fieldsReadOnly}
-                disabled={sending}
+                disabled={sending || deciding}
                 onFieldChange={updateField}
                 totalPages={NOMINEE_DOCUMENT_TOTAL_PAGES}
                 canSignScholarshipHolder={canSignScholarshipHolder}
                 canSignHostContact={canSignHostContact}
+                showNomineeDecision={isSignMode}
+                agreementDecision={fields.agreementDecision}
+                deciding={deciding}
+                onAgreementDecision={(decision) =>
+                  void handleAgreementDecision(decision)
+                }
               />
             </div>
           )}
@@ -717,9 +781,13 @@ export function NomineeLetterModal({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs font-semibold text-slate-700">
               {isSignMode
-                ? persistedNomineeSigned
-                  ? "Your digital signature is saved."
-                  : "Append your digital signature on the last page, then save."
+                ? agreementRejected
+                  ? "You rejected this scholarship agreement."
+                  : !agreementAccepted
+                    ? "Accept the scholarship agreement to enable your digital signature, or reject the nomination."
+                    : persistedNomineeSigned
+                      ? "Your digital signature is saved. You can download the agreement."
+                      : "Append your digital signature on the last page, then save."
                 : isSendMode
                   ? !persistedNomineeSigned
                     ? "Waiting for the nominee to sign the scholarship agreement before the host contact can sign."
@@ -760,25 +828,39 @@ export function NomineeLetterModal({
                 </button>
               )}
               {isSignMode ? (
-                <button
-                  type="button"
-                  onClick={() => void handleSubmit()}
-                  disabled={
-                    sending ||
-                    loading ||
-                    !fields ||
-                    Boolean(loadError) ||
-                    persistedNomineeSigned ||
-                    !nomineeSignatureReady
-                  }
-                  className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
-                >
-                  {persistedNomineeSigned
-                    ? "Signature saved"
-                    : sending
-                      ? "Saving…"
-                      : "Save signature"}
-                </button>
+                <>
+                  {persistedNomineeSigned && (
+                    <button
+                      type="button"
+                      onClick={handleDownloadAgreement}
+                      disabled={!fields || !auto}
+                      className="rounded-lg border-2 border-[#062763]/30 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
+                    >
+                      Download agreement
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void handleSubmit()}
+                    disabled={
+                      sending ||
+                      deciding ||
+                      loading ||
+                      !fields ||
+                      Boolean(loadError) ||
+                      !agreementAccepted ||
+                      persistedNomineeSigned ||
+                      !nomineeSignatureReady
+                    }
+                    className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
+                  >
+                    {persistedNomineeSigned
+                      ? "Signature saved"
+                      : sending
+                        ? "Saving…"
+                        : "Save signature"}
+                  </button>
+                </>
               ) : isSendMode ? (
                 <>
                   {persistedNomineeSigned && !persistedHostSigned && (

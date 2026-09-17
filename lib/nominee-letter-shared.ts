@@ -147,6 +147,8 @@ export type NomineeLetterEditableFields = {
   /** Agreement signature block — host university contact person. */
   hostContactSignature: string;
   hostContactSignedDate: string;
+  /** Nominee accept/reject of the scholarship agreement. */
+  agreementDecision: string;
 };
 
 /** Snapshot persisted when the coordinator shares with the focal person. */
@@ -280,6 +282,7 @@ export function validateNomineeLetterFields(
       fields.scholarshipHolderSignedDate?.trim() ?? "",
     hostContactSignature: fields.hostContactSignature?.trim() ?? "",
     hostContactSignedDate: fields.hostContactSignedDate?.trim() ?? "",
+    agreementDecision: fields.agreementDecision?.trim() ?? "",
   };
 }
 
@@ -318,6 +321,7 @@ export function parseNomineeLetterSharedSnapshot(
       hostContactSignedDate: String(
         editableRecord.hostContactSignedDate ?? ""
       ),
+      agreementDecision: String(editableRecord.agreementDecision ?? ""),
     });
     return {
       editable,

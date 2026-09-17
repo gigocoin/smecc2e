@@ -125,6 +125,7 @@ export async function POST(request: Request, context: RouteContext) {
           scholarshipHolderSignedDate: "",
           hostContactSignature: "",
           hostContactSignedDate: "",
+          agreementDecision: "",
         },
         initiatorEmail: user.email,
         initiatorName: user.name,
