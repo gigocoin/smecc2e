@@ -105,7 +105,7 @@ function applicantAgreementIdentity(application: ApplicationRecord) {
 }
 
 /** Focal person recorded for the applicant's preferred host institution. */
-async function findHostFocalPerson(
+export async function findHostFocalPerson(
   institution: string
 ): Promise<{ name: string; email: string; address: string } | null> {
   const name = institution.trim();
@@ -128,7 +128,7 @@ async function findHostFocalPerson(
 }
 
 /** Country of the host university, taken from its registered programmes. */
-async function findHostCountry(institution: string): Promise<string> {
+export async function findHostCountry(institution: string): Promise<string> {
   const name = institution.trim();
   if (!name) return "";
 
@@ -139,6 +139,28 @@ async function findHostCountry(institution: string): Promise<string> {
   });
 
   return program?.country ?? "";
+}
+
+/** Focal person + host country for a selected host university. */
+export async function getHostInstitutionDetails(institution: string): Promise<{
+  institution: string;
+  focalPersonName: string;
+  focalPersonEmail: string;
+  focalPersonAddress: string;
+  hostCountry: string;
+}> {
+  const name = institution.trim();
+  const [focalPerson, hostCountry] = await Promise.all([
+    findHostFocalPerson(name),
+    findHostCountry(name),
+  ]);
+  return {
+    institution: name,
+    focalPersonName: focalPerson?.name ?? "",
+    focalPersonEmail: focalPerson?.email ?? "",
+    focalPersonAddress: focalPerson?.address ?? "",
+    hostCountry,
+  };
 }
 
 async function loadApplicantRow(applicationRef: string) {

@@ -95,6 +95,7 @@ export function EditableSelect({
   onChange,
   disabled,
   placeholder,
+  className,
 }: {
   id: string;
   label: string;
@@ -105,6 +106,7 @@ export function EditableSelect({
   onChange: (value: string) => void;
   disabled: boolean;
   placeholder: string;
+  className?: string;
 }) {
   return (
     <>
@@ -116,7 +118,7 @@ export function EditableSelect({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        className={controlClass}
+        className={`${controlClass}${className ? ` ${className}` : ""}`}
       >
         <option value="" disabled>
           {placeholder}

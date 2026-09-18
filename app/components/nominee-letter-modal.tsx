@@ -76,6 +76,8 @@ export function NomineeLetterModal({
   const [shareSuccess, setShareSuccess] = useState<string | null>(null);
   const [persistedNomineeSigned, setPersistedNomineeSigned] = useState(false);
   const [persistedHostSigned, setPersistedHostSigned] = useState(false);
+  const [hostUniversities, setHostUniversities] = useState<string[]>([]);
+  const [hostLookupLoading, setHostLookupLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -126,6 +128,30 @@ export function NomineeLetterModal({
     };
   }, [applicationId, isSendMode, isSignMode, startEditing]);
 
+  useEffect(() => {
+    if (isSignMode) return;
+    let active = true;
+    const loadUniversities = async () => {
+      try {
+        const res = await fetch("/api/universities", { cache: "no-store" });
+        const data = (await res.json()) as {
+          universityNames?: string[];
+          error?: string;
+        };
+        if (!active || !res.ok) return;
+        setHostUniversities(
+          (data.universityNames ?? []).map((name) => name.trim()).filter(Boolean)
+        );
+      } catch {
+        // Keep the letter usable even if the university list fails to load.
+      }
+    };
+    void loadUniversities();
+    return () => {
+      active = false;
+    };
+  }, [isSignMode]);
+
   const updateField = (
     key: keyof NomineeLetterEditableFields,
     value: string
@@ -133,6 +159,77 @@ export function NomineeLetterModal({
     setFields((prev) => (prev ? { ...prev, [key]: value } : prev));
     setSendError(null);
     setShareSuccess(null);
+  };
+
+  const hostUniversityOptions = useMemo(() => {
+    const selected = fields?.hostUniversity?.trim() ?? "";
+    if (selected && !hostUniversities.includes(selected)) {
+      return [selected, ...hostUniversities];
+    }
+    return hostUniversities;
+  }, [fields?.hostUniversity, hostUniversities]);
+
+  const handleHostUniversityChange = async (value: string) => {
+    updateField("hostUniversity", value);
+    if (!value.trim()) {
+      setLetter((prev) =>
+        prev
+          ? {
+              ...prev,
+              auto: {
+                ...prev.auto,
+                focalPersonName: "",
+                focalPersonEmail: "",
+                focalPersonAddress: "",
+                hostCountry: "",
+              },
+            }
+          : prev
+      );
+      return;
+    }
+
+    setHostLookupLoading(true);
+    setSendError(null);
+    try {
+      const res = await fetch(
+        `/api/host-institutions/details?name=${encodeURIComponent(value)}`,
+        { cache: "no-store" }
+      );
+      const data = (await res.json()) as {
+        details?: {
+          focalPersonName: string;
+          focalPersonEmail: string;
+          focalPersonAddress: string;
+          hostCountry: string;
+        };
+        error?: string;
+      };
+      if (!res.ok || !data.details) {
+        setSendError(
+          data.error ?? "Could not load host university contact details."
+        );
+        return;
+      }
+      setLetter((prev) =>
+        prev
+          ? {
+              ...prev,
+              auto: {
+                ...prev.auto,
+                focalPersonName: data.details!.focalPersonName,
+                focalPersonEmail: data.details!.focalPersonEmail,
+                focalPersonAddress: data.details!.focalPersonAddress,
+                hostCountry: data.details!.hostCountry,
+              },
+            }
+          : prev
+      );
+    } catch {
+      setSendError("Could not load host university contact details.");
+    } finally {
+      setHostLookupLoading(false);
+    }
   };
 
   const fieldsReadOnly =
@@ -496,14 +593,19 @@ export function NomineeLetterModal({
                 {fieldsReadOnly ? (
                   <AutoValue value={fields.hostUniversity} />
                 ) : (
-                  <EditableInput
+                  <EditableSelect
                     id="nominee-host-university"
                     label="Host university"
                     value={fields.hostUniversity}
-                    onChange={(value) => updateField("hostUniversity", value)}
-                    disabled={sending}
-                    placeholder="Host university"
-                    width="18rem"
+                    options={hostUniversityOptions}
+                    onChange={(value) => void handleHostUniversityChange(value)}
+                    disabled={sending || hostLookupLoading}
+                    placeholder={
+                      hostUniversities.length
+                        ? "Select host university"
+                        : "Loading host universities…"
+                    }
+                    className="max-w-full min-w-56"
                   />
                 )}
                 . The details of the scholarship are as follows:
@@ -526,14 +628,19 @@ export function NomineeLetterModal({
                   {fieldsReadOnly ? (
                     <AutoValue value={fields.hostUniversity} />
                   ) : (
-                    <EditableInput
+                    <EditableSelect
                       id="nominee-host-university-detail"
                       label="Host university (details)"
                       value={fields.hostUniversity}
-                      onChange={(value) => updateField("hostUniversity", value)}
-                      disabled={sending}
-                      placeholder="Host university"
-                      width="18rem"
+                      options={hostUniversityOptions}
+                      onChange={(value) => void handleHostUniversityChange(value)}
+                      disabled={sending || hostLookupLoading}
+                      placeholder={
+                        hostUniversities.length
+                          ? "Select host university"
+                          : "Loading host universities…"
+                      }
+                      className="max-w-full min-w-56"
                     />
                   )}
                 </p>
@@ -542,26 +649,40 @@ export function NomineeLetterModal({
                   Host University Contact Person:
                 </p>
                 <p className="text-sm text-slate-800">
-                  <AutoValue
-                    value={auto.focalPersonName}
-                    missingLabel="No focal person set for this institution"
-                  />
+                  {hostLookupLoading ? (
+                    <span className="font-semibold text-slate-500">
+                      Loading host contact…
+                    </span>
+                  ) : (
+                    <AutoValue
+                      value={auto.focalPersonName}
+                      missingLabel="No focal person set for this institution"
+                    />
+                  )}
                 </p>
 
                 <p className={detailLabelClass}>Contact e-mail:</p>
                 <p className="text-sm text-slate-800">
-                  <EmailLink
-                    value={auto.focalPersonEmail}
-                    missingLabel="No focal person e-mail"
-                  />
+                  {hostLookupLoading ? (
+                    <span className="font-semibold text-slate-500">…</span>
+                  ) : (
+                    <EmailLink
+                      value={auto.focalPersonEmail}
+                      missingLabel="No focal person e-mail"
+                    />
+                  )}
                 </p>
 
                 <p className={detailLabelClass}>Contact address:</p>
                 <p className="text-sm text-slate-800">
-                  <AutoValue
-                    value={auto.focalPersonAddress}
-                    missingLabel="No address on the focal person's profile"
-                  />
+                  {hostLookupLoading ? (
+                    <span className="font-semibold text-slate-500">…</span>
+                  ) : (
+                    <AutoValue
+                      value={auto.focalPersonAddress}
+                      missingLabel="No address on the focal person's profile"
+                    />
+                  )}
                 </p>
 
                 <p className={detailLabelClass}>Type of Mobility:</p>
@@ -711,14 +832,19 @@ export function NomineeLetterModal({
                 {fieldsReadOnly ? (
                   <AutoValue value={fields.hostUniversity} />
                 ) : (
-                  <EditableInput
+                  <EditableSelect
                     id="nominee-host-university-closing"
                     label="Host university (closing)"
                     value={fields.hostUniversity}
-                    onChange={(value) => updateField("hostUniversity", value)}
-                    disabled={sending}
-                    placeholder="Host university"
-                    width="18rem"
+                    options={hostUniversityOptions}
+                    onChange={(value) => void handleHostUniversityChange(value)}
+                    disabled={sending || hostLookupLoading}
+                    placeholder={
+                      hostUniversities.length
+                        ? "Select host university"
+                        : "Loading host universities…"
+                    }
+                    className="max-w-full min-w-56"
                   />
                 )}
                 , in <AutoValue value={auto.hostCountry} />.
