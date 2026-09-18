@@ -363,7 +363,14 @@ export function NomineeLetterModal({
   };
 
   const handleDownloadAgreement = async () => {
-    if (!documentRef.current || !displayAuto) return;
+    if (
+      !documentRef.current ||
+      !displayAuto ||
+      !persistedNomineeSigned ||
+      !persistedHostSigned
+    ) {
+      return;
+    }
     setDownloadingPdf(true);
     setSendError(null);
     try {
@@ -381,6 +388,31 @@ export function NomineeLetterModal({
       setDownloadingPdf(false);
     }
   };
+
+  const bothPartiesSigned = persistedNomineeSigned && persistedHostSigned;
+  const downloadDisabled =
+    !bothPartiesSigned ||
+    !fields ||
+    !displayAuto ||
+    downloadingPdf ||
+    loading ||
+    Boolean(loadError);
+
+  const downloadAgreementButton = (
+    <button
+      type="button"
+      onClick={() => void handleDownloadAgreement()}
+      disabled={downloadDisabled}
+      title={
+        bothPartiesSigned
+          ? undefined
+          : "Available after both the nominee and host contact have signed"
+      }
+      className="rounded-lg border-2 border-[#062763]/30 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {downloadingPdf ? "Preparing PDF…" : "Download agreement"}
+    </button>
+  );
 
   const handleSubmit = async () => {
     if (!fields) return;
@@ -929,19 +961,21 @@ export function NomineeLetterModal({
                   : !agreementAccepted
                     ? "Accept the scholarship agreement to enable your digital signature, or reject the nomination."
                     : persistedNomineeSigned
-                      ? "Your digital signature is saved. You can download the agreement."
+                      ? bothPartiesSigned
+                        ? "Both parties have signed. You can download the agreement."
+                        : "Your digital signature is saved. Download unlocks after the host contact signs."
                       : "Append your digital signature on the last page, then save."
                 : isSendMode
                   ? !persistedNomineeSigned
                     ? "Waiting for the nominee to sign the scholarship agreement before the host contact can sign."
                     : persistedHostSigned
-                      ? letter?.applicantEmail
-                        ? `Host contact has signed. Sends to ${letter.applicantEmail}, copying coordinators and the host focal person.`
-                        : "Host contact has signed. Sends to the applicant, copying coordinators and the host focal person."
+                      ? "Both parties have signed. You can download the agreement or send the nominee letter."
                       : "Nominee has signed. Append the host contact digital signature on the last page, then save it."
-                  : letter?.auto.focalPersonEmail
-                    ? `Shares with ${letter.auto.focalPersonEmail}, copying coordinators.`
-                    : "Shares with the host focal person, copying coordinators."}
+                  : bothPartiesSigned
+                    ? "Both parties have signed. You can download the completed scholarship agreement."
+                    : letter?.auto.focalPersonEmail
+                      ? `Shares with ${letter.auto.focalPersonEmail}, copying coordinators.`
+                      : "Shares with the host focal person, copying coordinators."}
             </p>
             <div className="flex gap-2">
               <button
@@ -972,16 +1006,7 @@ export function NomineeLetterModal({
               )}
               {isSignMode ? (
                 <>
-                  {persistedNomineeSigned && (
-                    <button
-                      type="button"
-                      onClick={() => void handleDownloadAgreement()}
-                      disabled={!fields || !auto || downloadingPdf}
-                      className="rounded-lg border-2 border-[#062763]/30 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
-                    >
-                      {downloadingPdf ? "Preparing PDF…" : "Download agreement"}
-                    </button>
-                  )}
+                  {downloadAgreementButton}
                   <button
                     type="button"
                     onClick={() => void handleSubmit()}
@@ -1036,24 +1061,31 @@ export function NomineeLetterModal({
                   >
                     {sending ? "Sending…" : "Send nominee letter"}
                   </button>
+                  {downloadAgreementButton}
                 </>
               ) : letter?.shared && !editing ? (
-                <button
-                  type="button"
-                  disabled
-                  className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-100"
-                >
-                  Draft Shared
-                </button>
+                <>
+                  <button
+                    type="button"
+                    disabled
+                    className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-100"
+                  >
+                    Draft Shared
+                  </button>
+                  {downloadAgreementButton}
+                </>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => void handleSubmit()}
-                  disabled={sending || loading || !fields || Boolean(loadError)}
-                  className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
-                >
-                  {sending ? "Sharing…" : "Share with focal person"}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void handleSubmit()}
+                    disabled={sending || loading || !fields || Boolean(loadError)}
+                    className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
+                  >
+                    {sending ? "Sharing…" : "Share with focal person"}
+                  </button>
+                  {downloadAgreementButton}
+                </>
               )}
             </div>
           </div>
