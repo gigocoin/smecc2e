@@ -19,6 +19,7 @@ export function NomineeLetterPage({
 }) {
   return (
     <article
+      data-nominee-letter-page={pageNumber}
       className="flex min-h-280 flex-col rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
       aria-label={`Page ${pageNumber} of ${totalPages}`}
     >

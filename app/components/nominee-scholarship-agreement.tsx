@@ -1477,7 +1477,10 @@ export function NomineeScholarshipAgreement({
       </Clause>
 
       {showNomineeDecision && (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4">
+        <div
+          data-pdf-exclude
+          className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4"
+        >
           <p className="text-sm font-bold text-slate-900">
             Scholarship agreement decision
           </p>

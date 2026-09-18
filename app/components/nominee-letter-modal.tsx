@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   NOMINEE_LETTER_PENDING,
   NOMINEE_TARGET_GROUP_OPTIONS,
@@ -13,7 +13,7 @@ import {
   type NomineeLetterAutoFields,
   type NomineeLetterEditableFields,
 } from "@/lib/nominee-letter-shared";
-import { downloadNomineeAgreementHtml } from "@/lib/nominee-letter-download";
+import { downloadNomineeAgreementPdf } from "@/lib/nominee-letter-download";
 import {
   AutoValue,
   EditableInput,
@@ -78,6 +78,8 @@ export function NomineeLetterModal({
   const [persistedHostSigned, setPersistedHostSigned] = useState(false);
   const [hostUniversities, setHostUniversities] = useState<string[]>([]);
   const [hostLookupLoading, setHostLookupLoading] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const documentRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -360,9 +362,24 @@ export function NomineeLetterModal({
     }
   };
 
-  const handleDownloadAgreement = () => {
-    if (!displayAuto || !fields) return;
-    downloadNomineeAgreementHtml(displayAuto, fields);
+  const handleDownloadAgreement = async () => {
+    if (!documentRef.current || !displayAuto) return;
+    setDownloadingPdf(true);
+    setSendError(null);
+    try {
+      await downloadNomineeAgreementPdf(
+        documentRef.current,
+        displayAuto.applicantNo
+      );
+    } catch (err) {
+      setSendError(
+        err instanceof Error
+          ? err.message
+          : "Could not download the agreement PDF."
+      );
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -536,7 +553,7 @@ export function NomineeLetterModal({
           )}
 
           {auto && fields && (
-            <div className="space-y-6">
+            <div ref={documentRef} className="space-y-6">
               <NomineeLetterPage
                 pageNumber={1}
                 totalPages={NOMINEE_DOCUMENT_TOTAL_PAGES}
@@ -958,11 +975,11 @@ export function NomineeLetterModal({
                   {persistedNomineeSigned && (
                     <button
                       type="button"
-                      onClick={handleDownloadAgreement}
-                      disabled={!fields || !auto}
+                      onClick={() => void handleDownloadAgreement()}
+                      disabled={!fields || !auto || downloadingPdf}
                       className="rounded-lg border-2 border-[#062763]/30 px-4 py-2 text-sm font-semibold text-[#062763] transition hover:bg-[#062763]/5 disabled:opacity-50"
                     >
-                      Download agreement
+                      {downloadingPdf ? "Preparing PDF…" : "Download agreement"}
                     </button>
                   )}
                   <button
