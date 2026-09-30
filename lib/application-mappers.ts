@@ -123,6 +123,28 @@ export function payloadToApplicantFields(
   };
 }
 
+/** A text field stored on the shared nomination-letter / agreement snapshot. */
+export function nomineeLetterEditableField(
+  nomineeLetterSharedData: unknown,
+  key: string
+): string {
+  if (!nomineeLetterSharedData || typeof nomineeLetterSharedData !== "object") {
+    return "";
+  }
+  const editable = (
+    nomineeLetterSharedData as { editable?: Record<string, unknown> }
+  ).editable;
+  const value = editable?.[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/** Host university stored on the shared nomination-letter / agreement snapshot. */
+export function nomineeLetterHostUniversity(
+  nomineeLetterSharedData: unknown
+): string {
+  return nomineeLetterEditableField(nomineeLetterSharedData, "hostUniversity");
+}
+
 export function mapPrismaApplicant(
   row: Applicant & {
     evaluator1?: Pick<User, "id" | "publicId" | "name" | "email"> | null;
@@ -164,6 +186,21 @@ export function mapPrismaApplicant(
     ),
     nomineeLetterShared: row.nomineeLetterSharedAt != null,
     nomineeLetterSent: row.nomineeLetterSentAt != null,
+    nomineeHostUniversity: nomineeLetterHostUniversity(
+      row.nomineeLetterSharedData
+    ),
+    nomineeMobilityType: nomineeLetterEditableField(
+      row.nomineeLetterSharedData,
+      "mobilityType"
+    ),
+    nomineeDurationMonths: nomineeLetterEditableField(
+      row.nomineeLetterSharedData,
+      "durationMonths"
+    ),
+    nomineeAreaOfStudy: nomineeLetterEditableField(
+      row.nomineeLetterSharedData,
+      "areaOfStudy"
+    ),
     email: row.email,
     nationality: row.nationality,
     countryOfResidence: row.countryOfResidence,

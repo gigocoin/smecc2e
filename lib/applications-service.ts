@@ -12,6 +12,7 @@ import type {
 import {
   applicantEmailFromPayload,
   mapPrismaApplicant,
+  nomineeLetterHostUniversity,
   payloadToApplicantFields,
 } from "./application-mappers";
 import {
@@ -249,12 +250,32 @@ export async function isApplicationAssignedToEvaluator(
   return Boolean(row);
 }
 
+/** Host on the shared nomination letter, otherwise the applicant's preferred host. */
+function nomineeHostInstitution(row: {
+  preferredHostInstitution: string;
+  nomineeLetterSharedData: unknown;
+}): string {
+  return (
+    nomineeLetterHostUniversity(row.nomineeLetterSharedData) ||
+    row.preferredHostInstitution.trim()
+  );
+}
+
+function sameInstitution(left: string, right: string): boolean {
+  return left.trim().toLowerCase() === right.trim().toLowerCase();
+}
+
 export async function listApplications(options?: {
   includeDrafts?: boolean;
   /** When set, only applications assigned to this evaluator (public id) are returned. */
   assignedToEvaluatorPublicId?: string;
   /** Evaluator interview queue: assigned as interviewer with completed scorecards. */
   interviewQueueForPublicId?: string;
+  /**
+   * When set, offered nominees are limited to this host institution.
+   * Other statuses are unchanged.
+   */
+  hostInstitutionForOffered?: string;
 }): Promise<ApplicationRecord[]> {
   const includeDrafts = options?.includeDrafts ?? false;
   const interviewUserInternalId = options?.interviewQueueForPublicId
@@ -303,10 +324,20 @@ export async function listApplications(options?: {
       ? await resolveUserInternalId(options.assignedToEvaluatorPublicId)
       : null);
 
-  return rows.map((row) => {
+  const hostInstitution = options?.hostInstitutionForOffered?.trim() ?? "";
+  const limitOfferedToHost = options?.hostInstitutionForOffered !== undefined;
+
+  return rows.flatMap((row) => {
+    if (
+      limitOfferedToHost &&
+      row.status === "offered" &&
+      !sameInstitution(nomineeHostInstitution(row), hostInstitution)
+    ) {
+      return [];
+    }
     const application = mapPrismaApplicant(row);
-    if (!evaluatorInternalId) return application;
-    return enrichApplicationForEvaluator(application, row, evaluatorInternalId);
+    if (!evaluatorInternalId) return [application];
+    return [enrichApplicationForEvaluator(application, row, evaluatorInternalId)];
   });
 }
 

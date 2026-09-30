@@ -151,6 +151,14 @@ export type ApplicationRecord = ApplicationPayload & {
   nomineeLetterShared?: boolean;
   /** Administrator has sent the dated nomination letter to the applicant */
   nomineeLetterSent?: boolean;
+  /** Host university saved on the scholarship agreement, when set */
+  nomineeHostUniversity?: string;
+  /** Type of mobility saved on the nomination letter, when set */
+  nomineeMobilityType?: string;
+  /** Maximum duration in months saved on the nomination letter, when set */
+  nomineeDurationMonths?: string;
+  /** Area of study/work saved on the nomination letter, when set */
+  nomineeAreaOfStudy?: string;
   /** Populated for evaluator sessions: this user's review on the application */
   myEvaluatorReviewStatus?: EvaluatorReviewStatus | null;
   /** Populated for evaluator sessions: this user's submitted evaluation scores */

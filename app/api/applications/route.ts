@@ -35,6 +35,11 @@ export async function GET(request: Request) {
       includeDrafts:
         (user.role === "Coordinator" || user.role === "Administrator") &&
         !forEvaluation,
+      // Administrators only see nominees hosted at their own institution.
+      hostInstitutionForOffered:
+        user.role === "Administrator" && !forEvaluation && !forInterview
+          ? user.institution
+          : undefined,
     });
     return NextResponse.json({ applications });
   } catch (err) {

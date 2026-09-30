@@ -171,17 +171,28 @@ export function CoordinatorApplicants({
 
   const mobilityOptions = useMemo(() => {
     const set = new Set(
-      applications.map((a) => a.typeOfMobility).filter(Boolean)
+      applications
+        .filter((a) => statusFilter === "all" || a.status === statusFilter)
+        .map((a) =>
+          statusFilter === "offered"
+            ? a.nomineeMobilityType || a.typeOfMobility
+            : a.typeOfMobility
+        )
+        .filter(Boolean)
     );
     return Array.from(set).sort();
-  }, [applications]);
+  }, [applications, statusFilter]);
 
   const filteredApplicants = useMemo(() => {
     const q = search.trim().toLowerCase();
     return applications.filter((app) => {
       if (statusFilter !== "all" && app.status !== statusFilter) return false;
-      if (mobilityFilter !== "all" && app.typeOfMobility !== mobilityFilter) {
-        return false;
+      if (mobilityFilter !== "all") {
+        const mobility =
+          statusFilter === "offered"
+            ? app.nomineeMobilityType || app.typeOfMobility
+            : app.typeOfMobility;
+        if (mobility !== mobilityFilter) return false;
       }
       if (!q) return true;
       const haystack = [
@@ -189,6 +200,10 @@ export function CoordinatorApplicants({
         applicantDisplayName(app),
         applicantPrimaryEmail(app),
         app.nationality,
+        app.nomineeHostUniversity,
+        app.nomineeMobilityType,
+        app.nomineeDurationMonths,
+        app.nomineeAreaOfStudy,
         app.preferredHostInstitution,
       ]
         .join(" ")
@@ -270,6 +285,35 @@ export function CoordinatorApplicants({
     setDeleting(true);
     setDeleteError(null);
     try {
+      if (statusFilter === "offered") {
+        const res = await fetch(
+          `/api/applications/${encodeURIComponent(deletingApplication.id)}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "evaluation" }),
+          }
+        );
+        const data = (await res.json()) as {
+          error?: string;
+          application?: ApplicationRecord;
+        };
+        if (!res.ok || !data.application) {
+          setDeleteError(data.error ?? "Could not cancel this nomination.");
+          return;
+        }
+        setApplications((prev) =>
+          prev.map((a) =>
+            a.id === deletingApplication.id ? data.application! : a
+          )
+        );
+        if (expandedId === deletingApplication.id) {
+          setExpandedId(null);
+        }
+        closeDeleteModal();
+        return;
+      }
+
       const res = await fetch(
         `/api/applications/${encodeURIComponent(deletingApplication.id)}`,
         { method: "DELETE" }
@@ -287,7 +331,11 @@ export function CoordinatorApplicants({
       }
       closeDeleteModal();
     } catch {
-      setDeleteError("Could not delete application.");
+      setDeleteError(
+        statusFilter === "offered"
+          ? "Could not cancel this nomination."
+          : "Could not delete application."
+      );
     } finally {
       setDeleting(false);
     }
@@ -446,7 +494,9 @@ export function CoordinatorApplicants({
                 <tr>
                   <th className="w-10 px-2 py-3" aria-hidden />
                   <th className="px-4 py-3">Applicant</th>
-                  <th className="px-4 py-3">Mobility</th>
+                  <th className="px-4 py-3">
+                    {statusFilter === "offered" ? "Mobility/Duration" : "Mobility"}
+                  </th>
                   <th className="px-4 py-3">Host / Programme</th>
                   <th className="px-4 py-3">Status</th>
                   {showCurrentPageColumn && (
@@ -512,16 +562,47 @@ export function CoordinatorApplicants({
                             </p>
                           </td>
                           <td className="px-4 py-3 font-medium text-slate-900">
-                            {app.typeOfMobility || "—"}
+                            {statusFilter === "offered" ? (
+                              <>
+                                <p>
+                                  {app.nomineeMobilityType ||
+                                    app.typeOfMobility ||
+                                    "—"}
+                                </p>
+                                {app.nomineeDurationMonths ? (
+                                  <p className="text-xs font-semibold text-slate-900">
+                                    {/^\d+(\.\d+)?$/.test(
+                                      app.nomineeDurationMonths
+                                    )
+                                      ? `${app.nomineeDurationMonths} months`
+                                      : app.nomineeDurationMonths}
+                                  </p>
+                                ) : null}
+                              </>
+                            ) : (
+                              app.typeOfMobility || "—"
+                            )}
                           </td>
                           <td className="max-w-40 px-4 py-3 font-medium text-slate-900">
                             <p className="truncate">
-                              {app.preferredHostInstitution || "—"}
+                              {(statusFilter === "offered"
+                                ? app.nomineeHostUniversity
+                                : "") ||
+                                app.preferredHostInstitution ||
+                                "—"}
                             </p>
-                            {app.proposedAcademicProgramme && (
-                              <p className="truncate text-xs font-semibold text-slate-900">
-                                {app.proposedAcademicProgramme}
-                              </p>
+                            {statusFilter === "offered" ? (
+                              app.nomineeAreaOfStudy ? (
+                                <p className="truncate text-xs font-semibold text-slate-900">
+                                  {app.nomineeAreaOfStudy}
+                                </p>
+                              ) : null
+                            ) : (
+                              app.proposedAcademicProgramme && (
+                                <p className="truncate text-xs font-semibold text-slate-900">
+                                  {app.proposedAcademicProgramme}
+                                </p>
+                              )
                             )}
                           </td>
                           <td className="px-4 py-3">
@@ -592,9 +673,15 @@ export function CoordinatorApplicants({
                                       setDeleteError(null);
                                     }}
                                     disabled={tableBusy}
-                                    className={`${actionBtnClass} border-red-200 text-red-700 hover:bg-red-50`}
+                                    className={`${actionBtnClass} ${
+                                      statusFilter === "offered"
+                                        ? "border-amber-300 text-amber-900 hover:bg-amber-50"
+                                        : "border-red-200 text-red-700 hover:bg-red-50"
+                                    }`}
                                   >
-                                    Delete
+                                    {statusFilter === "offered"
+                                      ? "Cancel"
+                                      : "Delete"}
                                   </button>
                                 )}
                               </div>
@@ -658,18 +745,36 @@ export function CoordinatorApplicants({
           >
             <h2
               id="delete-application-title"
-              className="text-base font-bold text-red-800"
+              className={`text-base font-bold ${
+                statusFilter === "offered" ? "text-amber-900" : "text-red-800"
+              }`}
             >
-              Delete application
+              {statusFilter === "offered"
+                ? "Cancel nomination"
+                : "Delete application"}
             </h2>
             <p className="mt-2 text-sm font-semibold text-slate-900">
-              Remove the application for{" "}
-              <strong>
-                {applicantDisplayName(deletingApplication) ||
-                  deletingApplication.id}
-              </strong>{" "}
-              ({deletingApplication.id})? Uploaded documents will also be
-              removed. This cannot be undone.
+              {statusFilter === "offered" ? (
+                <>
+                  Return{" "}
+                  <strong>
+                    {applicantDisplayName(deletingApplication) ||
+                      deletingApplication.id}
+                  </strong>{" "}
+                  ({deletingApplication.id}) to evaluation? They will leave the
+                  nominees list.
+                </>
+              ) : (
+                <>
+                  Remove the application for{" "}
+                  <strong>
+                    {applicantDisplayName(deletingApplication) ||
+                      deletingApplication.id}
+                  </strong>{" "}
+                  ({deletingApplication.id})? Uploaded documents will also be
+                  removed. This cannot be undone.
+                </>
+              )}
             </p>
             {deleteError && (
               <p
@@ -686,15 +791,25 @@ export function CoordinatorApplicants({
                 disabled={deleting}
                 className="rounded-lg border-2 border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"
               >
-                Cancel
+                {statusFilter === "offered" ? "Keep nominee" : "Cancel"}
               </button>
               <button
                 type="button"
                 onClick={handleDeleteApplication}
                 disabled={deleting}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-50 ${
+                  statusFilter === "offered"
+                    ? "bg-amber-700 hover:bg-amber-800"
+                    : "bg-red-600 hover:bg-red-700"
+                }`}
               >
-                {deleting ? "Deleting…" : "Delete"}
+                {statusFilter === "offered"
+                  ? deleting
+                    ? "Cancelling…"
+                    : "Cancel nomination"
+                  : deleting
+                    ? "Deleting…"
+                    : "Delete"}
               </button>
             </div>
           </div>
