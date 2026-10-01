@@ -10,8 +10,20 @@ import {
   type ApplicationStatus,
 } from "@/lib/application-types";
 import {
+  parseScholarsApprovalView,
+  parseScholarsGrievanceView,
   parseScholarsManagementSection,
+  parseScholarsMobilityView,
+  parseScholarsPaymentView,
+  parseScholarsRecordView,
+  parseScholarsTaskView,
+  SCHOLARS_APPROVAL_VIEW_LABELS,
+  SCHOLARS_GRIEVANCE_VIEW_LABELS,
   SCHOLARS_MANAGEMENT_SECTION_LABELS,
+  SCHOLARS_MOBILITY_VIEW_LABELS,
+  SCHOLARS_PAYMENT_VIEW_LABELS,
+  SCHOLARS_RECORD_VIEW_LABELS,
+  SCHOLARS_TASK_VIEW_LABELS,
 } from "@/lib/coordinator-scholars-nav";
 import {
   ApplicationDetailPanel,
@@ -24,7 +36,32 @@ export function CoordinatorScholars() {
   const searchParams = useSearchParams();
   const sectionParam = searchParams.get("section");
   const activeSection = parseScholarsManagementSection(sectionParam);
-  const pageTitle = SCHOLARS_MANAGEMENT_SECTION_LABELS[activeSection];
+  const pageTitle =
+    activeSection === "mobilities"
+      ? SCHOLARS_MOBILITY_VIEW_LABELS[
+          parseScholarsMobilityView(searchParams.get("mobility"))
+        ]
+      : activeSection === "tasks"
+        ? SCHOLARS_TASK_VIEW_LABELS[
+            parseScholarsTaskView(searchParams.get("task"))
+          ]
+        : activeSection === "approvals"
+          ? SCHOLARS_APPROVAL_VIEW_LABELS[
+              parseScholarsApprovalView(searchParams.get("approval"))
+            ]
+          : activeSection === "grievances"
+            ? SCHOLARS_GRIEVANCE_VIEW_LABELS[
+                parseScholarsGrievanceView(searchParams.get("grievance"))
+              ]
+            : activeSection === "payments"
+              ? SCHOLARS_PAYMENT_VIEW_LABELS[
+                  parseScholarsPaymentView(searchParams.get("payment"))
+                ]
+              : activeSection === "records"
+                ? SCHOLARS_RECORD_VIEW_LABELS[
+                    parseScholarsRecordView(searchParams.get("record"))
+                  ]
+                : SCHOLARS_MANAGEMENT_SECTION_LABELS[activeSection];
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -111,7 +148,7 @@ export function CoordinatorScholars() {
       </header>
 
       <main className="flex-1 overflow-auto bg-slate-50 p-4 sm:p-6">
-        {activeSection !== "by_category" && (
+        {activeSection !== "mobilities" && (
           <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-slate-900">
             {pageTitle} workflows will be available here. Below is the current
             list of approved scholars.

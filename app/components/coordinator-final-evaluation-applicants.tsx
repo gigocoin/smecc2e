@@ -30,6 +30,7 @@ const MIGRATE_OPTIONS: {
 }[] = [
   { value: "reserved", label: "Reserved", status: "reserved" },
   { value: "nominated", label: "Nominated", status: "offered" },
+  { value: "rejected", label: "Rejected", status: "rejected" },
 ];
 
 function migrateSelectValue(status: ApplicationStatus): string {

@@ -42,9 +42,27 @@ import {
   isWorkPackagesGroupActive,
 } from "@/lib/coordinator-project-nav";
 import {
+  buildScholarsApprovalNav,
+  buildScholarsGrievanceNav,
   buildScholarsManagementNav,
+  buildScholarsMobilityNav,
+  buildScholarsPaymentNav,
+  buildScholarsRecordNav,
+  buildScholarsTaskNav,
+  isScholarsApprovalSubActive,
+  isScholarsApprovalsGroupActive,
+  isScholarsGrievanceSubActive,
+  isScholarsGrievancesGroupActive,
   isScholarsManagementGroupActive,
   isScholarsManagementSubActive,
+  isScholarsMobilityGroupActive,
+  isScholarsMobilitySubActive,
+  isScholarsPaymentSubActive,
+  isScholarsPaymentsGroupActive,
+  isScholarsRecordSubActive,
+  isScholarsRecordsGroupActive,
+  isScholarsTaskSubActive,
+  isScholarsTasksGroupActive,
 } from "@/lib/coordinator-scholars-nav";
 import { useDashboardPortal } from "./dashboard-portal-provider";
 
@@ -104,6 +122,31 @@ function NavIcon({ section }: { section: CoordinatorNavId }) {
   }
 }
 
+/** Keep a fixed flyout inside the viewport so overflow scrolls instead of clipping. */
+function flyoutPanelPosition(rect: DOMRect): {
+  top: number;
+  left: number;
+  maxHeight: number;
+} {
+  const margin = 8;
+  const preferredMax = Math.min(window.innerHeight * 0.7, 28 * 16);
+  const spaceBelow = window.innerHeight - rect.top - margin;
+  const spaceAbove = rect.bottom - margin;
+  let maxHeight = Math.min(preferredMax, Math.max(spaceBelow, 0));
+  let top = rect.top;
+
+  if (maxHeight < 180 && spaceAbove > spaceBelow) {
+    maxHeight = Math.min(preferredMax, spaceAbove);
+    top = Math.max(margin, rect.bottom - maxHeight);
+  }
+
+  if (top + maxHeight > window.innerHeight - margin) {
+    top = Math.max(margin, window.innerHeight - margin - maxHeight);
+  }
+
+  return { top, left: rect.right + 4, maxHeight };
+}
+
 function FlyoutChevron({ open }: { open: boolean }) {
   return (
     <svg
@@ -137,9 +180,11 @@ function SidebarFlyoutSubmenu({
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const [panelPos, setPanelPos] = useState<{ top: number; left: number } | null>(
-    null
-  );
+  const [panelPos, setPanelPos] = useState<{
+    top: number;
+    left: number;
+    maxHeight: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -149,8 +194,7 @@ function SidebarFlyoutSubmenu({
     const updatePosition = () => {
       const el = rootRef.current;
       if (!el) return;
-      const rect = el.getBoundingClientRect();
-      setPanelPos({ top: rect.top, left: rect.right + 4 });
+      setPanelPos(flyoutPanelPosition(el.getBoundingClientRect()));
     };
     updatePosition();
     window.addEventListener("resize", updatePosition);
@@ -199,8 +243,12 @@ function SidebarFlyoutSubmenu({
           ref={panelRef}
           role="menu"
           aria-label={label}
-          style={{ top: panelPos.top, left: panelPos.left }}
-          className="fixed z-[70] w-56 max-h-[min(70vh,28rem)] overflow-x-hidden overflow-y-auto rounded-lg border border-white/15 bg-[#062763] py-2 shadow-2xl"
+          style={{
+            top: panelPos.top,
+            left: panelPos.left,
+            maxHeight: panelPos.maxHeight,
+          }}
+          className="fixed z-[70] w-56 overflow-x-hidden overflow-y-auto rounded-lg border border-white/15 bg-[#062763] py-2 shadow-2xl"
         >
           {children}
         </div>
@@ -383,14 +431,62 @@ function ScholarsManagementNav({
   basePath,
   pathname,
   sectionParam,
+  mobilityParam,
+  taskParam,
+  approvalParam,
+  grievanceParam,
+  paymentParam,
+  recordParam,
   onNavigate,
 }: {
   basePath: string;
   pathname: string;
   sectionParam: string | null;
+  mobilityParam: string | null;
+  taskParam: string | null;
+  approvalParam: string | null;
+  grievanceParam: string | null;
+  paymentParam: string | null;
+  recordParam: string | null;
   onNavigate: () => void;
 }) {
   const items = buildScholarsManagementNav(basePath);
+  const mobilityItems = buildScholarsMobilityNav(basePath);
+  const taskItems = buildScholarsTaskNav(basePath);
+  const approvalItems = buildScholarsApprovalNav(basePath);
+  const grievanceItems = buildScholarsGrievanceNav(basePath);
+  const paymentItems = buildScholarsPaymentNav(basePath);
+  const recordItems = buildScholarsRecordNav(basePath);
+  const mobilityGroupActive = isScholarsMobilityGroupActive(
+    pathname,
+    sectionParam,
+    basePath
+  );
+  const tasksGroupActive = isScholarsTasksGroupActive(
+    pathname,
+    sectionParam,
+    basePath
+  );
+  const approvalsGroupActive = isScholarsApprovalsGroupActive(
+    pathname,
+    sectionParam,
+    basePath
+  );
+  const grievancesGroupActive = isScholarsGrievancesGroupActive(
+    pathname,
+    sectionParam,
+    basePath
+  );
+  const paymentsGroupActive = isScholarsPaymentsGroupActive(
+    pathname,
+    sectionParam,
+    basePath
+  );
+  const recordsGroupActive = isScholarsRecordsGroupActive(
+    pathname,
+    sectionParam,
+    basePath
+  );
   const groupActive = isScholarsManagementGroupActive(
     items,
     pathname,
@@ -398,10 +494,31 @@ function ScholarsManagementNav({
     basePath
   );
   const [open, setOpen] = useState(false);
+  const [mobilitiesOpen, setMobilitiesOpen] = useState(false);
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const [approvalsOpen, setApprovalsOpen] = useState(false);
+  const [grievancesOpen, setGrievancesOpen] = useState(false);
+  const [paymentsOpen, setPaymentsOpen] = useState(false);
+  const [recordsOpen, setRecordsOpen] = useState(false);
 
   useEffect(() => {
     setOpen(false);
-  }, [pathname, sectionParam]);
+    setMobilitiesOpen(false);
+    setTasksOpen(false);
+    setApprovalsOpen(false);
+    setGrievancesOpen(false);
+    setPaymentsOpen(false);
+    setRecordsOpen(false);
+  }, [
+    pathname,
+    sectionParam,
+    mobilityParam,
+    taskParam,
+    approvalParam,
+    grievanceParam,
+    paymentParam,
+    recordParam,
+  ]);
 
   return (
     <SidebarFlyoutSubmenu
@@ -413,6 +530,228 @@ function ScholarsManagementNav({
       onClose={() => setOpen(false)}
     >
       {items.map((item) => {
+        if (item.nestedMenu === "mobilities") {
+          return (
+            <FlyoutNestedSubmenu
+              key={item.id}
+              label={item.label}
+              groupActive={mobilityGroupActive}
+              open={mobilitiesOpen}
+              onToggle={() => setMobilitiesOpen((prev) => !prev)}
+              onClose={() => setMobilitiesOpen(false)}
+            >
+              {mobilityItems.map((mobilityItem) => {
+                const active = isScholarsMobilitySubActive(
+                  mobilityItem,
+                  pathname,
+                  sectionParam,
+                  mobilityParam,
+                  basePath
+                );
+                return (
+                  <FlyoutSubmenuLink
+                    key={mobilityItem.id}
+                    href={mobilityItem.href}
+                    active={active}
+                    onNavigate={() => {
+                      setMobilitiesOpen(false);
+                      setOpen(false);
+                      onNavigate();
+                    }}
+                  >
+                    {mobilityItem.label}
+                  </FlyoutSubmenuLink>
+                );
+              })}
+            </FlyoutNestedSubmenu>
+          );
+        }
+
+        if (item.nestedMenu === "approvals") {
+          return (
+            <FlyoutNestedSubmenu
+              key={item.id}
+              label={item.label}
+              groupActive={approvalsGroupActive}
+              open={approvalsOpen}
+              onToggle={() => setApprovalsOpen((prev) => !prev)}
+              onClose={() => setApprovalsOpen(false)}
+            >
+              {approvalItems.map((approvalItem) => {
+                const active = isScholarsApprovalSubActive(
+                  approvalItem,
+                  pathname,
+                  sectionParam,
+                  approvalParam,
+                  basePath
+                );
+                return (
+                  <FlyoutSubmenuLink
+                    key={approvalItem.id}
+                    href={approvalItem.href}
+                    active={active}
+                    onNavigate={() => {
+                      setApprovalsOpen(false);
+                      setOpen(false);
+                      onNavigate();
+                    }}
+                  >
+                    {approvalItem.label}
+                  </FlyoutSubmenuLink>
+                );
+              })}
+            </FlyoutNestedSubmenu>
+          );
+        }
+
+        if (item.nestedMenu === "grievances") {
+          return (
+            <FlyoutNestedSubmenu
+              key={item.id}
+              label={item.label}
+              groupActive={grievancesGroupActive}
+              open={grievancesOpen}
+              onToggle={() => setGrievancesOpen((prev) => !prev)}
+              onClose={() => setGrievancesOpen(false)}
+            >
+              {grievanceItems.map((grievanceItem) => {
+                const active = isScholarsGrievanceSubActive(
+                  grievanceItem,
+                  pathname,
+                  sectionParam,
+                  grievanceParam,
+                  basePath
+                );
+                return (
+                  <FlyoutSubmenuLink
+                    key={grievanceItem.id}
+                    href={grievanceItem.href}
+                    active={active}
+                    onNavigate={() => {
+                      setGrievancesOpen(false);
+                      setOpen(false);
+                      onNavigate();
+                    }}
+                  >
+                    {grievanceItem.label}
+                  </FlyoutSubmenuLink>
+                );
+              })}
+            </FlyoutNestedSubmenu>
+          );
+        }
+
+        if (item.nestedMenu === "payments") {
+          return (
+            <FlyoutNestedSubmenu
+              key={item.id}
+              label={item.label}
+              groupActive={paymentsGroupActive}
+              open={paymentsOpen}
+              onToggle={() => setPaymentsOpen((prev) => !prev)}
+              onClose={() => setPaymentsOpen(false)}
+            >
+              {paymentItems.map((paymentItem) => {
+                const active = isScholarsPaymentSubActive(
+                  paymentItem,
+                  pathname,
+                  sectionParam,
+                  paymentParam,
+                  basePath
+                );
+                return (
+                  <FlyoutSubmenuLink
+                    key={paymentItem.id}
+                    href={paymentItem.href}
+                    active={active}
+                    onNavigate={() => {
+                      setPaymentsOpen(false);
+                      setOpen(false);
+                      onNavigate();
+                    }}
+                  >
+                    {paymentItem.label}
+                  </FlyoutSubmenuLink>
+                );
+              })}
+            </FlyoutNestedSubmenu>
+          );
+        }
+
+        if (item.nestedMenu === "records") {
+          return (
+            <FlyoutNestedSubmenu
+              key={item.id}
+              label={item.label}
+              groupActive={recordsGroupActive}
+              open={recordsOpen}
+              onToggle={() => setRecordsOpen((prev) => !prev)}
+              onClose={() => setRecordsOpen(false)}
+            >
+              {recordItems.map((recordItem) => {
+                const active = isScholarsRecordSubActive(
+                  recordItem,
+                  pathname,
+                  sectionParam,
+                  recordParam,
+                  basePath
+                );
+                return (
+                  <FlyoutSubmenuLink
+                    key={recordItem.id}
+                    href={recordItem.href}
+                    active={active}
+                    onNavigate={() => {
+                      setRecordsOpen(false);
+                      setOpen(false);
+                      onNavigate();
+                    }}
+                  >
+                    {recordItem.label}
+                  </FlyoutSubmenuLink>
+                );
+              })}
+            </FlyoutNestedSubmenu>
+          );
+        }
+
+        if (item.nestedMenu === "tasks") {
+          return (
+            <FlyoutNestedSubmenu
+              key={item.id}
+              label={item.label}
+              groupActive={tasksGroupActive}
+              open={tasksOpen}
+              onToggle={() => setTasksOpen((prev) => !prev)}
+              onClose={() => setTasksOpen(false)}
+            >
+              {taskItems.map((taskItem) => {
+                const active = isScholarsTaskSubActive(
+                  taskItem,
+                  pathname,
+                  sectionParam,
+                  taskParam,
+                  basePath
+                );
+                return (
+                  <FlyoutSubmenuLink
+                    key={taskItem.id}
+                    href={taskItem.href}
+                    active={active}
+                    onNavigate={() => {
+                      setTasksOpen(false);
+                      setOpen(false);
+                      onNavigate();
+                    }}
+                  >
+                    {taskItem.label}
+                  </FlyoutSubmenuLink>
+                );
+              })}
+            </FlyoutNestedSubmenu>
+          );
+        }
+
         const active = isScholarsManagementSubActive(
           item,
           pathname,
@@ -422,7 +761,7 @@ function ScholarsManagementNav({
         return (
           <FlyoutSubmenuLink
             key={item.id}
-            href={item.href}
+            href={item.href!}
             active={active}
             onNavigate={() => {
               setOpen(false);
@@ -666,9 +1005,11 @@ function FlyoutNestedSubmenu({
 }) {
   const triggerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const [panelPos, setPanelPos] = useState<{ top: number; left: number } | null>(
-    null
-  );
+  const [panelPos, setPanelPos] = useState<{
+    top: number;
+    left: number;
+    maxHeight: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -678,8 +1019,7 @@ function FlyoutNestedSubmenu({
     const updatePosition = () => {
       const el = triggerRef.current;
       if (!el) return;
-      const rect = el.getBoundingClientRect();
-      setPanelPos({ top: rect.top, left: rect.right + 4 });
+      setPanelPos(flyoutPanelPosition(el.getBoundingClientRect()));
     };
     updatePosition();
     window.addEventListener("resize", updatePosition);
@@ -727,8 +1067,12 @@ function FlyoutNestedSubmenu({
           ref={panelRef}
           role="menu"
           aria-label={label}
-          style={{ top: panelPos.top, left: panelPos.left }}
-          className="fixed z-[80] w-72 max-h-[min(70vh,28rem)] overflow-x-hidden overflow-y-auto rounded-lg border border-white/15 bg-[#062763] py-2 shadow-2xl"
+          style={{
+            top: panelPos.top,
+            left: panelPos.left,
+            maxHeight: panelPos.maxHeight,
+          }}
+          className="fixed z-[80] w-72 overflow-x-hidden overflow-y-auto rounded-lg border border-white/15 bg-[#062763] py-2 shadow-2xl"
         >
           {children}
         </div>
@@ -937,6 +1281,30 @@ export function CoordinatorSidebar({
   const statusParam = isHydrated ? searchParams.get("status") : null;
   const scholarsSectionParam =
     isHydrated && pathname.includes("/scholars") ? section : null;
+  const scholarsMobilityParam =
+    isHydrated && pathname.includes("/scholars")
+      ? searchParams.get("mobility")
+      : null;
+  const scholarsTaskParam =
+    isHydrated && pathname.includes("/scholars") && section === "tasks"
+      ? searchParams.get("task")
+      : null;
+  const scholarsApprovalParam =
+    isHydrated && pathname.includes("/scholars") && section === "approvals"
+      ? searchParams.get("approval")
+      : null;
+  const scholarsGrievanceParam =
+    isHydrated && pathname.includes("/scholars") && section === "grievances"
+      ? searchParams.get("grievance")
+      : null;
+  const scholarsPaymentParam =
+    isHydrated && pathname.includes("/scholars") && section === "payments"
+      ? searchParams.get("payment")
+      : null;
+  const scholarsRecordParam =
+    isHydrated && pathname.includes("/scholars") && section === "records"
+      ? searchParams.get("record")
+      : null;
   const financeSectionParam =
     isHydrated && pathname.includes("/finance") ? section : null;
   const projectSectionParam =
@@ -1069,6 +1437,12 @@ export function CoordinatorSidebar({
                           basePath={basePath}
                           pathname={pathname}
                           sectionParam={scholarsSectionParam}
+                          mobilityParam={scholarsMobilityParam}
+                          taskParam={scholarsTaskParam}
+                          approvalParam={scholarsApprovalParam}
+                          grievanceParam={scholarsGrievanceParam}
+                          paymentParam={scholarsPaymentParam}
+                          recordParam={scholarsRecordParam}
                           onNavigate={close}
                         />
                         <FinancialManagementNav
