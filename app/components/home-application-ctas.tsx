@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import {
   APPLICATION_DEADLINE,
+  APPLICATIONS_ACTIVE,
   getApplicationCountdown,
+  isApplicationDeadlinePassed,
   type ApplicationCountdown,
 } from "@/lib/application-deadline";
 import {
@@ -38,7 +40,10 @@ export function HomeApplicationCtas() {
     return () => window.clearInterval(id);
   }, []);
 
-  const expired = countdown?.expired ?? false;
+  const calendarExpired =
+    countdown?.expired ??
+    APPLICATION_DEADLINE.getTime() <= Date.now();
+  const expired = isApplicationDeadlinePassed();
   const deadlineLabel = APPLICATION_DEADLINE.toLocaleString(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
@@ -51,6 +56,10 @@ export function HomeApplicationCtas() {
           <p className="text-[clamp(0.8rem,2.4dvh+0.4rem,1rem)] font-bold text-[#f7d46b]">
             Application deadline has passed ({deadlineLabel}). New applications
             are closed.
+          </p>
+        ) : APPLICATIONS_ACTIVE && calendarExpired ? (
+          <p className="text-[clamp(0.8rem,2.4dvh+0.4rem,1rem)] font-bold text-[#f7d46b]">
+            Applications are open.
           </p>
         ) : (
           <div className="flex flex-col items-center gap-2 sm:gap-3">
