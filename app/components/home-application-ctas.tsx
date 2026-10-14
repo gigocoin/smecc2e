@@ -1,81 +1,18 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import {
-  APPLICATION_DEADLINE,
-  APPLICATIONS_ACTIVE,
-  getApplicationCountdown,
-  isApplicationDeadlinePassed,
-  type ApplicationCountdown,
-} from "@/lib/application-deadline";
 import {
   APPLICATION_GUIDELINE_DOWNLOAD_NAME,
   APPLICATION_GUIDELINE_PDF,
 } from "@/lib/application-guidelines";
 
-function pad(value: number): string {
-  return String(value).padStart(2, "0");
-}
-
-function CountdownUnit({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="min-w-[3.25rem] rounded-lg border border-white/20 bg-white/10 px-2 py-1.5 text-center sm:min-w-[3.75rem] sm:px-2.5 sm:py-2">
-      <p className="font-mono text-[clamp(1rem,3.5dvh+0.35rem,1.75rem)] font-black leading-none text-white tabular-nums">
-        {pad(value)}
-      </p>
-      <p className="mt-1 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-[#f7d46b] sm:text-xs">
-        {label}
-      </p>
-    </div>
-  );
-}
+const COHORT_CLOSED_MESSAGE =
+  "Application for the 1st Cohort closed on 16th July 2026.";
 
 export function HomeApplicationCtas() {
-  const [countdown, setCountdown] = useState<ApplicationCountdown | null>(null);
-
-  useEffect(() => {
-    const tick = () => setCountdown(getApplicationCountdown());
-    tick();
-    const id = window.setInterval(tick, 1000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  const calendarExpired =
-    countdown?.expired ??
-    APPLICATION_DEADLINE.getTime() <= Date.now();
-  const expired = isApplicationDeadlinePassed();
-  const deadlineLabel = APPLICATION_DEADLINE.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-
   return (
     <div className="w-full max-w-7xl">
       <div className="mb-3 rounded-xl border border-[#f7be2a]/35 bg-[#041a42]/55 px-3 py-2.5 backdrop-blur-sm sm:mb-4 sm:px-4 sm:py-3">
-        {expired ? (
-          <p className="text-[clamp(0.8rem,2.4dvh+0.4rem,1rem)] font-bold text-[#f7d46b]">
-            Application deadline has passed ({deadlineLabel}). New applications
-            are closed.
-          </p>
-        ) : APPLICATIONS_ACTIVE && calendarExpired ? (
-          <p className="text-[clamp(0.8rem,2.4dvh+0.4rem,1rem)] font-bold text-[#f7d46b]">
-            Applications are open.
-          </p>
-        ) : (
-          <div className="flex flex-col items-center gap-2 sm:gap-3">
-            <p className="text-[clamp(0.75rem,2.2dvh+0.35rem,0.95rem)] font-bold uppercase tracking-[0.1em] text-[#f7d46b]">
-              Application deadline — 12:00 AM, 17 July 2026
-            </p>
-            {countdown && (
-              <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
-                <CountdownUnit label="Days" value={countdown.days} />
-                <CountdownUnit label="Hours" value={countdown.hours} />
-                <CountdownUnit label="Mins" value={countdown.minutes} />
-                <CountdownUnit label="Secs" value={countdown.seconds} />
-              </div>
-            )}
-          </div>
-        )}
+        <p className="text-[clamp(0.8rem,2.4dvh+0.4rem,1rem)] font-bold text-[#f7d46b]">
+          {COHORT_CLOSED_MESSAGE}
+        </p>
       </div>
 
       <div>
@@ -100,22 +37,13 @@ export function HomeApplicationCtas() {
         >
           Download Application Guidelines
         </a>
-        {expired ? (
-          <span
-            aria-disabled="true"
-            title="Application deadline has passed"
-            className="mt-2 inline-block cursor-not-allowed rounded-full bg-[#f7be2a]/40 px-4 py-1.5 text-[clamp(0.8rem,1.2dvh+0.45rem,1rem)] font-extrabold uppercase tracking-[0.12em] text-[#062763]/60 sm:mt-2.5 sm:px-5 sm:py-2 sm:tracking-[0.14em]"
-          >
-            Applications Closed
-          </span>
-        ) : (
-          <a
-            href="/application?fresh=1"
-            className="mt-2 inline-block rounded-full bg-[#f7be2a] px-4 py-1.5 text-[clamp(0.8rem,1.2dvh+0.45rem,1rem)] font-extrabold uppercase tracking-[0.12em] text-[#062763] transition hover:bg-white focus:outline-none focus:ring-4 focus:ring-[#f7be2a]/40 sm:mt-2.5 sm:px-5 sm:py-2 sm:tracking-[0.14em]"
-          >
-            Start Application
-          </a>
-        )}
+        <span
+          aria-disabled="true"
+          title={COHORT_CLOSED_MESSAGE}
+          className="mt-2 inline-block cursor-not-allowed rounded-full bg-[#f7be2a]/40 px-4 py-1.5 text-[clamp(0.8rem,1.2dvh+0.45rem,1rem)] font-extrabold uppercase tracking-[0.12em] text-[#062763]/60 sm:mt-2.5 sm:px-5 sm:py-2 sm:tracking-[0.14em]"
+        >
+          Start Application
+        </span>
       </div>
     </div>
   );
