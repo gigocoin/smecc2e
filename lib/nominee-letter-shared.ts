@@ -160,6 +160,8 @@ export type NomineeLetterSharedSnapshot = {
   hostCountry: string;
   letterDate?: string;
   responseDeadline?: string;
+  /** Coordinator-entered HTML date value (`YYYY-MM-DD`), when set. */
+  letterDateInput?: string;
 };
 
 export const PROJECT_COORDINATOR_SIGNATURE = [
@@ -334,6 +336,10 @@ export function parseNomineeLetterSharedSnapshot(
       responseDeadline:
         typeof record.responseDeadline === "string"
           ? record.responseDeadline
+          : undefined,
+      letterDateInput:
+        typeof record.letterDateInput === "string"
+          ? record.letterDateInput
           : undefined,
     };
   } catch {

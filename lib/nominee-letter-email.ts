@@ -38,6 +38,8 @@ export type NomineeLetterData = {
   applicantName: string;
   shared: boolean;
   sent: boolean;
+  /** Coordinator date input (`YYYY-MM-DD`), when previously saved. */
+  letterDateInput?: string;
 };
 
 export type NomineeLetterSendResult = {
@@ -195,13 +197,14 @@ async function buildPrepareLetterData(
   return {
     auto: {
       applicantNo: application.id,
-      letterDate: NOMINEE_LETTER_PENDING,
+      letterDate: shared?.letterDate?.trim() || NOMINEE_LETTER_PENDING,
       firstName: application.firstName ?? "",
       surname: application.surname ?? "",
       focalPersonName: focalPerson?.name ?? "",
       focalPersonEmail: focalPerson?.email ?? "",
       focalPersonAddress: focalPerson?.address ?? "",
-      responseDeadline: NOMINEE_LETTER_PENDING,
+      responseDeadline:
+        shared?.responseDeadline?.trim() || NOMINEE_LETTER_PENDING,
       hostCountry,
       ...applicantAgreementIdentity(application),
     },
@@ -230,6 +233,7 @@ async function buildPrepareLetterData(
     applicantName: applicantDisplayFirstSurname(application),
     shared: Boolean(shared),
     sent: false,
+    letterDateInput: shared?.letterDateInput?.trim() || "",
   };
 }
 
@@ -257,6 +261,7 @@ function buildSendLetterData(
     applicantName: applicantDisplayFirstSurname(application),
     shared: true,
     sent,
+    letterDateInput: shared.letterDateInput?.trim() || "",
   };
 }
 
@@ -413,6 +418,7 @@ async function deliverNomineeLetterEmail(options: {
 export async function shareNomineeLetterEmail(options: {
   applicationRef: string;
   fields: NomineeLetterEditableFields;
+  letterDateInput?: string;
   initiatorEmail?: string | null;
   initiatorName?: string | null;
 }): Promise<NomineeLetterSendResult> {
@@ -440,12 +446,21 @@ export async function shareNomineeLetterEmail(options: {
     findHostCountry(editable.hostUniversity),
   ]);
 
+  const letterDateInput = options.letterDateInput?.trim() ?? "";
+  if (!letterDateInput) {
+    throw new Error("Letter date is required");
+  }
+  const dates = nomineeLetterDatesFromInput(letterDateInput);
+
   const snapshot: NomineeLetterSharedSnapshot = {
     editable,
     focalPersonName: focalPerson?.name ?? "",
     focalPersonEmail: focalPerson?.email ?? "",
     focalPersonAddress: focalPerson?.address ?? "",
     hostCountry,
+    letterDate: dates.letterDate,
+    responseDeadline: dates.responseDeadline,
+    letterDateInput,
   };
 
   await prisma.applicant.update({
@@ -459,13 +474,13 @@ export async function shareNomineeLetterEmail(options: {
 
   const auto: NomineeLetterAutoFields = {
     applicantNo: application.id,
-    letterDate: NOMINEE_LETTER_PENDING,
+    letterDate: dates.letterDate,
     firstName: application.firstName ?? "",
     surname: application.surname ?? "",
     focalPersonName: snapshot.focalPersonName,
     focalPersonEmail: snapshot.focalPersonEmail,
     focalPersonAddress: snapshot.focalPersonAddress,
-    responseDeadline: NOMINEE_LETTER_PENDING,
+    responseDeadline: dates.responseDeadline,
     hostCountry: snapshot.hostCountry,
     ...applicantAgreementIdentity(application),
   };
@@ -517,11 +532,34 @@ export async function sendNomineeLetterEmail(options: {
     );
   }
 
-  const dates = nomineeLetterDatesFromInput(options.letterDateInput);
+  const letterDateInput = options.letterDateInput?.trim() ?? "";
+  let dates: { letterDate: string; responseDeadline: string };
+  let resolvedLetterDateInput = letterDateInput;
+
+  if (letterDateInput) {
+    dates = nomineeLetterDatesFromInput(letterDateInput);
+  } else if (
+    shared.letterDate?.trim() &&
+    shared.letterDate.trim() !== NOMINEE_LETTER_PENDING &&
+    shared.responseDeadline?.trim() &&
+    shared.responseDeadline.trim() !== NOMINEE_LETTER_PENDING
+  ) {
+    dates = {
+      letterDate: shared.letterDate.trim(),
+      responseDeadline: shared.responseDeadline.trim(),
+    };
+    resolvedLetterDateInput = shared.letterDateInput?.trim() || "";
+  } else {
+    throw new Error("Letter date is required");
+  }
+
   const updatedSnapshot: NomineeLetterSharedSnapshot = {
     ...shared,
     letterDate: dates.letterDate,
     responseDeadline: dates.responseDeadline,
+    ...(resolvedLetterDateInput
+      ? { letterDateInput: resolvedLetterDateInput }
+      : {}),
   };
 
   await prisma.applicant.update({

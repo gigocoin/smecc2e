@@ -127,6 +127,7 @@ export async function POST(request: Request, context: RouteContext) {
           hostContactSignedDate: "",
           agreementDecision: "",
         },
+        letterDateInput: body.letterDate ?? "",
         initiatorEmail: user.email,
         initiatorName: user.name,
       });

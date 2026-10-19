@@ -37,6 +37,8 @@ export type NomineeLetterData = {
   applicantName: string;
   shared: boolean;
   sent: boolean;
+  /** Coordinator date input (`YYYY-MM-DD`), when previously saved. */
+  letterDateInput?: string;
 };
 
 export function NomineeLetterModal({
@@ -103,6 +105,7 @@ export function NomineeLetterModal({
         }
         setLetter(data.letter);
         setFields(data.letter.editable);
+        setLetterDateInput(data.letter.letterDateInput?.trim() ?? "");
         setPersistedNomineeSigned(
           Boolean(
             data.letter.editable.scholarshipHolderSignature?.trim() &&
@@ -236,6 +239,9 @@ export function NomineeLetterModal({
 
   const fieldsReadOnly =
     isSendMode || isSignMode || Boolean(letter?.shared && !editing);
+  /** Letter date is editable only for coordinators while drafting/editing. */
+  const canEditLetterDate =
+    !isSendMode && !isSignMode && !fieldsReadOnly;
 
   const nomineeSignatureReady = Boolean(
     fields?.scholarshipHolderSignature?.trim() &&
@@ -260,7 +266,7 @@ export function NomineeLetterModal({
     isSendMode && persistedNomineeSigned && !persistedHostSigned;
 
   const derivedDates = useMemo(() => {
-    if (!isSendMode || !letterDateInput.trim()) {
+    if (!letterDateInput.trim()) {
       return {
         letterDate: NOMINEE_LETTER_PENDING,
         responseDeadline: NOMINEE_LETTER_PENDING,
@@ -274,17 +280,29 @@ export function NomineeLetterModal({
         responseDeadline: NOMINEE_LETTER_PENDING,
       };
     }
-  }, [isSendMode, letterDateInput]);
+  }, [letterDateInput]);
 
   const displayAuto = useMemo(() => {
     if (!letter) return null;
-    if (!isSendMode) return letter.auto;
-    return {
-      ...letter.auto,
-      letterDate: derivedDates.letterDate,
-      responseDeadline: derivedDates.responseDeadline,
-    };
-  }, [derivedDates, isSendMode, letter]);
+    if (canEditLetterDate || isSendMode) {
+      return {
+        ...letter.auto,
+        letterDate: letterDateInput.trim()
+          ? derivedDates.letterDate
+          : letter.auto.letterDate,
+        responseDeadline: letterDateInput.trim()
+          ? derivedDates.responseDeadline
+          : letter.auto.responseDeadline,
+      };
+    }
+    return letter.auto;
+  }, [
+    canEditLetterDate,
+    derivedDates,
+    isSendMode,
+    letter,
+    letterDateInput,
+  ]);
 
   const handleSaveHostSignature = async () => {
     if (!fields) return;
@@ -450,7 +468,7 @@ export function NomineeLetterModal({
           body: JSON.stringify(
             isSendMode
               ? { action: "send", letterDate: letterDateInput }
-              : { action: "share", ...fields }
+              : { action: "share", ...fields, letterDate: letterDateInput }
           ),
         }
       );
@@ -597,7 +615,7 @@ export function NomineeLetterModal({
                 </p>
                 <p>
                   Date:{" "}
-                  {isSendMode ? (
+                  {canEditLetterDate ? (
                     <EditableInput
                       id="nominee-letter-date"
                       label="Letter date"
@@ -1055,7 +1073,12 @@ export function NomineeLetterModal({
                       loading ||
                       !fields ||
                       Boolean(loadError) ||
-                      !letterDateInput.trim()
+                      !(
+                        letterDateInput.trim() ||
+                        (letter?.auto.letterDate?.trim() &&
+                          letter.auto.letterDate.trim() !==
+                            NOMINEE_LETTER_PENDING)
+                      )
                     }
                     className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
                   >
@@ -1079,7 +1102,13 @@ export function NomineeLetterModal({
                   <button
                     type="button"
                     onClick={() => void handleSubmit()}
-                    disabled={sending || loading || !fields || Boolean(loadError)}
+                    disabled={
+                      sending ||
+                      loading ||
+                      !fields ||
+                      Boolean(loadError) ||
+                      !letterDateInput.trim()
+                    }
                     className="rounded-lg bg-[#062763] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#062763]/90 disabled:opacity-50"
                   >
                     {sending ? "Sharing…" : "Share with focal person"}
