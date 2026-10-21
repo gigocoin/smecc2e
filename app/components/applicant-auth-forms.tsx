@@ -11,7 +11,17 @@ import {
   applicantPasswordChangedLoginPath,
 } from "@/lib/applicant-login-paths";
 
-function ApplicantLoginFormContent() {
+function ApplicantLoginFormContent({
+  title = "Applicant dashboard",
+  subtitle = "Sign in to continue your scholarship application",
+  beginApplicationDisabled = false,
+  dashboardPath,
+}: {
+  title?: string;
+  subtitle?: string;
+  beginApplicationDisabled?: boolean;
+  dashboardPath?: string;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect");
@@ -45,6 +55,19 @@ function ApplicantLoginFormContent() {
 
       if (!res.ok) {
         setError(data.error ?? "Login failed. Please try again.");
+        return;
+      }
+
+      if (dashboardPath && data.mustChangePassword) {
+        router.replace(
+          `/applicant/change-password?redirect=${encodeURIComponent(dashboardPath)}`
+        );
+        router.refresh();
+        return;
+      }
+      if (dashboardPath) {
+        router.replace(dashboardPath);
+        router.refresh();
         return;
       }
 
@@ -82,12 +105,8 @@ function ApplicantLoginFormContent() {
               />
             </div>
           </Link>
-          <h1 className="mt-4 text-xl font-bold tracking-tight">
-            Applicant dashboard
-          </h1>
-          <p className="mt-2 text-sm text-slate-200">
-            Sign in to continue your scholarship application
-          </p>
+          <h1 className="mt-4 text-xl font-bold tracking-tight">{title}</h1>
+          <p className="mt-2 text-sm text-slate-200">{subtitle}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5 px-6 py-8">
@@ -212,9 +231,22 @@ function ApplicantLoginFormContent() {
 
       <p className="mt-6 text-center text-sm text-slate-600">
         Haven&apos;t started yet?{" "}
-        <Link href="/application" className="font-semibold text-[#062763] hover:underline">
-          Begin your application
-        </Link>
+        {beginApplicationDisabled ? (
+          <span
+            aria-disabled="true"
+            title="Application for the 1st Cohort closed on 16th July 2026."
+            className="cursor-not-allowed font-semibold text-slate-400"
+          >
+            Begin your application
+          </span>
+        ) : (
+          <Link
+            href="/application"
+            className="font-semibold text-[#062763] hover:underline"
+          >
+            Begin your application
+          </Link>
+        )}
       </p>
       <p className="mt-3 text-center text-sm text-slate-600">
         Staff or coordinator?{" "}
@@ -226,7 +258,17 @@ function ApplicantLoginFormContent() {
   );
 }
 
-export function ApplicantLoginForm() {
+export function ApplicantLoginForm({
+  title,
+  subtitle,
+  beginApplicationDisabled = false,
+  dashboardPath,
+}: {
+  title?: string;
+  subtitle?: string;
+  beginApplicationDisabled?: boolean;
+  dashboardPath?: string;
+} = {}) {
   return (
     <Suspense
       fallback={
@@ -235,7 +277,12 @@ export function ApplicantLoginForm() {
         </div>
       }
     >
-      <ApplicantLoginFormContent />
+      <ApplicantLoginFormContent
+        title={title}
+        subtitle={subtitle}
+        beginApplicationDisabled={beginApplicationDisabled}
+        dashboardPath={dashboardPath}
+      />
     </Suspense>
   );
 }
@@ -244,6 +291,7 @@ function ApplicantChangePasswordFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const emailParam = searchParams.get("email");
+  const returnTo = searchParams.get("redirect");
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -279,9 +327,13 @@ function ApplicantChangePasswordFormContent() {
         setError(data.error ?? "Could not update password.");
         return;
       }
-      router.replace(
+      const next =
         data.redirectTo ??
-          applicantPasswordChangedLoginPath(emailParam ?? "")
+        applicantPasswordChangedLoginPath(emailParam ?? "");
+      router.replace(
+        returnTo === "/scholar"
+          ? next.replace("/applicant/login", "/scholar/login")
+          : next
       );
       router.refresh();
     } catch {

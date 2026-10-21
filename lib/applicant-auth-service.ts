@@ -34,6 +34,23 @@ export type ApplicantSessionUser = {
     firstName: string;
     surname: string;
     submittedAt: string | null;
+    preferredHostInstitution: string;
+    typeOfMobility: string;
+    proposedAcademicProgramme: string;
+    nationality: string;
+    middleName: string;
+    bachelorProgrammeUniversity: string;
+    masterProgrammeUniversity: string;
+    personalEmail: string;
+    phoneNumber: string;
+    homeAddress: string;
+    passportOrIdNumber: string;
+    nextOfKinName: string;
+    nextOfKinWhatsapp: string;
+    nextOfKinEmail: string;
+    nextOfKinRelationship: string;
+    gender: string;
+    thematicArea: string;
   } | null;
 };
 
@@ -59,6 +76,23 @@ export async function getApplicantSessionUser(): Promise<ApplicantSessionUser | 
           firstName: application.firstName,
           surname: application.surname,
           submittedAt: application.submittedAt?.toISOString() ?? null,
+          preferredHostInstitution: application.preferredHostInstitution,
+          typeOfMobility: application.typeOfMobility,
+          proposedAcademicProgramme: application.proposedAcademicProgramme,
+          nationality: application.nationality,
+          middleName: application.middleName,
+          bachelorProgrammeUniversity: application.bachelorProgrammeUniversity,
+          masterProgrammeUniversity: application.masterProgrammeUniversity,
+          personalEmail: application.personalEmail,
+          phoneNumber: application.phoneNumber,
+          homeAddress: application.homeAddress,
+          passportOrIdNumber: application.passportOrIdNumber,
+          nextOfKinName: application.nextOfKinName,
+          nextOfKinWhatsapp: application.nextOfKinWhatsapp,
+          nextOfKinEmail: application.nextOfKinEmail,
+          nextOfKinRelationship: application.nextOfKinRelationship,
+          gender: application.gender,
+          thematicArea: application.thematicArea,
         }
       : null,
   };

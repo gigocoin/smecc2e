@@ -68,6 +68,14 @@ export function FooterLoginMenu({ compact = false }: { compact?: boolean }) {
           className="absolute bottom-full right-0 z-50 mb-2 min-w-44 overflow-hidden rounded-lg border border-white/20 bg-white py-1 shadow-lg"
         >
           <Link
+            href="/scholar/login"
+            role="menuitem"
+            className={menuItemClass}
+            onClick={() => setOpen(false)}
+          >
+            Scholar Login
+          </Link>
+          <Link
             href={APPLICANT_LOGIN_PATH}
             role="menuitem"
             className={menuItemClass}

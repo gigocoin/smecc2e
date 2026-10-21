@@ -181,6 +181,23 @@ export async function findApplicantSummaryByEmail(email: string): Promise<{
   firstName: string;
   surname: string;
   submittedAt: Date | null;
+  preferredHostInstitution: string;
+  typeOfMobility: string;
+  proposedAcademicProgramme: string;
+  nationality: string;
+  middleName: string;
+  bachelorProgrammeUniversity: string;
+  masterProgrammeUniversity: string;
+  personalEmail: string;
+  phoneNumber: string;
+  homeAddress: string;
+  passportOrIdNumber: string;
+  nextOfKinName: string;
+  nextOfKinWhatsapp: string;
+  nextOfKinEmail: string;
+  nextOfKinRelationship: string;
+  gender: string;
+  thematicArea: string;
 } | null> {
   const normalized = normalizeEmail(email);
   const row = await prisma.applicant.findFirst({
@@ -199,6 +216,23 @@ export async function findApplicantSummaryByEmail(email: string): Promise<{
       firstName: true,
       surname: true,
       submittedAt: true,
+      preferredHostInstitution: true,
+      typeOfMobility: true,
+      proposedAcademicProgramme: true,
+      nationality: true,
+      middleName: true,
+      bachelorProgrammeUniversity: true,
+      masterProgrammeUniversity: true,
+      personalEmail: true,
+      phoneNumber: true,
+      homeAddress: true,
+      passportOrIdNumber: true,
+      nextOfKinName: true,
+      nextOfKinWhatsapp: true,
+      nextOfKinEmail: true,
+      nextOfKinRelationship: true,
+      gender: true,
+      thematicArea: true,
     },
   });
   if (!row) return null;
@@ -210,5 +244,22 @@ export async function findApplicantSummaryByEmail(email: string): Promise<{
     firstName: row.firstName,
     surname: row.surname,
     submittedAt: row.submittedAt,
+    preferredHostInstitution: row.preferredHostInstitution,
+    typeOfMobility: row.typeOfMobility,
+    proposedAcademicProgramme: row.proposedAcademicProgramme,
+    nationality: row.nationality,
+    middleName: row.middleName,
+    bachelorProgrammeUniversity: row.bachelorProgrammeUniversity,
+    masterProgrammeUniversity: row.masterProgrammeUniversity,
+    personalEmail: row.personalEmail,
+    phoneNumber: row.phoneNumber,
+    homeAddress: row.homeAddress,
+    passportOrIdNumber: row.passportOrIdNumber,
+    nextOfKinName: row.nextOfKinName,
+    nextOfKinWhatsapp: row.nextOfKinWhatsapp,
+    nextOfKinEmail: row.nextOfKinEmail,
+    nextOfKinRelationship: row.nextOfKinRelationship,
+    gender: row.gender,
+    thematicArea: row.thematicArea,
   };
 }

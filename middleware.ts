@@ -68,6 +68,42 @@ export async function middleware(request: NextRequest) {
   const applicantHome = applicantDefaultPath();
   const applicantChangePassword = applicantChangePasswordPath();
 
+  if (pathname === "/scholar/login") {
+    if (
+      applicantLoggedIn &&
+      applicantSession &&
+      !applicantSession.mustChangePassword
+    ) {
+      return NextResponse.redirect(new URL("/scholar", request.url));
+    }
+    if (applicantLoggedIn && applicantSession?.mustChangePassword) {
+      return NextResponse.redirect(
+        new URL(
+          "/applicant/change-password?redirect=%2Fscholar",
+          request.url
+        )
+      );
+    }
+    return NextResponse.next();
+  }
+
+  if (pathname === "/scholar") {
+    if (!applicantLoggedIn) {
+      const loginUrl = new URL("/scholar/login", request.url);
+      loginUrl.searchParams.set("redirect", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    if (applicantSession?.mustChangePassword) {
+      return NextResponse.redirect(
+        new URL(
+          "/applicant/change-password?redirect=%2Fscholar",
+          request.url
+        )
+      );
+    }
+    return NextResponse.next();
+  }
+
   if (isApplicantPath(pathname)) {
     if (isApplicantPublicPath(pathname)) {
       const freshVerification =
@@ -192,5 +228,7 @@ export const config = {
     "/application/:path*",
     "/applicant",
     "/applicant/:path*",
+    "/scholar",
+    "/scholar/:path*",
   ],
 };
