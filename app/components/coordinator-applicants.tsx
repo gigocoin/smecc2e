@@ -25,6 +25,7 @@ import {
   StatusBadge,
 } from "./coordinator-shared";
 import { NomineeLetterModal } from "./nominee-letter-modal";
+import { ScholarConfirmationModal } from "./scholar-confirmation-modal";
 
 const actionBtnClass =
   "rounded-lg border-2 px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50";
@@ -113,6 +114,10 @@ export function CoordinatorApplicants({
     useState<ApplicationRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [migratingApplication, setMigratingApplication] =
+    useState<ApplicationRecord | null>(null);
+  const [migrating, setMigrating] = useState(false);
+  const [migrateError, setMigrateError] = useState<string | null>(null);
   const [nomineeLetterApplication, setNomineeLetterApplication] =
     useState<ApplicationRecord | null>(null);
   const [nomineeLetterStartEditing, setNomineeLetterStartEditing] =
@@ -120,9 +125,10 @@ export function CoordinatorApplicants({
   const [nomineeLetterSuccess, setNomineeLetterSuccess] = useState<
     string | null
   >(null);
+  const [migrateSuccess, setMigrateSuccess] = useState<string | null>(null);
 
   const tableBusy =
-    assigningEvaluatorSlot !== null || deleting || updatingStatus;
+    assigningEvaluatorSlot !== null || deleting || migrating || updatingStatus;
 
   const loadApplications = useCallback(async () => {
     setLoading(true);
@@ -341,8 +347,66 @@ export function CoordinatorApplicants({
     }
   };
 
+  const closeMigrateModal = () => {
+    if (migrating) return;
+    setMigratingApplication(null);
+    setMigrateError(null);
+  };
+
+  const handleMigrateToScholar = async () => {
+    if (!migratingApplication) return;
+    setMigrating(true);
+    setMigrateError(null);
+    const nomineeName =
+      applicantDisplayName(migratingApplication).trim() ||
+      migratingApplication.id;
+    try {
+      const res = await fetch(
+        `/api/applications/${encodeURIComponent(migratingApplication.id)}/scholar-confirmation`,
+        { method: "POST" }
+      );
+      const data = (await res.json()) as {
+        error?: string;
+        application?: ApplicationRecord;
+        email?: string;
+        devMode?: boolean;
+      };
+      if (!res.ok || !data.application) {
+        setMigrateError(
+          data.error ?? "Could not send the confirmation email."
+        );
+        return;
+      }
+      setApplications((prev) =>
+        prev.map((a) =>
+          a.id === migratingApplication.id ? data.application! : a
+        )
+      );
+      if (expandedId === migratingApplication.id) {
+        setExpandedId(null);
+      }
+      setMigrateSuccess(
+        data.devMode
+          ? `${nomineeName} is now a scholar. The confirmation email was not delivered because email sending is not configured.`
+          : `Confirmation sent to ${data.email ?? "the nominee"}. ${nomineeName} is now a scholar.`
+      );
+      setMigratingApplication(null);
+      setMigrateError(null);
+    } catch {
+      setMigrateError("Could not send the confirmation email.");
+    } finally {
+      setMigrating(false);
+    }
+  };
+
   return (
-    <div className="flex min-w-0 flex-1 flex-col">
+    <div
+      className={
+        statusFilter === "offered"
+          ? "flex h-[95vh] min-w-0 flex-col overflow-auto"
+          : "flex min-w-0 flex-1 flex-col"
+      }
+    >
       <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-6 lg:pl-6">
         <div className="pl-12 lg:pl-0">
           <h1 className="text-base font-bold text-[#062763] sm:text-lg">
@@ -437,13 +501,27 @@ export function CoordinatorApplicants({
         </div>
       </header>
 
-      <main className="flex-1 overflow-auto bg-slate-50 p-4 sm:p-6">
+      <main
+        className={
+          statusFilter === "offered"
+            ? "min-w-0 bg-slate-50 p-4 sm:p-6"
+            : "min-w-0 flex-1 overflow-x-auto overflow-y-auto bg-slate-50 p-4 sm:p-6"
+        }
+      >
         {nomineeLetterSuccess && (
           <p
             className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900"
             role="status"
           >
             {nomineeLetterSuccess}
+          </p>
+        )}
+        {migrateSuccess && (
+          <p
+            className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900"
+            role="status"
+          >
+            {migrateSuccess}
           </p>
         )}
         <div className="mb-6 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-end sm:p-5">
@@ -478,7 +556,7 @@ export function CoordinatorApplicants({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="min-w-max rounded-xl border border-slate-200 bg-white">
           <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
             <h2 className="text-base font-bold text-[#062763]">
               Applications ({filteredApplicants.length})
@@ -488,8 +566,8 @@ export function CoordinatorApplicants({
               have evaluators assigned.
             </p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+          <div>
+            <table className="w-max min-w-full text-left text-sm">
               <thead className="bg-[#e8f0ff] text-xs font-bold uppercase tracking-wide text-[#062763]">
                 <tr>
                   <th className="w-10 px-2 py-3" aria-hidden />
@@ -617,8 +695,8 @@ export function CoordinatorApplicants({
                             {formatDate(app.submittedAt)}
                           </td>
                           {showActionsColumn && (
-                            <td className="px-4 py-3 text-right">
-                              <div className="flex flex-wrap justify-end gap-2">
+                            <td className="px-4 py-3 text-right whitespace-nowrap">
+                              <div className="flex flex-nowrap items-center justify-end gap-2">
                                 {showNomineeLetter && app.status === "offered" && (
                                   <>
                                     {showNomineeLetterShare &&
@@ -627,7 +705,7 @@ export function CoordinatorApplicants({
                                         <button
                                           type="button"
                                           disabled
-                                          className={`${actionBtnClass} border-emerald-200 bg-emerald-50 text-emerald-800 disabled:opacity-100`}
+                                          className={`${actionBtnClass} shrink-0 border-emerald-200 bg-emerald-50 text-emerald-800 disabled:opacity-100`}
                                         >
                                           Draft Shared
                                         </button>
@@ -640,7 +718,7 @@ export function CoordinatorApplicants({
                                             setNomineeLetterSuccess(null);
                                           }}
                                           disabled={tableBusy}
-                                          className={`${actionBtnClass} border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
+                                          className={`${actionBtnClass} shrink-0 border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
                                         >
                                           Edit
                                         </button>
@@ -655,7 +733,7 @@ export function CoordinatorApplicants({
                                           setNomineeLetterSuccess(null);
                                         }}
                                         disabled={tableBusy}
-                                        className={`${actionBtnClass} border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
+                                        className={`${actionBtnClass} shrink-0 border-[#062763]/25 text-[#062763] hover:bg-[#062763]/5`}
                                       >
                                         {showNomineeLetterSend
                                           ? "View letter"
@@ -663,6 +741,20 @@ export function CoordinatorApplicants({
                                       </button>
                                     )}
                                   </>
+                                )}
+                                {statusFilter === "offered" && canDeleteApplications && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setMigratingApplication(app);
+                                      setMigrateError(null);
+                                    }}
+                                    disabled={tableBusy}
+                                    className={`${actionBtnClass} shrink-0 border-[#062763] bg-[#062763] text-white hover:bg-[#0a3580]`}
+                                  >
+                                    Migrate to scholar
+                                  </button>
                                 )}
                                 {canDeleteApplications && (
                                   <button
@@ -673,7 +765,7 @@ export function CoordinatorApplicants({
                                       setDeleteError(null);
                                     }}
                                     disabled={tableBusy}
-                                    className={`${actionBtnClass} ${
+                                    className={`${actionBtnClass} shrink-0 ${
                                       statusFilter === "offered"
                                         ? "border-amber-300 text-amber-900 hover:bg-amber-50"
                                         : "border-red-200 text-red-700 hover:bg-red-50"
@@ -730,6 +822,16 @@ export function CoordinatorApplicants({
           </div>
         </div>
       </main>
+
+      {canDeleteApplications && migratingApplication && (
+        <ScholarConfirmationModal
+          application={migratingApplication}
+          sending={migrating}
+          error={migrateError}
+          onClose={closeMigrateModal}
+          onSend={() => void handleMigrateToScholar()}
+        />
+      )}
 
       {canDeleteApplications && deletingApplication && (
         <div

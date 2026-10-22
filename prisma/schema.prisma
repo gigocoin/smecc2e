@@ -208,10 +208,155 @@ model Applicant {
   nomineeLetterSharedAt   DateTime? @map("nominee_letter_shared_at")
   nomineeLetterSentAt     DateTime? @map("nominee_letter_sent_at")
 
+  scholar Scholar?
+
   @@index([email])
   @@index([status])
   @@index([submittedAt])
   @@map("applicants")
+}
+
+/// Snapshot of a nominee (applicant) record created when they become a scholar.
+model Scholar {
+  id          String   @id @default(cuid())
+  applicantId String   @unique @map("applicant_id")
+  applicant   Applicant @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+  migratedAt  DateTime @default(now()) @map("migrated_at")
+
+  publicId  String? @unique @map("public_id")
+
+  status       ScholarshipApplicationStatus @default(approved)
+  currentPage  Int?                         @map("current_page")
+  submittedAt  DateTime?                    @map("submitted_at")
+  createdAt    DateTime                     @default(now()) @map("created_at")
+  updatedAt    DateTime                     @updatedAt @map("updated_at")
+
+  evaluator1Id  String?                      @map("evaluator1_id")
+  evaluator2Id  String?                      @map("evaluator2_id")
+  evaluator1ReviewStatus EvaluatorReviewStatus @default(pending) @map("evaluator1_review_status")
+  evaluator2ReviewStatus EvaluatorReviewStatus @default(pending) @map("evaluator2_review_status")
+  evaluator1EvaluationData Json? @map("evaluator1_evaluation_data")
+  evaluator2EvaluationData Json? @map("evaluator2_evaluation_data")
+
+  interviewerId  String? @map("interviewer_id")
+  interviewScore Float?  @map("interview_score")
+  interviewEvaluationData Json? @map("interview_evaluation_data")
+
+  email                   String
+  nationality             String
+  countryOfResidence      String  @map("country_of_residence")
+  region                  String
+  typeOfMobility          String  @map("type_of_mobility")
+  preferredHostInstitution String @map("preferred_host_institution")
+  proposedAcademicProgramme String @map("proposed_academic_programme")
+  thematicArea            String @map("thematic_area")
+  surname                 String
+  firstName               String  @map("first_name")
+  middleName              String  @default("") @map("middle_name")
+  gender                  String
+  dateOfBirth             String  @map("date_of_birth")
+  stateProvince           String  @map("state_province")
+  homeAddress             String  @map("home_address") @db.Text
+  personalEmail           String  @map("personal_email")
+  phoneNumber             String  @map("phone_number")
+  linkedinUrl             String  @default("") @map("linkedin_url")
+  socialMediaUrl          String  @default("") @map("social_media_url")
+  passportOrIdNumber      String  @map("passport_or_id_number")
+  profileUploaded         Boolean @default(false) @map("profile_uploaded")
+
+  passportFileName              String? @map("passport_file_name")
+
+  belongsToDisadvantagedGroup   String  @map("belongs_to_disadvantaged_group")
+  disadvantagedFinancially      Boolean @default(false) @map("disadvantaged_financially")
+  disadvantagedDisability         Boolean @default(false) @map("disadvantaged_disability")
+  disadvantagedRefugee            Boolean @default(false) @map("disadvantaged_refugee")
+  disadvantagedConflict         Boolean @default(false) @map("disadvantaged_conflict")
+  disadvantagedMinority         Boolean @default(false) @map("disadvantaged_minority")
+  disadvantagedOther            Boolean @default(false) @map("disadvantaged_other")
+  disadvantagedOtherSpecify     String  @default("") @map("disadvantaged_other_specify")
+  disadvantagedDocFileName      String? @map("disadvantaged_doc_file_name")
+
+  eduBachelor                   Boolean @default(false) @map("edu_bachelor")
+  eduMaster                     Boolean @default(false) @map("edu_master")
+  eduPhd                        Boolean @default(false) @map("edu_phd")
+  bachelorProgrammeUniversity   String  @default("") @map("bachelor_programme_university")
+  bachelorCgpa                  String  @default("") @map("bachelor_cgpa")
+  masterProgrammeUniversity     String  @default("") @map("master_programme_university")
+  masterCgpa                    String  @default("") @map("master_cgpa")
+  academicCertificatesFileName String? @map("academic_certificates_file_name")
+  academicTranscriptsFileName   String? @map("academic_transcripts_file_name")
+
+  currentlyEnrolledInDegree     String  @default("") @map("currently_enrolled_in_degree")
+  registrationNumber            String  @default("") @map("registration_number")
+  proofOfRegistrationFileName   String? @map("proof_of_registration_file_name")
+  proofOfCourseworkFileName     String? @map("proof_of_coursework_file_name")
+
+  whyApplyingScholarship          String @default("") @map("why_applying_scholarship") @db.Text
+  cvFileName                      String? @map("cv_file_name")
+  publicationsFileName            String? @map("publications_file_name")
+  backgroundThematicAlignment     String @default("") @map("background_thematic_alignment") @db.Text
+  scholarshipCareerGoals          String @default("") @map("scholarship_career_goals") @db.Text
+  africaCleanEnergyContribution   String @default("") @map("africa_clean_energy_contribution") @db.Text
+
+  studyResearchPlanFileName       String? @map("study_research_plan_file_name")
+  researchProposalFileName        String? @map("research_proposal_file_name")
+
+  traineePreferredIndustrySector  String @default("") @map("trainee_preferred_industry_sector")
+  traineeshipRelevantSkills         String @default("") @map("traineeship_relevant_skills") @db.Text
+  traineeshipCareerInterestArea     String @default("") @map("traineeship_career_interest_area") @db.Text
+  traineeshipCurrentProgrammeType   String @default("") @map("traineeship_current_programme_type")
+  traineeshipCurrentPosition        String @default("") @map("traineeship_current_position")
+
+  staffOrganizationsWorkedWith      String @default("") @map("staff_organizations_worked_with") @db.Text
+  staffCurrentRankPosition          String @default("") @map("staff_current_rank_position")
+  staffYearsOfExperience            String @default("") @map("staff_years_of_experience")
+  staffMobilityPurpose              String @default("") @map("staff_mobility_purpose") @db.Text
+  staffProposedWorkPlan             String @default("") @map("staff_proposed_work_plan") @db.Text
+  staffExpectedBenefits             String @default("") @map("staff_expected_benefits") @db.Text
+
+  homeInstructionLanguage           String @default("") @map("home_instruction_language")
+  hasLanguageProficiencyCertificate String @default("") @map("has_language_proficiency_certificate")
+  languageCertificateFileName       String? @map("language_certificate_file_name")
+
+  referee1Name            String @default("") @map("referee1_name")
+  referee1Relationship      String @default("") @map("referee1_relationship")
+  referee1Position        String @default("") @map("referee1_position")
+  referee1Institution     String @default("") @map("referee1_institution")
+  referee1Email           String @default("") @map("referee1_email")
+  referee1Phone           String @default("") @map("referee1_phone")
+  referee2Name            String @default("") @map("referee2_name")
+  referee2Relationship    String @default("") @map("referee2_relationship")
+  referee2Position        String @default("") @map("referee2_position")
+  referee2Institution     String @default("") @map("referee2_institution")
+  referee2Email           String @default("") @map("referee2_email")
+  referee2Phone           String @default("") @map("referee2_phone")
+  referenceLettersFileName String? @map("reference_letters_file_name")
+
+  graduateAdmissionProofFileName      String? @map("graduate_admission_proof_file_name")
+  staffEmploymentProofFileName        String? @map("staff_employment_proof_file_name")
+  staffHostCommitmentLetterFileName   String? @map("staff_host_commitment_letter_file_name")
+  medicalFitnessDeclarationFileName   String? @map("medical_fitness_declaration_file_name")
+
+  previousIntraAfricaScholarship           String @default("") @map("previous_intra_africa_scholarship")
+  previousScholarshipDeclarationFileName   String? @map("previous_scholarship_declaration_file_name")
+
+  declarationCertified     Boolean @default(false) @map("declaration_certified")
+  dataProtectionConsent    Boolean @default(false) @map("data_protection_consent")
+  applicantSignature       String  @default("") @map("applicant_signature")
+
+  nextOfKinName            String @default("") @map("next_of_kin_name")
+  nextOfKinWhatsapp         String @default("") @map("next_of_kin_whatsapp")
+  nextOfKinEmail            String @default("") @map("next_of_kin_email")
+  nextOfKinRelationship     String @default("") @map("next_of_kin_relationship")
+
+  nomineeLetterSharedData Json?     @map("nominee_letter_shared_data")
+  nomineeLetterSharedAt   DateTime? @map("nominee_letter_shared_at")
+  nomineeLetterSentAt     DateTime? @map("nominee_letter_sent_at")
+
+  @@index([email])
+  @@index([status])
+  @@index([submittedAt])
+  @@map("scholars")
 }
 
 /// Dashboard / coordination team member

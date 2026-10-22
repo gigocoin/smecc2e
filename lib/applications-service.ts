@@ -21,6 +21,10 @@ import {
   migrateApplicationDocumentStorage,
 } from "./application-document-storage";
 import { validateApplicationForSubmit } from "./application-validation";
+import {
+  deleteScholarForApplicant,
+  upsertScholarFromApplicant,
+} from "./scholars-service";
 import { isApplicantEmailVerifiedForSubmit } from "./email-verification-store";
 import {
   getActiveEvaluationRubric,
@@ -520,6 +524,16 @@ export async function updateApplicationStatus(
     data: { status, updatedAt: new Date() },
     include: applicantIncludeEvaluators(),
   });
+
+  if (status === "approved" || status === "pre_departure") {
+    const snapshot = await prisma.applicant.findUnique({
+      where: { id: updated.id },
+    });
+    if (snapshot) await upsertScholarFromApplicant(snapshot);
+  } else {
+    await deleteScholarForApplicant(existing.id);
+  }
+
   return mapPrismaApplicant(updated);
 }
 
