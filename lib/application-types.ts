@@ -221,6 +221,8 @@ export function applicantDisplayName(app: ApplicationPayload): string {
   return [app.surname, app.firstName, app.middleName].filter(Boolean).join(" ");
 }
 
-export function applicantPrimaryEmail(app: ApplicationPayload): string {
+export function applicantPrimaryEmail(
+  app: Pick<ApplicationPayload, "personalEmail" | "email">
+): string {
   return app.personalEmail || app.email;
 }

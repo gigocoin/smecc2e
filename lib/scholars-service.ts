@@ -1,4 +1,4 @@
-import type { Applicant, Scholar, User } from "@prisma/client";
+import { Prisma, type Applicant, type Scholar, type User } from "@prisma/client";
 import { mapPrismaApplicant, nomineeLetterHostUniversity } from "./application-mappers";
 import type { ApplicationRecord } from "./application-types";
 import { prisma } from "./prisma";
@@ -16,21 +16,41 @@ function scholarHostInstitution(row: Scholar): string {
   );
 }
 
+function toJsonInput(
+  value: Prisma.JsonValue | null
+): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  if (value === null) return Prisma.JsonNull;
+  return value;
+}
+
 /** Copy a nominee applicant row into the scholars table. */
 export async function upsertScholarFromApplicant(applicant: Applicant): Promise<void> {
-  const { id, createdAt, updatedAt, ...snapshot } = applicant;
+  const {
+    id,
+    createdAt,
+    updatedAt,
+    evaluator1EvaluationData,
+    evaluator2EvaluationData,
+    interviewEvaluationData,
+    nomineeLetterSharedData,
+    ...snapshot
+  } = applicant;
   const migratedAt = new Date();
+  const data = {
+    ...snapshot,
+    migratedAt,
+    evaluator1EvaluationData: toJsonInput(evaluator1EvaluationData),
+    evaluator2EvaluationData: toJsonInput(evaluator2EvaluationData),
+    interviewEvaluationData: toJsonInput(interviewEvaluationData),
+    nomineeLetterSharedData: toJsonInput(nomineeLetterSharedData),
+  };
   await prisma.scholar.upsert({
     where: { applicantId: id },
     create: {
       applicantId: id,
-      migratedAt,
-      ...snapshot,
+      ...data,
     },
-    update: {
-      migratedAt,
-      ...snapshot,
-    },
+    update: data,
   });
 }
 
