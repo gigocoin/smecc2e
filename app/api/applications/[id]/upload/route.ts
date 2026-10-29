@@ -7,8 +7,8 @@ import {
 } from "@/lib/application-deadline";
 import {
   applicationDocumentStorageErrorResponse,
-  blobStorageConfigurationError,
-  isProductionWithoutBlobStorage,
+  isProductionWithoutR2Storage,
+  r2StorageConfigurationError,
   saveApplicationDocument,
 } from "@/lib/application-document-storage";
 import {
@@ -74,9 +74,9 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    if (isProductionWithoutBlobStorage()) {
+    if (isProductionWithoutR2Storage()) {
       return NextResponse.json(
-        { error: blobStorageConfigurationError() },
+        { error: r2StorageConfigurationError() },
         { status: 503 }
       );
     }

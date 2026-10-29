@@ -1,44 +1,107 @@
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { access, mkdir, readdir, readFile, writeFile } from "fs/promises";
 import path from "path";
-import { del, get, list, put } from "@vercel/blob";
 import {
   documentDisplayName,
   mimeTypeFromFileName,
   type ApplicationDocumentField,
 } from "./application-documents";
 
-const BLOB_ACCESS = "private" as const;
+type R2Config = {
+  accountId: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+  endpoint: string;
+};
 
-export function useBlobStorage(): boolean {
+let r2Client: S3Client | null = null;
+
+function r2ConfigFromEnv(): R2Config | null {
+  const accountId = process.env.R2_ACCOUNT_ID?.trim() ?? "";
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim() ?? "";
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim() ?? "";
+  const bucket = process.env.R2_BUCKET_NAME?.trim() ?? "";
+  if (!accountId || !accessKeyId || !secretAccessKey || !bucket) {
+    return null;
+  }
+
+  const endpoint =
+    process.env.R2_ENDPOINT?.trim() ||
+    `https://${accountId}.r2.cloudflarestorage.com`;
+
+  return { accountId, accessKeyId, secretAccessKey, bucket, endpoint };
+}
+
+export function useR2Storage(): boolean {
   if (process.env.APPLICATION_DOCUMENT_STORAGE === "local") {
     return false;
   }
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  return r2ConfigFromEnv() !== null;
 }
 
-export function isProductionWithoutBlobStorage(): boolean {
-  return process.env.NODE_ENV === "production" && !useBlobStorage();
+export function isProductionWithoutR2Storage(): boolean {
+  return process.env.NODE_ENV === "production" && !useR2Storage();
 }
 
-export function blobStorageConfigurationError(): string {
-  return "Document uploads are not configured for production. Add a Vercel Blob store and set BLOB_READ_WRITE_TOKEN.";
-}
-
-export function blobStorageQuotaExceededError(): string {
-  return "Document storage is full (Vercel Blob quota reached). Free space in your Vercel Blob store, upgrade your plan, or set APPLICATION_DOCUMENT_STORAGE=local in .env for local development.";
+export function r2StorageConfigurationError(): string {
+  return "Document uploads are not configured for production. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME.";
 }
 
 export function applicationDocumentStorageErrorResponse(
   err: unknown
 ): { error: string; status: number } | null {
   const message = err instanceof Error ? err.message : String(err);
-  if (message.includes("BLOB_READ_WRITE_TOKEN")) {
-    return { error: blobStorageConfigurationError(), status: 503 };
-  }
-  if (/quota exceeded|storage quota/i.test(message)) {
-    return { error: blobStorageQuotaExceededError(), status: 507 };
+  const name =
+    err && typeof err === "object" && "name" in err ? String(err.name) : "";
+  if (
+    message.includes("R2_ACCOUNT_ID") ||
+    message.includes("R2_ACCESS_KEY_ID") ||
+    message.includes("R2_SECRET_ACCESS_KEY") ||
+    message.includes("R2_BUCKET_NAME") ||
+    name === "CredentialsProviderError" ||
+    name === "InvalidAccessKeyId" ||
+    name === "SignatureDoesNotMatch" ||
+    name === "NoSuchBucket"
+  ) {
+    return { error: r2StorageConfigurationError(), status: 503 };
   }
   return null;
+}
+
+function getR2Client(): S3Client {
+  const config = r2ConfigFromEnv();
+  if (!config) {
+    throw new Error(r2StorageConfigurationError());
+  }
+  if (!r2Client) {
+    r2Client = new S3Client({
+      region: "auto",
+      endpoint: config.endpoint,
+      credentials: {
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey,
+      },
+      requestChecksumCalculation: "WHEN_REQUIRED",
+      responseChecksumValidation: "WHEN_REQUIRED",
+    });
+  }
+  return r2Client;
+}
+
+function bucketName(): string {
+  const config = r2ConfigFromEnv();
+  if (!config) {
+    throw new Error(r2StorageConfigurationError());
+  }
+  return config.bucket;
 }
 
 function localDocumentsDir(applicationRef: string): string {
@@ -55,11 +118,11 @@ function localDocumentPath(applicationRef: string, storedName: string): string {
   return path.join(localDocumentsDir(applicationRef), storedName);
 }
 
-function blobPathname(applicationRef: string, storedName: string): string {
+function objectKey(applicationRef: string, storedName: string): string {
   return `applications/${applicationRef}/${storedName}`;
 }
 
-function blobPrefix(applicationRef: string): string {
+function objectPrefix(applicationRef: string): string {
   return `applications/${applicationRef}/`;
 }
 
@@ -91,12 +154,6 @@ async function localFileExists(filePath: string): Promise<boolean> {
   }
 }
 
-async function streamToBuffer(
-  stream: ReadableStream<Uint8Array>
-): Promise<Buffer> {
-  return Buffer.from(await new Response(stream).arrayBuffer());
-}
-
 function matchesStoredDocument(
   candidateName: string,
   storedName: string
@@ -115,35 +172,92 @@ function matchesStoredDocument(
   );
 }
 
-async function listAllBlobsWithPrefix(prefix: string) {
-  const blobs = [];
-  let cursor: string | undefined;
-  do {
-    const page = await list({ prefix, cursor });
-    blobs.push(...page.blobs);
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
-  return blobs;
+function isMissingObjectError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const name = "name" in err ? String(err.name) : "";
+  const metadata =
+    "$metadata" in err && err.$metadata && typeof err.$metadata === "object"
+      ? err.$metadata
+      : null;
+  const status =
+    metadata && "httpStatusCode" in metadata
+      ? Number(metadata.httpStatusCode)
+      : 0;
+  return name === "NotFound" || name === "NoSuchKey" || status === 404;
 }
 
-async function getBlobBuffer(pathname: string): Promise<Buffer | null> {
-  const candidates = [pathname];
-  const encoded = pathname
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-  if (encoded !== pathname) {
-    candidates.push(encoded);
+async function objectExists(key: string): Promise<boolean> {
+  try {
+    await getR2Client().send(
+      new HeadObjectCommand({ Bucket: bucketName(), Key: key })
+    );
+    return true;
+  } catch (err) {
+    if (isMissingObjectError(err)) return false;
+    throw err;
   }
+}
 
-  for (const candidate of candidates) {
-    const result = await get(candidate, { access: BLOB_ACCESS });
-    if (result?.stream) {
-      return streamToBuffer(result.stream);
+async function listObjects(prefix: string): Promise<{ key: string }[]> {
+  const objects: { key: string }[] = [];
+  let continuationToken: string | undefined;
+
+  do {
+    const page = await getR2Client().send(
+      new ListObjectsV2Command({
+        Bucket: bucketName(),
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+    );
+    for (const item of page.Contents ?? []) {
+      if (item.Key && !item.Key.endsWith("/")) {
+        objects.push({ key: item.Key });
+      }
     }
-  }
+    continuationToken = page.IsTruncated
+      ? page.NextContinuationToken
+      : undefined;
+  } while (continuationToken);
 
-  return null;
+  return objects;
+}
+
+export async function listApplicationObjectKeys(
+  prefix: string
+): Promise<string[]> {
+  const objects = await listObjects(prefix);
+  return objects.map((object) => object.key);
+}
+
+async function getObjectBuffer(
+  key: string
+): Promise<{ buffer: Buffer; contentType?: string } | null> {
+  try {
+    const result = await getR2Client().send(
+      new GetObjectCommand({ Bucket: bucketName(), Key: key })
+    );
+    if (!result.Body) return null;
+    const bytes = await result.Body.transformToByteArray();
+    return {
+      buffer: Buffer.from(bytes),
+      contentType: result.ContentType,
+    };
+  } catch (err) {
+    if (isMissingObjectError(err)) return null;
+    throw err;
+  }
+}
+
+async function deleteObjectKeys(keys: string[]): Promise<void> {
+  if (keys.length === 0) return;
+  const client = getR2Client();
+  const bucket = bucketName();
+  await Promise.all(
+    keys.map((Key) =>
+      client.send(new DeleteObjectCommand({ Bucket: bucket, Key }))
+    )
+  );
 }
 
 async function resolveLocalDocumentPath(
@@ -175,30 +289,29 @@ async function resolveLocalDocumentPath(
   }
 }
 
-async function resolveBlobPathname(
+async function resolveObjectKey(
   applicationRef: string,
   storedName: string,
   field: ApplicationDocumentField
 ): Promise<string | null> {
-  const direct = blobPathname(applicationRef, storedName);
-  const directBuffer = await getBlobBuffer(direct);
-  if (directBuffer) {
+  const direct = objectKey(applicationRef, storedName);
+  if (await objectExists(direct)) {
     return direct;
   }
 
-  const blobs = await listAllBlobsWithPrefix(blobPrefix(applicationRef));
+  const objects = await listObjects(objectPrefix(applicationRef));
   if (field === "profile") {
-    const profileBlob = blobs.find((blob) =>
-      blob.pathname.split("/").pop()?.startsWith("profile")
+    const profileObject = objects.find((object) =>
+      object.key.split("/").pop()?.startsWith("profile")
     );
-    return profileBlob?.pathname ?? null;
+    return profileObject?.key ?? null;
   }
 
-  const match = blobs.find((blob) => {
-    const fileName = blob.pathname.split("/").pop() ?? "";
+  const match = objects.find((object) => {
+    const fileName = object.key.split("/").pop() ?? "";
     return matchesStoredDocument(fileName, storedName);
   });
-  return match?.pathname ?? null;
+  return match?.key ?? null;
 }
 
 async function resolveLocalDocumentPathGlobal(
@@ -227,30 +340,30 @@ async function resolveLocalDocumentPathGlobal(
   return null;
 }
 
-async function resolveBlobPathnameGlobal(
+async function resolveObjectKeyGlobal(
   storedName: string,
   field: ApplicationDocumentField,
   skipRefs: string[]
 ): Promise<string | null> {
   const skip = new Set(skipRefs);
-  const blobs = await listAllBlobsWithPrefix("applications/");
+  const objects = await listObjects("applications/");
 
   if (field === "profile") {
-    const profileBlob = blobs.find((blob) => {
-      const parts = blob.pathname.split("/");
+    const profileObject = objects.find((object) => {
+      const parts = object.key.split("/");
       if (parts.length < 3 || skip.has(parts[1] ?? "")) return false;
       return parts[parts.length - 1]?.startsWith("profile");
     });
-    return profileBlob?.pathname ?? null;
+    return profileObject?.key ?? null;
   }
 
-  const match = blobs.find((blob) => {
-    const parts = blob.pathname.split("/");
+  const match = objects.find((object) => {
+    const parts = object.key.split("/");
     if (parts.length < 3 || skip.has(parts[1] ?? "")) return false;
     const fileName = parts[parts.length - 1] ?? "";
     return matchesStoredDocument(fileName, storedName);
   });
-  return match?.pathname ?? null;
+  return match?.key ?? null;
 }
 
 export async function saveApplicationDocument(
@@ -259,17 +372,19 @@ export async function saveApplicationDocument(
   data: Buffer,
   contentType: string
 ): Promise<void> {
-  if (isProductionWithoutBlobStorage()) {
-    throw new Error(blobStorageConfigurationError());
+  if (isProductionWithoutR2Storage()) {
+    throw new Error(r2StorageConfigurationError());
   }
 
-  if (useBlobStorage()) {
-    await put(blobPathname(applicationRef, storedName), data, {
-      access: BLOB_ACCESS,
-      addRandomSuffix: false,
-      contentType,
-      allowOverwrite: true,
-    });
+  if (useR2Storage()) {
+    await getR2Client().send(
+      new PutObjectCommand({
+        Bucket: bucketName(),
+        Key: objectKey(applicationRef, storedName),
+        Body: data,
+        ContentType: contentType,
+      })
+    );
     return;
   }
 
@@ -283,20 +398,16 @@ export async function readApplicationDocument(
   storedName: string,
   field: ApplicationDocumentField
 ): Promise<{ buffer: Buffer; fileName: string } | null> {
-  if (useBlobStorage()) {
-    const pathname = await resolveBlobPathname(
-      applicationRef,
-      storedName,
-      field
-    );
-    if (!pathname) return null;
+  if (useR2Storage()) {
+    const key = await resolveObjectKey(applicationRef, storedName, field);
+    if (!key) return null;
 
-    const buffer = await getBlobBuffer(pathname);
-    if (!buffer) return null;
+    const downloaded = await getObjectBuffer(key);
+    if (!downloaded) return null;
 
     return {
-      buffer,
-      fileName: pathname.split("/").pop() ?? storedName,
+      buffer: downloaded.buffer,
+      fileName: key.split("/").pop() ?? storedName,
     };
   }
 
@@ -336,18 +447,14 @@ export async function readApplicationDocumentWithRefs(
     }
   }
 
-  if (useBlobStorage()) {
-    const pathname = await resolveBlobPathnameGlobal(
-      storedName,
-      field,
-      uniqueRefs
-    );
-    if (!pathname) return null;
+  if (useR2Storage()) {
+    const key = await resolveObjectKeyGlobal(storedName, field, uniqueRefs);
+    if (!key) return null;
 
-    const buffer = await getBlobBuffer(pathname);
-    if (!buffer) return null;
+    const downloaded = await getObjectBuffer(key);
+    if (!downloaded) return null;
 
-    const foundRef = pathname.split("/")[1];
+    const foundRef = key.split("/")[1];
     if (migrateToRef && foundRef && foundRef !== migrateToRef) {
       try {
         await migrateApplicationDocumentStorage(foundRef, migrateToRef);
@@ -357,8 +464,8 @@ export async function readApplicationDocumentWithRefs(
     }
 
     return {
-      buffer,
-      fileName: pathname.split("/").pop() ?? storedName,
+      buffer: downloaded.buffer,
+      fileName: key.split("/").pop() ?? storedName,
     };
   }
 
@@ -381,24 +488,20 @@ export async function migrateApplicationDocumentStorage(
 ): Promise<void> {
   if (!fromRef || !toRef || fromRef === toRef) return;
 
-  if (useBlobStorage()) {
-    const blobs = await listAllBlobsWithPrefix(blobPrefix(fromRef));
-    for (const blob of blobs) {
-      const fileName = blob.pathname.split("/").pop();
+  if (useR2Storage()) {
+    const objects = await listObjects(objectPrefix(fromRef));
+    for (const object of objects) {
+      const fileName = object.key.split("/").pop();
       if (!fileName) continue;
 
-      const result = await get(blob.pathname, { access: BLOB_ACCESS });
-      if (!result?.stream) continue;
+      const downloaded = await getObjectBuffer(object.key);
+      if (!downloaded) continue;
 
-      const buffer = await streamToBuffer(result.stream);
-      const contentType =
-        result.headers.get("content-type") ??
-        mimeTypeFromFileName(fileName);
       await saveApplicationDocument(
         toRef,
         fileName,
-        buffer,
-        contentType
+        downloaded.buffer,
+        downloaded.contentType ?? mimeTypeFromFileName(fileName)
       );
     }
     await deleteAllApplicationDocuments(fromRef);
@@ -424,8 +527,8 @@ export async function deleteApplicationDocument(
   applicationRef: string,
   storedName: string
 ): Promise<void> {
-  if (useBlobStorage()) {
-    await del(blobPathname(applicationRef, storedName));
+  if (useR2Storage()) {
+    await deleteObjectKeys([objectKey(applicationRef, storedName)]);
     return;
   }
 
@@ -446,9 +549,9 @@ export async function deleteAllApplicationDocumentsForRefs(
 export async function deleteAllApplicationDocuments(
   applicationRef: string
 ): Promise<void> {
-  if (useBlobStorage()) {
-    const blobs = await listAllBlobsWithPrefix(blobPrefix(applicationRef));
-    await Promise.all(blobs.map((blob) => del(blob.pathname)));
+  if (useR2Storage()) {
+    const objects = await listObjects(objectPrefix(applicationRef));
+    await deleteObjectKeys(objects.map((object) => object.key));
     return;
   }
 

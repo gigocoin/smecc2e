@@ -1,15 +1,15 @@
 /**
- * Repair document storage for an applicant (run on production with BLOB_READ_WRITE_TOKEN).
+ * Repair document storage for an applicant (run where R2 credentials are set).
  *
  * Usage: npx tsx scripts/repair-applicant-documents.ts APP-2026-0026
  */
 import { PrismaClient } from "@prisma/client";
-import { list } from "@vercel/blob";
 import {
   applicationDocumentStorageRefs,
+  listApplicationObjectKeys,
   migrateApplicationDocumentStorage,
   primaryApplicationDocumentRef,
-  useBlobStorage,
+  useR2Storage,
 } from "../lib/application-document-storage";
 
 const publicId = process.argv[2];
@@ -18,21 +18,10 @@ if (!publicId) {
   process.exit(1);
 }
 
-async function listAllBlobs(prefix: string) {
-  const blobs = [];
-  let cursor: string | undefined;
-  do {
-    const page = await list({ prefix, cursor });
-    blobs.push(...page.blobs);
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
-  return blobs;
-}
-
 async function main() {
-  if (!useBlobStorage()) {
+  if (!useR2Storage()) {
     console.error(
-      "BLOB_READ_WRITE_TOKEN is not set. Add your Vercel Blob token to the environment."
+      "R2 is not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME."
     );
     process.exit(1);
   }
@@ -53,18 +42,22 @@ async function main() {
     console.log("Primary ref:", primary);
 
     for (const ref of refs) {
-      const blobs = await listAllBlobs(`applications/${ref}/`);
-      console.log(`\nBlob prefix applications/${ref}/ → ${blobs.length} file(s)`);
-      for (const blob of blobs) {
-        console.log(" ", blob.pathname);
+      const keys = await listApplicationObjectKeys(`applications/${ref}/`);
+      console.log(`\nR2 prefix applications/${ref}/ → ${keys.length} file(s)`);
+      for (const key of keys) {
+        console.log(" ", key);
       }
     }
 
     const secondary = refs.find((ref) => ref !== primary);
     if (secondary) {
-      const secondaryBlobs = await listAllBlobs(`applications/${secondary}/`);
-      if (secondaryBlobs.length > 0) {
-        console.log(`\nMigrating ${secondaryBlobs.length} file(s) from ${secondary} → ${primary}…`);
+      const secondaryKeys = await listApplicationObjectKeys(
+        `applications/${secondary}/`
+      );
+      if (secondaryKeys.length > 0) {
+        console.log(
+          `\nMigrating ${secondaryKeys.length} file(s) from ${secondary} → ${primary}…`
+        );
         await migrateApplicationDocumentStorage(secondary, primary);
         console.log("Migration complete.");
       }

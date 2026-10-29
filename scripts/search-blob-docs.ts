@@ -1,4 +1,4 @@
-import { list } from "@vercel/blob";
+import { listApplicationObjectKeys } from "../lib/application-document-storage";
 
 const needles = [
   "1780271755503-e053dcb0__NIN.png",
@@ -7,31 +7,15 @@ const needles = [
 ];
 
 async function main() {
-  let cursor: string | undefined;
-  const matches: string[] = [];
-  let total = 0;
+  const keys = await listApplicationObjectKeys("applications/");
+  const matches = keys.filter((key) => {
+    const name = key.split("/").pop() ?? "";
+    return needles.some(
+      (needle) => name === needle || name.includes(needle) || key.includes(needle)
+    );
+  });
 
-  do {
-    const page = await list({ prefix: "applications/", cursor, limit: 1000 });
-    for (const blob of page.blobs) {
-      total++;
-      const name = blob.pathname.split("/").pop() ?? "";
-      if (
-        needles.some(
-          (needle) =>
-            name === needle ||
-            name.includes(needle) ||
-            blob.pathname.includes(needle)
-        )
-      ) {
-        matches.push(blob.pathname);
-      }
-    }
-    cursor = page.hasMore ? page.cursor : undefined;
-    process.stdout.write(`\rScanned ${total} blobs…`);
-  } while (cursor);
-
-  console.log(`\nTotal: ${total}`);
+  console.log(`Total: ${keys.length}`);
   console.log("Matches:", matches.length ? matches : "(none)");
 }
 

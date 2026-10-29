@@ -8,7 +8,7 @@ import {
 import {
   primaryApplicationDocumentRef,
   readApplicationDocumentWithRefs,
-  useBlobStorage,
+  useR2Storage,
 } from "@/lib/application-document-storage";
 import { mimeTypeForFileName } from "@/lib/application-documents-server";
 import {
@@ -83,9 +83,9 @@ export async function GET(
       { migrateToRef }
     );
     if (!document) {
-      const missingMessage = useBlobStorage()
+      const missingMessage = useR2Storage()
         ? "Document file missing on the server. Ask the applicant to re-upload the file by opening their draft application, or submit a new application with documents attached."
-        : "Document storage is not configured for production. Connect a Vercel Blob store and set BLOB_READ_WRITE_TOKEN, then ask the applicant to re-upload their documents.";
+        : "Document storage is not configured for production. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME, then ask the applicant to re-upload their documents.";
       return NextResponse.json(
         { error: missingMessage },
         { status: 404 }
