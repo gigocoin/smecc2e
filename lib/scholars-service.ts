@@ -87,13 +87,40 @@ export async function listScholars(options?: {
     orderBy: [{ submittedAt: "desc" }, { updatedAt: "desc" }],
   });
 
+  const applicantIds = rows.map((row) => row.applicantId);
+  const liveLetters =
+    applicantIds.length === 0
+      ? []
+      : await prisma.applicant.findMany({
+          where: { id: { in: applicantIds } },
+          select: {
+            id: true,
+            nomineeLetterSharedData: true,
+            nomineeLetterSharedAt: true,
+            nomineeLetterSentAt: true,
+          },
+        });
+  const letterByApplicantId = new Map(
+    liveLetters.map((letter) => [letter.id, letter])
+  );
+  const rowsWithLetter = rows.map((row) => {
+    const live = letterByApplicantId.get(row.applicantId);
+    if (!live?.nomineeLetterSharedData) return row;
+    return {
+      ...row,
+      nomineeLetterSharedData: live.nomineeLetterSharedData,
+      nomineeLetterSharedAt: live.nomineeLetterSharedAt,
+      nomineeLetterSentAt: live.nomineeLetterSentAt,
+    };
+  });
+
   const limitToHost = options?.hostInstitution !== undefined;
   const hostInstitution = options?.hostInstitution?.trim() ?? "";
   const visibleRows = limitToHost
-    ? rows.filter((row) =>
+    ? rowsWithLetter.filter((row) =>
         sameInstitution(scholarHostInstitution(row), hostInstitution)
       )
-    : rows;
+    : rowsWithLetter;
 
   const staffIds = [
     ...new Set(

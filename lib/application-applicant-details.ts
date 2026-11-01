@@ -1,4 +1,9 @@
-import type { ApplicationPayload } from "./application-types";
+import type { ApplicationPayload, ApplicationRecord } from "./application-types";
+import {
+  formatNomineeSubsistenceAllowance,
+  formatOptionalNomineeLetterDate,
+  NOMINEE_LETTER_PENDING,
+} from "./nominee-letter-shared";
 import type { ApplicationDocumentField } from "./application-documents";
 import { documentDisplayName } from "./application-documents";
 import {
@@ -83,6 +88,94 @@ function formatDisadvantagedCategories(payload: ApplicationPayload): string {
     );
   }
   return labels.join("; ") || "—";
+}
+
+function letterText(value: string | null | undefined): string {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed || trimmed === NOMINEE_LETTER_PENDING || trimmed === "—") return "";
+  return trimmed;
+}
+
+function letterDate(value: string | null | undefined): string {
+  const trimmed = letterText(value);
+  if (!trimmed) return "";
+  const formatted = formatOptionalNomineeLetterDate(trimmed);
+  return formatted === NOMINEE_LETTER_PENDING ? "" : formatted;
+}
+
+/** Award fields taken from the scholar's current nomination letter. */
+export function buildNomineeLetterDetailSection(
+  record: ApplicationRecord
+): ApplicantDetailSection | null {
+  const host = letterText(record.nomineeHostUniversity);
+  const mobility = letterText(record.nomineeMobilityType);
+  const area = letterText(record.nomineeAreaOfStudy);
+  if (!host && !mobility && !area) return null;
+
+  const duration = letterText(record.nomineeDurationMonths);
+  const allowance = formatNomineeSubsistenceAllowance(
+    record.nomineeSubsistenceAllowance ?? "",
+    duration
+  );
+  const focal = [letterText(record.nomineeFocalPerson), letterText(record.nomineeFocalPersonEmail)]
+    .filter(Boolean)
+    .join(" · ");
+
+  const rows: ApplicantDetailRow[] = [
+    textRow("Host university", host),
+    textRow("Type of mobility", mobility),
+    textRow("Area of study / work", area),
+    textRow(
+      "Duration",
+      duration ? (/^\d+(\.\d+)?$/.test(duration) ? `${duration} months` : duration) : ""
+    ),
+    textRow("Mobility start", letterDate(record.nomineeStartDate)),
+    textRow("Mobility end", letterDate(record.nomineeEndDate)),
+    textRow("Target group", record.nomineeTargetGroup),
+    textRow("Scholarship holder", record.nomineeHolderType),
+    textRow("Mobility activity", record.nomineeMobilityActivity),
+    textRow("Subsistence allowance", allowance),
+    textRow("Host focal person", focal),
+  ].filter((row) => row.value !== "—");
+
+  return { title: "Nomination letter", rows };
+}
+
+/** Scholar review uses the shared nomination letter for the awarded mobility. */
+export function applyNomineeLetterToScholarDetails(
+  record: ApplicationRecord,
+  sections: ApplicantDetailSection[]
+): ApplicantDetailSection[] {
+  const letter = buildNomineeLetterDetailSection(record);
+  const next = sections.map((section) => {
+    if (!section.title.startsWith("Section A")) return section;
+    return {
+      ...section,
+      rows: section.rows.map((row) => {
+        if (row.label === "Type of mobility" && letterText(record.nomineeMobilityType)) {
+          return { ...row, value: record.nomineeMobilityType!.trim() };
+        }
+        if (
+          row.label === "Preferred host institution" &&
+          letterText(record.nomineeHostUniversity)
+        ) {
+          return {
+            ...row,
+            label: "Host institution",
+            value: record.nomineeHostUniversity!.trim(),
+          };
+        }
+        if (
+          row.label === "Proposed academic programme" &&
+          letterText(record.nomineeAreaOfStudy)
+        ) {
+          return { ...row, value: record.nomineeAreaOfStudy!.trim() };
+        }
+        return row;
+      }),
+    };
+  });
+  return letter ? [letter, ...next] : next;
 }
 
 /** Full applicant breakdown (registration through section O) for coordinator/admin review. */

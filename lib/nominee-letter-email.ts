@@ -332,19 +332,29 @@ function assertNominated(application: ApplicationRecord): void {
   }
 }
 
+const SHARED_LETTER_STATUSES = new Set<ApplicationRecord["status"]>([
+  "offered",
+  "reserved",
+  "approved",
+  "pre_departure",
+  "rejected",
+]);
+
 export async function getNomineeLetterData(
   applicationRef: string,
   mode: NomineeLetterMode = "share"
 ): Promise<NomineeLetterData> {
   const application = await getApplication(applicationRef);
   if (!application) throw new Error("Application not found");
-  assertNominated(application);
 
   const row = await loadApplicantRow(applicationRef);
   const shared = parseNomineeLetterSharedSnapshot(row.nomineeLetterSharedData);
   const sent = Boolean(row.nomineeLetterSentAt);
 
   if (mode === "send") {
+    if (!SHARED_LETTER_STATUSES.has(application.status)) {
+      assertNominated(application);
+    }
     if (!shared) {
       throw new Error(
         "The coordinator has not shared a nomination letter for this applicant yet"
@@ -353,6 +363,7 @@ export async function getNomineeLetterData(
     return buildSendLetterData(application, shared, sent);
   }
 
+  assertNominated(application);
   return buildPrepareLetterData(application, shared);
 }
 

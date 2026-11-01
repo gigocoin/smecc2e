@@ -309,6 +309,7 @@ export function CoordinatorScholars() {
                                   showStatusUpdate={false}
                                   collapsibleSections
                                   embedded
+                                  includeNomineeLetter
                                 />
                               </div>
                             </td>

@@ -159,6 +159,22 @@ export type ApplicationRecord = ApplicationPayload & {
   nomineeDurationMonths?: string;
   /** Area of study/work saved on the nomination letter, when set */
   nomineeAreaOfStudy?: string;
+  /** Mobility start date saved on the nomination letter (`YYYY-MM-DD`). */
+  nomineeStartDate?: string;
+  /** Mobility end date saved on the nomination letter (`YYYY-MM-DD`). */
+  nomineeEndDate?: string;
+  /** Target group saved on the nomination letter, when set */
+  nomineeTargetGroup?: string;
+  /** Scholarship-holder type saved on the nomination letter, when set */
+  nomineeHolderType?: string;
+  /** Mobility activity saved on the nomination letter, when set */
+  nomineeMobilityActivity?: string;
+  /** Subsistence-allowance option id saved on the nomination letter */
+  nomineeSubsistenceAllowance?: string;
+  /** Host focal person recorded on the shared nomination letter */
+  nomineeFocalPerson?: string;
+  /** Host focal person email recorded on the shared nomination letter */
+  nomineeFocalPersonEmail?: string;
   /** Populated for evaluator sessions: this user's review on the application */
   myEvaluatorReviewStatus?: EvaluatorReviewStatus | null;
   /** Populated for evaluator sessions: this user's submitted evaluation scores */

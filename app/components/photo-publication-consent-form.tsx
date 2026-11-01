@@ -82,6 +82,7 @@ type LetterFields = {
   endDate: string;
   nationality: string;
   focalPerson: string;
+  areaOfStudy: string;
 };
 
 type FormState = {
@@ -212,10 +213,12 @@ export function PhotoPublicationConsentForm({
               mobilityType?: string;
               mobilityStartDate?: string;
               mobilityEndDate?: string;
+              areaOfStudy?: string;
             };
           };
         };
         if (cancelled || !data.letter) return;
+        const areaOfStudy = data.letter.editable?.areaOfStudy ?? "";
         setLetter({
           host: data.letter.editable?.hostUniversity ?? "",
           mobilityType: data.letter.editable?.mobilityType ?? "",
@@ -223,6 +226,18 @@ export function PhotoPublicationConsentForm({
           endDate: data.letter.editable?.mobilityEndDate ?? "",
           nationality: data.letter.auto?.nationality ?? "",
           focalPerson: data.letter.auto?.focalPersonName ?? "",
+          areaOfStudy,
+        });
+        setForm((current) => {
+          if (current.signedAt || !areaOfStudy.trim()) return current;
+          const applicationDefault = fieldProgrammeFromUser(user);
+          if (
+            current.fieldProgramme.trim() &&
+            current.fieldProgramme !== applicationDefault
+          ) {
+            return current;
+          }
+          return { ...current, fieldProgramme: areaOfStudy };
         });
       } catch {
         setLetter(null);

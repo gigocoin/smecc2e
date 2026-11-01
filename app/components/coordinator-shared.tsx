@@ -9,6 +9,7 @@ import {
   type ApplicationStatus,
 } from "@/lib/application-types";
 import {
+  applyNomineeLetterToScholarDetails,
   buildApplicantDetailSections,
   type ApplicantDetailRow,
 } from "@/lib/application-applicant-details";
@@ -129,6 +130,7 @@ export function ApplicationDetailPanel({
   onAssignEvaluator,
   collapsibleSections = false,
   embedded = false,
+  includeNomineeLetter = false,
 }: {
   selected: ApplicationRecord;
   updatingStatus?: boolean;
@@ -147,10 +149,15 @@ export function ApplicationDetailPanel({
   collapsibleSections?: boolean;
   /** Inline accordion row (no max-height scroll container). */
   embedded?: boolean;
+  /** Show the current nomination letter and use it for mobility details. */
+  includeNomineeLetter?: boolean;
 }) {
-  const sections = buildApplicantDetailSections(selected, {
+  const applicationSections = buildApplicantDetailSections(selected, {
     profileUploaded: selected.profileUploaded,
   });
+  const sections = includeNomineeLetter
+    ? applyNomineeLetterToScholarDetails(selected, applicationSections)
+    : applicationSections;
   const [decision, setDecision] = useState<"accepted" | "rejected" | null>(() =>
     decisionFromApplication(selected)
   );

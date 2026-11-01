@@ -127,6 +127,61 @@ function journeyIndex(status: ApplicationStatus | null | undefined): number {
   return 1;
 }
 
+type AwardLetter = {
+  host: string;
+  mobilityType: string;
+  areaOfStudy: string;
+  durationMonths: string;
+  startDate: string;
+  endDate: string;
+};
+
+function awardText(value: string | null | undefined): string {
+  const text = value?.trim() ?? "";
+  if (!text || text === "[pending]" || text === "—") return "";
+  return text;
+}
+
+function awardOrPending(
+  primary: string | null | undefined,
+  fallback: string | null | undefined
+): string {
+  return awardText(primary) || awardText(fallback) || "Pending";
+}
+
+function awardDuration(months: string | null | undefined): string {
+  const text = awardText(months);
+  if (!text) return "";
+  return /^\d+(\.\d+)?$/.test(text) ? `${text} months` : text;
+}
+
+function scholarAwardDetails(
+  app: ApplicantSessionUser["application"],
+  award: AwardLetter | null
+): { label: string; value: string }[] {
+  const duration = awardDuration(award?.durationMonths);
+  const dates = [awardText(award?.startDate), awardText(award?.endDate)]
+    .filter(Boolean)
+    .join(" – ");
+  return [
+    { label: "Reference", value: app?.publicId || app?.id || "Not assigned" },
+    {
+      label: "Host university",
+      value: awardOrPending(award?.host, app?.preferredHostInstitution),
+    },
+    {
+      label: "Type of mobility",
+      value: awardOrPending(award?.mobilityType, app?.typeOfMobility),
+    },
+    {
+      label: "Area of study",
+      value: awardOrPending(award?.areaOfStudy, app?.proposedAcademicProgramme),
+    },
+    ...(duration ? [{ label: "Duration", value: duration }] : []),
+    ...(dates ? [{ label: "Mobility dates", value: dates }] : []),
+  ];
+}
+
 const JOURNEY = [
   {
     label: "Application",
@@ -158,6 +213,7 @@ export function ScholarDashboard() {
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [agreementOpen, setAgreementOpen] = useState(false);
   const [agreementMessage, setAgreementMessage] = useState<string | null>(null);
+  const [award, setAward] = useState<AwardLetter | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadUser = useCallback(async () => {
@@ -188,6 +244,44 @@ export function ScholarDashboard() {
   useEffect(() => {
     void loadUser();
   }, [loadUser]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/applicant/nominee-letter");
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          letter?: {
+            editable?: {
+              hostUniversity?: string;
+              mobilityType?: string;
+              areaOfStudy?: string;
+              durationMonths?: string;
+              mobilityStartDate?: string;
+              mobilityEndDate?: string;
+            };
+          };
+        };
+        if (cancelled || !data.letter?.editable) return;
+        const editable = data.letter.editable;
+        setAward({
+          host: editable.hostUniversity ?? "",
+          mobilityType: editable.mobilityType ?? "",
+          areaOfStudy: editable.areaOfStudy ?? "",
+          durationMonths: editable.durationMonths ?? "",
+          startDate: editable.mobilityStartDate ?? "",
+          endDate: editable.mobilityEndDate ?? "",
+        });
+      } catch {
+        if (!cancelled) setAward(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const sectionParam = searchParams.get("section");
   const onboardingParam = searchParams.get("onboarding");
@@ -230,7 +324,10 @@ export function ScholarDashboard() {
     app?.firstName || app?.surname
       ? `${app.firstName} ${app.surname}`.trim()
       : user.email;
-  const navItems = scholarNavForMobility(app?.typeOfMobility);
+  const navItems = scholarNavForMobility(
+    awardText(award?.mobilityType) || app?.typeOfMobility
+  );
+  const awardDetails = scholarAwardDetails(app, award);
   const section = parseScholarSection(searchParams.get("section"), navItems);
   const onboardingView =
     section === "onboarding"
@@ -415,6 +512,7 @@ export function ScholarDashboard() {
             <OnboardingPanel
               user={user}
               displayName={displayName}
+              awardDetails={awardDetails}
               agreementMessage={agreementMessage}
               onOpenAgreement={() => {
                 setAgreementMessage(null);
@@ -447,7 +545,7 @@ export function ScholarDashboard() {
                   onboardingView as Exclude<ScholarOnboardingView, "agreement">
                 ]
               }
-              details={onboardingDetails(onboardingView, user, displayName)}
+              details={onboardingDetails(onboardingView, user, displayName, award)}
             />
           ) : section === "pre_departure" ? (
             <SectionPanel
@@ -458,20 +556,7 @@ export function ScholarDashboard() {
                   ? PRE_DEPARTURE_INTRO[arrivalView]
                   : "Travel, insurance, visa, and arrival arrangements are confirmed here with your host university before you leave."
               }
-              details={[
-                {
-                  label: "Reference",
-                  value: app?.publicId || app?.id || "Not assigned",
-                },
-                {
-                  label: "Host university",
-                  value: app?.preferredHostInstitution || "Pending",
-                },
-                {
-                  label: "Type of mobility",
-                  value: app?.typeOfMobility || "Pending",
-                },
-              ]}
+              details={awardDetails}
             />
           ) : (
             <SectionPanel
@@ -481,20 +566,7 @@ export function ScholarDashboard() {
                   section as Exclude<ScholarSectionId, "onboarding" | "pre_departure">
                 ]
               }
-              details={[
-                {
-                  label: "Reference",
-                  value: app?.publicId || app?.id || "Not assigned",
-                },
-                {
-                  label: "Host university",
-                  value: app?.preferredHostInstitution || "Pending",
-                },
-                {
-                  label: "Type of mobility",
-                  value: app?.typeOfMobility || "Pending",
-                },
-              ]}
+              details={awardDetails}
             />
           )}
         </main>
@@ -506,12 +578,14 @@ export function ScholarDashboard() {
 function OnboardingPanel({
   user,
   displayName,
+  awardDetails,
   heading,
   agreementMessage,
   onOpenAgreement,
 }: {
   user: ApplicantSessionUser;
   displayName: string;
+  awardDetails: { label: string; value: string }[];
   heading?: string;
   agreementMessage: string | null;
   onOpenAgreement: () => void;
@@ -563,16 +637,9 @@ function OnboardingPanel({
         </div>
 
         <div className="grid gap-px bg-slate-200 sm:grid-cols-2 lg:grid-cols-4">
-          <Detail label="Reference" value={app?.publicId || app?.id || "Not assigned"} />
-          <Detail
-            label="Host university"
-            value={app?.preferredHostInstitution || "Pending"}
-          />
-          <Detail label="Type of mobility" value={app?.typeOfMobility || "Pending"} />
-          <Detail
-            label="Programme"
-            value={app?.proposedAcademicProgramme || "Pending"}
-          />
+          {awardDetails.map((detail) => (
+            <Detail key={detail.label} label={detail.label} value={detail.value} />
+          ))}
         </div>
 
         <div className="space-y-4 px-6 py-5">
@@ -684,9 +751,11 @@ function SectionPanel({
 function onboardingDetails(
   view: ScholarOnboardingView,
   user: ApplicantSessionUser,
-  displayName: string
+  displayName: string,
+  award: AwardLetter | null
 ): { label: string; value: string }[] {
   const app = user.application;
+  const awardDetails = scholarAwardDetails(app, award);
   if (view === "contact") {
     return [
       { label: "Name", value: displayName },
@@ -694,25 +763,14 @@ function onboardingDetails(
       { label: "Reference", value: app?.publicId || app?.id || "Not assigned" },
     ];
   }
-  if (view === "mobility") {
-    return [
-      { label: "Host university", value: app?.preferredHostInstitution || "Pending" },
-      { label: "Type of mobility", value: app?.typeOfMobility || "Pending" },
-      { label: "Programme", value: app?.proposedAcademicProgramme || "Pending" },
-    ];
-  }
   if (view === "acceptance") {
     return [
       { label: "Status", value: scholarStatusLabel(app?.status) },
+      ...awardDetails.filter((detail) => detail.label !== "Reference").slice(0, 2),
       { label: "Reference", value: app?.publicId || app?.id || "Not assigned" },
-      { label: "Host university", value: app?.preferredHostInstitution || "Pending" },
     ];
   }
-  return [
-    { label: "Name", value: displayName },
-    { label: "Reference", value: app?.publicId || app?.id || "Not assigned" },
-    { label: "Host university", value: app?.preferredHostInstitution || "Pending" },
-  ];
+  return awardDetails;
 }
 
 function flyoutPanelPosition(

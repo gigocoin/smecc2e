@@ -145,6 +145,17 @@ export function nomineeLetterHostUniversity(
   return nomineeLetterEditableField(nomineeLetterSharedData, "hostUniversity");
 }
 
+function nomineeLetterSnapshotText(
+  nomineeLetterSharedData: unknown,
+  key: string
+): string {
+  if (!nomineeLetterSharedData || typeof nomineeLetterSharedData !== "object") {
+    return "";
+  }
+  const value = (nomineeLetterSharedData as Record<string, unknown>)[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
 export function mapPrismaApplicant(
   row: Applicant & {
     evaluator1?: Pick<User, "id" | "publicId" | "name" | "email"> | null;
@@ -200,6 +211,38 @@ export function mapPrismaApplicant(
     nomineeAreaOfStudy: nomineeLetterEditableField(
       row.nomineeLetterSharedData,
       "areaOfStudy"
+    ),
+    nomineeStartDate: nomineeLetterEditableField(
+      row.nomineeLetterSharedData,
+      "mobilityStartDate"
+    ),
+    nomineeEndDate: nomineeLetterEditableField(
+      row.nomineeLetterSharedData,
+      "mobilityEndDate"
+    ),
+    nomineeTargetGroup: nomineeLetterEditableField(
+      row.nomineeLetterSharedData,
+      "targetGroup"
+    ),
+    nomineeHolderType: nomineeLetterEditableField(
+      row.nomineeLetterSharedData,
+      "holderType"
+    ),
+    nomineeMobilityActivity: nomineeLetterEditableField(
+      row.nomineeLetterSharedData,
+      "mobilityActivity"
+    ),
+    nomineeSubsistenceAllowance: nomineeLetterEditableField(
+      row.nomineeLetterSharedData,
+      "subsistenceAllowance"
+    ),
+    nomineeFocalPerson: nomineeLetterSnapshotText(
+      row.nomineeLetterSharedData,
+      "focalPersonName"
+    ),
+    nomineeFocalPersonEmail: nomineeLetterSnapshotText(
+      row.nomineeLetterSharedData,
+      "focalPersonEmail"
     ),
     email: row.email,
     nationality: row.nationality,
