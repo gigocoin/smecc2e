@@ -178,8 +178,8 @@ function addCanvasSliceToPdf(
   if (startNewPage) {
     pdf.addPage([A4_WIDTH_MM, pageHeight], "portrait");
   } else {
-    pdf.internal.pageSize.setWidth(A4_WIDTH_MM);
-    pdf.internal.pageSize.setHeight(pageHeight);
+    pdf.internal.pageSize.width = A4_WIDTH_MM;
+    pdf.internal.pageSize.height = pageHeight;
   }
 
   pdf.addImage(

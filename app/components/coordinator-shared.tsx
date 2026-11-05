@@ -35,7 +35,8 @@ export function formatDisadvantaged(app: ApplicationRecord): string {
   return items.join("; ") || "—";
 }
 
-export function formatDate(iso: string) {
+export function formatDate(iso: string | null | undefined) {
+  if (!iso) return "—";
   return new Date(iso).toLocaleString(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
