@@ -8,6 +8,11 @@ import type {
 import { applicantPrimaryEmail } from "./application-types";
 import { parseEvaluatorEvaluationSubmission } from "./evaluator-evaluation-types";
 import { parseInterviewEvaluationSubmission } from "./interview-scoring-sheet";
+import { parseScholarshipAcceptanceFormData } from "./scholarship-acceptance-shared";
+import { parseMobilityDetailsFormData } from "./mobility-details-shared";
+import { parsePersonalContactFormData } from "./personal-contact-shared";
+import { parsePhotoPublicationConsentFormData } from "./photo-publication-consent-shared";
+import { parseScholarshipAgreementFormData } from "./scholarship-agreement-shared";
 
 export function applicantEmailFromPayload(payload: ApplicationPayload): string {
   return applicantPrimaryEmail(payload).trim().toLowerCase();
@@ -243,6 +248,35 @@ export function mapPrismaApplicant(
     nomineeFocalPersonEmail: nomineeLetterSnapshotText(
       row.nomineeLetterSharedData,
       "focalPersonEmail"
+    ),
+    scholarshipAcceptanceSubmitted:
+      row.scholarshipAcceptanceSubmittedAt != null,
+    scholarshipAcceptanceSubmittedAt:
+      row.scholarshipAcceptanceSubmittedAt?.toISOString() ?? null,
+    scholarshipAcceptanceData: parseScholarshipAcceptanceFormData(
+      row.scholarshipAcceptanceData
+    ),
+    scholarshipAgreementSubmitted:
+      row.scholarshipAgreementSubmittedAt != null,
+    scholarshipAgreementSubmittedAt:
+      row.scholarshipAgreementSubmittedAt?.toISOString() ?? null,
+    scholarshipAgreementData: parseScholarshipAgreementFormData(
+      row.scholarshipAgreementData
+    ),
+    personalContactSubmitted: row.personalContactSubmittedAt != null,
+    personalContactSubmittedAt:
+      row.personalContactSubmittedAt?.toISOString() ?? null,
+    personalContactData: parsePersonalContactFormData(row.personalContactData),
+    mobilityDetailsSubmitted: row.mobilityDetailsSubmittedAt != null,
+    mobilityDetailsSubmittedAt:
+      row.mobilityDetailsSubmittedAt?.toISOString() ?? null,
+    mobilityDetailsData: parseMobilityDetailsFormData(row.mobilityDetailsData),
+    photoPublicationConsentSubmitted:
+      row.photoPublicationConsentSubmittedAt != null,
+    photoPublicationConsentSubmittedAt:
+      row.photoPublicationConsentSubmittedAt?.toISOString() ?? null,
+    photoPublicationConsentData: parsePhotoPublicationConsentFormData(
+      row.photoPublicationConsentData
     ),
     email: row.email,
     nationality: row.nationality,

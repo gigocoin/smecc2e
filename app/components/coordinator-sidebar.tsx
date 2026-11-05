@@ -42,27 +42,12 @@ import {
   isWorkPackagesGroupActive,
 } from "@/lib/coordinator-project-nav";
 import {
-  buildScholarsApprovalNav,
-  buildScholarsGrievanceNav,
   buildScholarsManagementNav,
-  buildScholarsMobilityNav,
-  buildScholarsPaymentNav,
-  buildScholarsRecordNav,
-  buildScholarsTaskNav,
-  isScholarsApprovalSubActive,
-  isScholarsApprovalsGroupActive,
-  isScholarsGrievanceSubActive,
-  isScholarsGrievancesGroupActive,
+  buildScholarsOnboardingNav,
   isScholarsManagementGroupActive,
   isScholarsManagementSubActive,
-  isScholarsMobilityGroupActive,
-  isScholarsMobilitySubActive,
-  isScholarsPaymentSubActive,
-  isScholarsPaymentsGroupActive,
-  isScholarsRecordSubActive,
-  isScholarsRecordsGroupActive,
-  isScholarsTaskSubActive,
-  isScholarsTasksGroupActive,
+  isScholarsOnboardingGroupActive,
+  isScholarsOnboardingSubActive,
 } from "@/lib/coordinator-scholars-nav";
 import { useDashboardPortal } from "./dashboard-portal-provider";
 
@@ -431,58 +416,18 @@ function ScholarsManagementNav({
   basePath,
   pathname,
   sectionParam,
-  mobilityParam,
-  taskParam,
-  approvalParam,
-  grievanceParam,
-  paymentParam,
-  recordParam,
+  onboardingParam,
   onNavigate,
 }: {
   basePath: string;
   pathname: string;
   sectionParam: string | null;
-  mobilityParam: string | null;
-  taskParam: string | null;
-  approvalParam: string | null;
-  grievanceParam: string | null;
-  paymentParam: string | null;
-  recordParam: string | null;
+  onboardingParam: string | null;
   onNavigate: () => void;
 }) {
   const items = buildScholarsManagementNav(basePath);
-  const mobilityItems = buildScholarsMobilityNav(basePath);
-  const taskItems = buildScholarsTaskNav(basePath);
-  const approvalItems = buildScholarsApprovalNav(basePath);
-  const grievanceItems = buildScholarsGrievanceNav(basePath);
-  const paymentItems = buildScholarsPaymentNav(basePath);
-  const recordItems = buildScholarsRecordNav(basePath);
-  const mobilityGroupActive = isScholarsMobilityGroupActive(
-    pathname,
-    sectionParam,
-    basePath
-  );
-  const tasksGroupActive = isScholarsTasksGroupActive(
-    pathname,
-    sectionParam,
-    basePath
-  );
-  const approvalsGroupActive = isScholarsApprovalsGroupActive(
-    pathname,
-    sectionParam,
-    basePath
-  );
-  const grievancesGroupActive = isScholarsGrievancesGroupActive(
-    pathname,
-    sectionParam,
-    basePath
-  );
-  const paymentsGroupActive = isScholarsPaymentsGroupActive(
-    pathname,
-    sectionParam,
-    basePath
-  );
-  const recordsGroupActive = isScholarsRecordsGroupActive(
+  const onboardingItems = buildScholarsOnboardingNav(basePath);
+  const onboardingGroupActive = isScholarsOnboardingGroupActive(
     pathname,
     sectionParam,
     basePath
@@ -494,31 +439,12 @@ function ScholarsManagementNav({
     basePath
   );
   const [open, setOpen] = useState(false);
-  const [mobilitiesOpen, setMobilitiesOpen] = useState(false);
-  const [tasksOpen, setTasksOpen] = useState(false);
-  const [approvalsOpen, setApprovalsOpen] = useState(false);
-  const [grievancesOpen, setGrievancesOpen] = useState(false);
-  const [paymentsOpen, setPaymentsOpen] = useState(false);
-  const [recordsOpen, setRecordsOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
 
   useEffect(() => {
     setOpen(false);
-    setMobilitiesOpen(false);
-    setTasksOpen(false);
-    setApprovalsOpen(false);
-    setGrievancesOpen(false);
-    setPaymentsOpen(false);
-    setRecordsOpen(false);
-  }, [
-    pathname,
-    sectionParam,
-    mobilityParam,
-    taskParam,
-    approvalParam,
-    grievanceParam,
-    paymentParam,
-    recordParam,
-  ]);
+    setOnboardingOpen(false);
+  }, [pathname, sectionParam, onboardingParam]);
 
   return (
     <SidebarFlyoutSubmenu
@@ -530,221 +456,36 @@ function ScholarsManagementNav({
       onClose={() => setOpen(false)}
     >
       {items.map((item) => {
-        if (item.nestedMenu === "mobilities") {
+        if (item.nestedMenu === "onboarding") {
           return (
             <FlyoutNestedSubmenu
               key={item.id}
               label={item.label}
-              groupActive={mobilityGroupActive}
-              open={mobilitiesOpen}
-              onToggle={() => setMobilitiesOpen((prev) => !prev)}
-              onClose={() => setMobilitiesOpen(false)}
+              groupActive={onboardingGroupActive}
+              open={onboardingOpen}
+              onToggle={() => setOnboardingOpen((prev) => !prev)}
+              onClose={() => setOnboardingOpen(false)}
             >
-              {mobilityItems.map((mobilityItem) => {
-                const active = isScholarsMobilitySubActive(
-                  mobilityItem,
+              {onboardingItems.map((onboardingItem) => {
+                const active = isScholarsOnboardingSubActive(
+                  onboardingItem,
                   pathname,
                   sectionParam,
-                  mobilityParam,
+                  onboardingParam,
                   basePath
                 );
                 return (
                   <FlyoutSubmenuLink
-                    key={mobilityItem.id}
-                    href={mobilityItem.href}
+                    key={onboardingItem.id}
+                    href={onboardingItem.href}
                     active={active}
                     onNavigate={() => {
-                      setMobilitiesOpen(false);
+                      setOnboardingOpen(false);
                       setOpen(false);
                       onNavigate();
                     }}
                   >
-                    {mobilityItem.label}
-                  </FlyoutSubmenuLink>
-                );
-              })}
-            </FlyoutNestedSubmenu>
-          );
-        }
-
-        if (item.nestedMenu === "approvals") {
-          return (
-            <FlyoutNestedSubmenu
-              key={item.id}
-              label={item.label}
-              groupActive={approvalsGroupActive}
-              open={approvalsOpen}
-              onToggle={() => setApprovalsOpen((prev) => !prev)}
-              onClose={() => setApprovalsOpen(false)}
-            >
-              {approvalItems.map((approvalItem) => {
-                const active = isScholarsApprovalSubActive(
-                  approvalItem,
-                  pathname,
-                  sectionParam,
-                  approvalParam,
-                  basePath
-                );
-                return (
-                  <FlyoutSubmenuLink
-                    key={approvalItem.id}
-                    href={approvalItem.href}
-                    active={active}
-                    onNavigate={() => {
-                      setApprovalsOpen(false);
-                      setOpen(false);
-                      onNavigate();
-                    }}
-                  >
-                    {approvalItem.label}
-                  </FlyoutSubmenuLink>
-                );
-              })}
-            </FlyoutNestedSubmenu>
-          );
-        }
-
-        if (item.nestedMenu === "grievances") {
-          return (
-            <FlyoutNestedSubmenu
-              key={item.id}
-              label={item.label}
-              groupActive={grievancesGroupActive}
-              open={grievancesOpen}
-              onToggle={() => setGrievancesOpen((prev) => !prev)}
-              onClose={() => setGrievancesOpen(false)}
-            >
-              {grievanceItems.map((grievanceItem) => {
-                const active = isScholarsGrievanceSubActive(
-                  grievanceItem,
-                  pathname,
-                  sectionParam,
-                  grievanceParam,
-                  basePath
-                );
-                return (
-                  <FlyoutSubmenuLink
-                    key={grievanceItem.id}
-                    href={grievanceItem.href}
-                    active={active}
-                    onNavigate={() => {
-                      setGrievancesOpen(false);
-                      setOpen(false);
-                      onNavigate();
-                    }}
-                  >
-                    {grievanceItem.label}
-                  </FlyoutSubmenuLink>
-                );
-              })}
-            </FlyoutNestedSubmenu>
-          );
-        }
-
-        if (item.nestedMenu === "payments") {
-          return (
-            <FlyoutNestedSubmenu
-              key={item.id}
-              label={item.label}
-              groupActive={paymentsGroupActive}
-              open={paymentsOpen}
-              onToggle={() => setPaymentsOpen((prev) => !prev)}
-              onClose={() => setPaymentsOpen(false)}
-            >
-              {paymentItems.map((paymentItem) => {
-                const active = isScholarsPaymentSubActive(
-                  paymentItem,
-                  pathname,
-                  sectionParam,
-                  paymentParam,
-                  basePath
-                );
-                return (
-                  <FlyoutSubmenuLink
-                    key={paymentItem.id}
-                    href={paymentItem.href}
-                    active={active}
-                    onNavigate={() => {
-                      setPaymentsOpen(false);
-                      setOpen(false);
-                      onNavigate();
-                    }}
-                  >
-                    {paymentItem.label}
-                  </FlyoutSubmenuLink>
-                );
-              })}
-            </FlyoutNestedSubmenu>
-          );
-        }
-
-        if (item.nestedMenu === "records") {
-          return (
-            <FlyoutNestedSubmenu
-              key={item.id}
-              label={item.label}
-              groupActive={recordsGroupActive}
-              open={recordsOpen}
-              onToggle={() => setRecordsOpen((prev) => !prev)}
-              onClose={() => setRecordsOpen(false)}
-            >
-              {recordItems.map((recordItem) => {
-                const active = isScholarsRecordSubActive(
-                  recordItem,
-                  pathname,
-                  sectionParam,
-                  recordParam,
-                  basePath
-                );
-                return (
-                  <FlyoutSubmenuLink
-                    key={recordItem.id}
-                    href={recordItem.href}
-                    active={active}
-                    onNavigate={() => {
-                      setRecordsOpen(false);
-                      setOpen(false);
-                      onNavigate();
-                    }}
-                  >
-                    {recordItem.label}
-                  </FlyoutSubmenuLink>
-                );
-              })}
-            </FlyoutNestedSubmenu>
-          );
-        }
-
-        if (item.nestedMenu === "tasks") {
-          return (
-            <FlyoutNestedSubmenu
-              key={item.id}
-              label={item.label}
-              groupActive={tasksGroupActive}
-              open={tasksOpen}
-              onToggle={() => setTasksOpen((prev) => !prev)}
-              onClose={() => setTasksOpen(false)}
-            >
-              {taskItems.map((taskItem) => {
-                const active = isScholarsTaskSubActive(
-                  taskItem,
-                  pathname,
-                  sectionParam,
-                  taskParam,
-                  basePath
-                );
-                return (
-                  <FlyoutSubmenuLink
-                    key={taskItem.id}
-                    href={taskItem.href}
-                    active={active}
-                    onNavigate={() => {
-                      setTasksOpen(false);
-                      setOpen(false);
-                      onNavigate();
-                    }}
-                  >
-                    {taskItem.label}
+                    {onboardingItem.label}
                   </FlyoutSubmenuLink>
                 );
               })}
@@ -1281,29 +1022,9 @@ export function CoordinatorSidebar({
   const statusParam = isHydrated ? searchParams.get("status") : null;
   const scholarsSectionParam =
     isHydrated && pathname.includes("/scholars") ? section : null;
-  const scholarsMobilityParam =
+  const scholarsOnboardingParam =
     isHydrated && pathname.includes("/scholars")
-      ? searchParams.get("mobility")
-      : null;
-  const scholarsTaskParam =
-    isHydrated && pathname.includes("/scholars") && section === "tasks"
-      ? searchParams.get("task")
-      : null;
-  const scholarsApprovalParam =
-    isHydrated && pathname.includes("/scholars") && section === "approvals"
-      ? searchParams.get("approval")
-      : null;
-  const scholarsGrievanceParam =
-    isHydrated && pathname.includes("/scholars") && section === "grievances"
-      ? searchParams.get("grievance")
-      : null;
-  const scholarsPaymentParam =
-    isHydrated && pathname.includes("/scholars") && section === "payments"
-      ? searchParams.get("payment")
-      : null;
-  const scholarsRecordParam =
-    isHydrated && pathname.includes("/scholars") && section === "records"
-      ? searchParams.get("record")
+      ? searchParams.get("onboarding")
       : null;
   const financeSectionParam =
     isHydrated && pathname.includes("/finance") ? section : null;
@@ -1437,12 +1158,7 @@ export function CoordinatorSidebar({
                           basePath={basePath}
                           pathname={pathname}
                           sectionParam={scholarsSectionParam}
-                          mobilityParam={scholarsMobilityParam}
-                          taskParam={scholarsTaskParam}
-                          approvalParam={scholarsApprovalParam}
-                          grievanceParam={scholarsGrievanceParam}
-                          paymentParam={scholarsPaymentParam}
-                          recordParam={scholarsRecordParam}
+                          onboardingParam={scholarsOnboardingParam}
                           onNavigate={close}
                         />
                         <FinancialManagementNav

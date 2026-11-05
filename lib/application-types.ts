@@ -1,5 +1,10 @@
 import type { EvaluatorEvaluationSubmission } from "./evaluator-evaluation-types";
 import type { InterviewEvaluationSubmission } from "./interview-scoring-sheet";
+import type { ScholarshipAcceptanceFormData } from "./scholarship-acceptance-shared";
+import type { MobilityDetailsFormData } from "./mobility-details-shared";
+import type { PersonalContactFormData } from "./personal-contact-shared";
+import type { PhotoPublicationConsentFormData } from "./photo-publication-consent-shared";
+import type { ScholarshipAgreementFormData } from "./scholarship-agreement-shared";
 
 export type ApplicationStatus =
   | "draft"
@@ -175,6 +180,36 @@ export type ApplicationRecord = ApplicationPayload & {
   nomineeFocalPerson?: string;
   /** Host focal person email recorded on the shared nomination letter */
   nomineeFocalPersonEmail?: string;
+  /** Scholar has submitted the scholarship acceptance & funding declaration */
+  scholarshipAcceptanceSubmitted?: boolean;
+  /** When the scholarship acceptance form was submitted */
+  scholarshipAcceptanceSubmittedAt?: string | null;
+  /** Submitted scholarship acceptance & funding declaration payload */
+  scholarshipAcceptanceData?: ScholarshipAcceptanceFormData | null;
+  /** Scholar has submitted the scholarship agreement / e-signature form */
+  scholarshipAgreementSubmitted?: boolean;
+  /** When the scholarship agreement form was submitted */
+  scholarshipAgreementSubmittedAt?: string | null;
+  /** Submitted scholarship agreement / e-signature payload */
+  scholarshipAgreementData?: ScholarshipAgreementFormData | null;
+  /** Scholar has submitted the personal & contact information update */
+  personalContactSubmitted?: boolean;
+  /** When the personal & contact information update was submitted */
+  personalContactSubmittedAt?: string | null;
+  /** Submitted personal & contact information update payload */
+  personalContactData?: PersonalContactFormData | null;
+  /** Scholar has submitted the mobility details confirmation */
+  mobilityDetailsSubmitted?: boolean;
+  /** When the mobility details confirmation was submitted */
+  mobilityDetailsSubmittedAt?: string | null;
+  /** Submitted mobility details confirmation payload */
+  mobilityDetailsData?: MobilityDetailsFormData | null;
+  /** Scholar has submitted the photo & publication consent */
+  photoPublicationConsentSubmitted?: boolean;
+  /** When the photo & publication consent was submitted */
+  photoPublicationConsentSubmittedAt?: string | null;
+  /** Submitted photo & publication consent payload */
+  photoPublicationConsentData?: PhotoPublicationConsentFormData | null;
   /** Populated for evaluator sessions: this user's review on the application */
   myEvaluatorReviewStatus?: EvaluatorReviewStatus | null;
   /** Populated for evaluator sessions: this user's submitted evaluation scores */

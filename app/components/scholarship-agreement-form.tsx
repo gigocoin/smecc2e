@@ -107,17 +107,41 @@ export function ScholarshipAgreementForm({
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey(applicationId));
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as Partial<FormState>;
-      setForm({ ...EMPTY_FORM, ...parsed });
-      if (parsed.signedAt) setSaved(true);
-    } catch {
-      setForm(EMPTY_FORM);
-    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/applicant/scholarship-agreement");
+        if (res.ok) {
+          const data = (await res.json()) as {
+            form?: Partial<FormState> | null;
+            submitted?: boolean;
+          };
+          if (!cancelled && data.form) {
+            setForm({ ...EMPTY_FORM, ...data.form });
+            if (data.submitted || data.form.signedAt) setSaved(true);
+            return;
+          }
+        }
+      } catch {
+        // Fall back to any local draft below.
+      }
+      if (cancelled) return;
+      try {
+        const raw = localStorage.getItem(storageKey(applicationId));
+        if (!raw) return;
+        const parsed = JSON.parse(raw) as Partial<FormState>;
+        setForm({ ...EMPTY_FORM, ...parsed });
+        if (parsed.signedAt) setSaved(true);
+      } catch {
+        setForm(EMPTY_FORM);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [applicationId]);
 
   useEffect(() => {
@@ -177,12 +201,13 @@ export function ScholarshipAgreementForm({
   });
 
   const update = (patch: Partial<FormState>) => {
-    setSaved(false);
+    if (saved || submitting) return;
     setError(null);
     setForm((current) => ({ ...current, ...patch, signature: "", signedAt: "" }));
   };
 
   const sign = () => {
+    if (saved || submitting) return;
     if (!form.agreementVersion.trim()) {
       setError("Enter the scholarship agreement version and date.");
       return;
@@ -213,14 +238,37 @@ export function ScholarshipAgreementForm({
       minute: "2-digit",
     });
     const next = { ...form, signature: fullName, signedAt };
-    setForm(next);
-    setSaved(true);
+    setSubmitting(true);
     setError(null);
-    try {
-      localStorage.setItem(storageKey(applicationId), JSON.stringify(next));
-    } catch {
-      setError("The agreement was signed in this session, but it could not be stored in this browser.");
-    }
+    void (async () => {
+      try {
+        const res = await fetch("/api/applicant/scholarship-agreement", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ form: next }),
+        });
+        const data = (await res.json()) as {
+          form?: FormState;
+          error?: string;
+        };
+        if (!res.ok) {
+          setError(data.error ?? "Could not submit the agreement.");
+          return;
+        }
+        const submitted = data.form ? { ...EMPTY_FORM, ...data.form } : next;
+        setForm(submitted);
+        setSaved(true);
+        try {
+          localStorage.setItem(storageKey(applicationId), JSON.stringify(submitted));
+        } catch {
+          // Server save succeeded; local draft is optional.
+        }
+      } catch {
+        setError("Could not submit the agreement.");
+      } finally {
+        setSubmitting(false);
+      }
+    })();
   };
 
   return (
@@ -446,9 +494,10 @@ export function ScholarshipAgreementForm({
         <button
           type="button"
           onClick={sign}
-          className="inline-flex rounded-lg bg-[#062763] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0a3580]"
+          disabled={saved || submitting}
+          className="inline-flex rounded-lg bg-[#062763] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0a3580] disabled:opacity-50"
         >
-          Sign agreement
+          {submitting ? "Submitting…" : saved ? "Agreement signed" : "Sign agreement"}
         </button>
       </div>
       <footer className="border-t border-slate-200 bg-white px-6 py-4">

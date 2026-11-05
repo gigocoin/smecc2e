@@ -1,100 +1,35 @@
-export type ScholarsManagementSection =
-  | "mobilities"
-  | "tasks"
-  | "approvals"
-  | "grievances"
-  | "payments"
-  | "reminders"
-  | "surveys"
-  | "records";
+import {
+  SCHOLAR_ONBOARDING_NAV,
+  type ScholarOnboardingView,
+} from "@/lib/scholar-nav";
 
-export type ScholarsMobilityView =
-  | "incoming"
-  | "active"
-  | "inactive"
-  | "alumni";
+export type ScholarsManagementSection =
+  | "onboarding"
+  | "pre_departure"
+  | "finance"
+  | "academic_plan"
+  | "supervision"
+  | "internships"
+  | "research_alumni"
+  | "grievance"
+  | "mobility_changes"
+  | "completion"
+  | "collaborations";
+
+export type ScholarsOnboardingView = ScholarOnboardingView;
 
 export type ScholarsManagementNavId = ScholarsManagementSection;
-
-export type ScholarsTaskView =
-  | "amend_cancel"
-  | "other_agreements"
-  | "assign_scholars"
-  | "assign_administrators";
 
 export type ScholarsManagementNavItem = {
   id: ScholarsManagementNavId;
   label: string;
   href?: string;
   section: ScholarsManagementSection;
-  /** Renders a nested right flyout instead of a direct link. */
-  nestedMenu?:
-    | "mobilities"
-    | "tasks"
-    | "approvals"
-    | "grievances"
-    | "payments"
-    | "records";
+  nestedMenu?: "onboarding";
 };
 
-export type ScholarsMobilityNavItem = {
-  id: ScholarsMobilityView;
-  label: string;
-  href: string;
-};
-
-export type ScholarsTaskNavItem = {
-  id: ScholarsTaskView;
-  label: string;
-  href: string;
-};
-
-export type ScholarsApprovalView =
-  | "assign_administrators"
-  | "administrator_approvals"
-  | "announcements";
-
-export type ScholarsApprovalNavItem = {
-  id: ScholarsApprovalView;
-  label: string;
-  href: string;
-};
-
-export type ScholarsPaymentView =
-  | "disbursements_to_partners"
-  | "bank_details"
-  | "allowance_schedule"
-  | "payment_confirmations"
-  | "insurance_costs"
-  | "research_costs";
-
-export type ScholarsPaymentNavItem = {
-  id: ScholarsPaymentView;
-  label: string;
-  href: string;
-};
-
-export type ScholarsRecordView =
-  | "signed_agreements"
-  | "scholar_feedback"
-  | "mobility_report"
-  | "internship_report"
-  | "financial_evidence_report"
-  | "academic_supervision_report";
-
-export type ScholarsRecordNavItem = {
-  id: ScholarsRecordView;
-  label: string;
-  href: string;
-};
-
-export type ScholarsGrievanceView =
-  | "level_one"
-  | "level_two"
-  | "decisions_remedies";
-
-export type ScholarsGrievanceNavItem = {
-  id: ScholarsGrievanceView;
+export type ScholarsOnboardingNavItem = {
+  id: ScholarsOnboardingView;
   label: string;
   href: string;
 };
@@ -103,75 +38,28 @@ export const SCHOLARS_MANAGEMENT_SECTION_LABELS: Record<
   ScholarsManagementSection,
   string
 > = {
-  mobilities: "Mobilities",
-  tasks: "Tasks",
-  approvals: "Approvals",
-  grievances: "Grievances",
-  payments: "Payments",
-  reminders: "Reminders",
-  surveys: "Surveys",
-  records: "Records",
+  onboarding: "Onboarding",
+  pre_departure: "Pre-departure & Arrival",
+  finance: "Scholars Finance",
+  academic_plan: "Academic/Mobility Plan",
+  supervision: "Supervision & Progress",
+  internships: "Internships Only",
+  research_alumni: "Research Outputs & Alumni",
+  grievance: "Grievance & Welfare",
+  mobility_changes: "Mobility changes",
+  completion: "Completion & Recognition",
+  collaborations: "Collaborations",
 };
 
-export const SCHOLARS_MOBILITY_VIEW_LABELS: Record<ScholarsMobilityView, string> =
-  {
-    incoming: "Incoming Scholars",
-    active: "Active Scholars",
-    inactive: "Inactive/At Risk Scholars",
-    alumni: "Completed/Alumni",
-  };
-
-export const SCHOLARS_TASK_VIEW_LABELS: Record<ScholarsTaskView, string> = {
-  amend_cancel: "Amend/Cancel existing Scholarship agreements",
-  other_agreements: "View/download other Agreements",
-  assign_scholars: "Assign to Scholars",
-  assign_administrators: "Assign to Administrators",
-};
-
-export const SCHOLARS_APPROVAL_VIEW_LABELS: Record<
-  ScholarsApprovalView,
+export const SCHOLARS_ONBOARDING_VIEW_LABELS: Record<
+  ScholarsOnboardingView,
   string
-> = {
-  assign_administrators: "Assign to Administrators",
-  administrator_approvals: "Administrators: Approvals",
-  announcements: "Announcements",
-};
+> = Object.fromEntries(
+  SCHOLAR_ONBOARDING_NAV.map((item) => [item.id, item.label])
+) as Record<ScholarsOnboardingView, string>;
 
-export const SCHOLARS_GRIEVANCE_VIEW_LABELS: Record<
-  ScholarsGrievanceView,
-  string
-> = {
-  level_one: "Level one complaints",
-  level_two: "Level two complaints",
-  decisions_remedies: "Decisions and Remedies",
-};
-
-export const SCHOLARS_PAYMENT_VIEW_LABELS: Record<ScholarsPaymentView, string> =
-  {
-    disbursements_to_partners: "Disbursements to partners",
-    bank_details: "Scholars Bank-detail record",
-    allowance_schedule: "Allowance payment Schedule",
-    payment_confirmations: "Payment Confirmations",
-    insurance_costs: "Insurance Costs",
-    research_costs: "Research-costs",
-  };
-
-export const SCHOLARS_RECORD_VIEW_LABELS: Record<ScholarsRecordView, string> = {
-  signed_agreements: "signed Scholarship Agreements",
-  scholar_feedback: "Scholar feedback",
-  mobility_report: "Mobility Report",
-  internship_report: "Internship report",
-  financial_evidence_report: "Financial evidence report",
-  academic_supervision_report: "Academic & Supervision report",
-};
-
-const DEFAULT_SCHOLARS_SECTION: ScholarsManagementSection = "mobilities";
-const DEFAULT_MOBILITY_VIEW: ScholarsMobilityView = "incoming";
-const DEFAULT_TASK_VIEW: ScholarsTaskView = "amend_cancel";
-const DEFAULT_APPROVAL_VIEW: ScholarsApprovalView = "assign_administrators";
-const DEFAULT_GRIEVANCE_VIEW: ScholarsGrievanceView = "level_one";
-const DEFAULT_PAYMENT_VIEW: ScholarsPaymentView = "disbursements_to_partners";
-const DEFAULT_RECORD_VIEW: ScholarsRecordView = "signed_agreements";
+const DEFAULT_SCHOLARS_SECTION: ScholarsManagementSection = "onboarding";
+const DEFAULT_ONBOARDING_VIEW: ScholarsOnboardingView = "acceptance";
 
 export function buildScholarsManagementNav(
   basePath: string
@@ -182,19 +70,12 @@ export function buildScholarsManagementNav(
   return (
     Object.keys(SCHOLARS_MANAGEMENT_SECTION_LABELS) as ScholarsManagementSection[]
   ).map((section) => {
-    if (
-      section === "mobilities" ||
-      section === "tasks" ||
-      section === "approvals" ||
-      section === "grievances" ||
-      section === "payments" ||
-      section === "records"
-    ) {
+    if (section === "onboarding") {
       return {
         id: section,
         label: SCHOLARS_MANAGEMENT_SECTION_LABELS[section],
         section,
-        nestedMenu: section,
+        nestedMenu: "onboarding",
       };
     }
     return {
@@ -206,21 +87,19 @@ export function buildScholarsManagementNav(
   });
 }
 
-export function buildScholarsMobilityNav(
+export function buildScholarsOnboardingNav(
   basePath: string
-): ScholarsMobilityNavItem[] {
+): ScholarsOnboardingNavItem[] {
   const root = basePath.replace(/\/$/, "");
   const scholarsBase = `${root}/scholars`;
 
-  return (
-    Object.keys(SCHOLARS_MOBILITY_VIEW_LABELS) as ScholarsMobilityView[]
-  ).map((view) => ({
-    id: view,
-    label: SCHOLARS_MOBILITY_VIEW_LABELS[view],
+  return SCHOLAR_ONBOARDING_NAV.map((item) => ({
+    id: item.id,
+    label: item.label,
     href:
-      view === DEFAULT_MOBILITY_VIEW
+      item.id === DEFAULT_ONBOARDING_VIEW
         ? scholarsBase
-        : `${scholarsBase}?mobility=${view}`,
+        : `${scholarsBase}?onboarding=${item.id}`,
   }));
 }
 
@@ -237,284 +116,36 @@ export function parseScholarsManagementSection(
   return DEFAULT_SCHOLARS_SECTION;
 }
 
-export function buildScholarsTaskNav(basePath: string): ScholarsTaskNavItem[] {
-  const root = basePath.replace(/\/$/, "");
-  const scholarsBase = `${root}/scholars`;
-
-  return (Object.keys(SCHOLARS_TASK_VIEW_LABELS) as ScholarsTaskView[]).map(
-    (view) => ({
-      id: view,
-      label: SCHOLARS_TASK_VIEW_LABELS[view],
-      href:
-        view === DEFAULT_TASK_VIEW
-          ? `${scholarsBase}?section=tasks`
-          : `${scholarsBase}?section=tasks&task=${view}`,
-    })
-  );
-}
-
-export function parseScholarsMobilityView(
-  mobilityParam: string | null
-): ScholarsMobilityView {
-  if (mobilityParam && mobilityParam in SCHOLARS_MOBILITY_VIEW_LABELS) {
-    return mobilityParam as ScholarsMobilityView;
+export function parseScholarsOnboardingView(
+  onboardingParam: string | null
+): ScholarsOnboardingView {
+  if (onboardingParam && onboardingParam in SCHOLARS_ONBOARDING_VIEW_LABELS) {
+    return onboardingParam as ScholarsOnboardingView;
   }
-  return DEFAULT_MOBILITY_VIEW;
+  return DEFAULT_ONBOARDING_VIEW;
 }
 
-export function parseScholarsTaskView(
-  taskParam: string | null
-): ScholarsTaskView {
-  if (taskParam && taskParam in SCHOLARS_TASK_VIEW_LABELS) {
-    return taskParam as ScholarsTaskView;
-  }
-  return DEFAULT_TASK_VIEW;
-}
-
-export function buildScholarsApprovalNav(
-  basePath: string
-): ScholarsApprovalNavItem[] {
-  const root = basePath.replace(/\/$/, "");
-  const scholarsBase = `${root}/scholars`;
-
-  return (
-    Object.keys(SCHOLARS_APPROVAL_VIEW_LABELS) as ScholarsApprovalView[]
-  ).map((view) => ({
-    id: view,
-    label: SCHOLARS_APPROVAL_VIEW_LABELS[view],
-    href:
-      view === DEFAULT_APPROVAL_VIEW
-        ? `${scholarsBase}?section=approvals`
-        : `${scholarsBase}?section=approvals&approval=${view}`,
-  }));
-}
-
-export function parseScholarsApprovalView(
-  approvalParam: string | null
-): ScholarsApprovalView {
-  if (approvalParam && approvalParam in SCHOLARS_APPROVAL_VIEW_LABELS) {
-    return approvalParam as ScholarsApprovalView;
-  }
-  return DEFAULT_APPROVAL_VIEW;
-}
-
-export function buildScholarsGrievanceNav(
-  basePath: string
-): ScholarsGrievanceNavItem[] {
-  const root = basePath.replace(/\/$/, "");
-  const scholarsBase = `${root}/scholars`;
-
-  return (
-    Object.keys(SCHOLARS_GRIEVANCE_VIEW_LABELS) as ScholarsGrievanceView[]
-  ).map((view) => ({
-    id: view,
-    label: SCHOLARS_GRIEVANCE_VIEW_LABELS[view],
-    href:
-      view === DEFAULT_GRIEVANCE_VIEW
-        ? `${scholarsBase}?section=grievances`
-        : `${scholarsBase}?section=grievances&grievance=${view}`,
-  }));
-}
-
-export function parseScholarsGrievanceView(
-  grievanceParam: string | null
-): ScholarsGrievanceView {
-  if (grievanceParam && grievanceParam in SCHOLARS_GRIEVANCE_VIEW_LABELS) {
-    return grievanceParam as ScholarsGrievanceView;
-  }
-  return DEFAULT_GRIEVANCE_VIEW;
-}
-
-export function buildScholarsPaymentNav(
-  basePath: string
-): ScholarsPaymentNavItem[] {
-  const root = basePath.replace(/\/$/, "");
-  const scholarsBase = `${root}/scholars`;
-
-  return (
-    Object.keys(SCHOLARS_PAYMENT_VIEW_LABELS) as ScholarsPaymentView[]
-  ).map((view) => ({
-    id: view,
-    label: SCHOLARS_PAYMENT_VIEW_LABELS[view],
-    href:
-      view === DEFAULT_PAYMENT_VIEW
-        ? `${scholarsBase}?section=payments`
-        : `${scholarsBase}?section=payments&payment=${view}`,
-  }));
-}
-
-export function parseScholarsPaymentView(
-  paymentParam: string | null
-): ScholarsPaymentView {
-  if (paymentParam && paymentParam in SCHOLARS_PAYMENT_VIEW_LABELS) {
-    return paymentParam as ScholarsPaymentView;
-  }
-  return DEFAULT_PAYMENT_VIEW;
-}
-
-export function isScholarsPaymentsGroupActive(
+export function isScholarsOnboardingGroupActive(
   pathname: string,
   sectionParam: string | null,
   basePath: string
 ): boolean {
   const root = basePath.replace(/\/$/, "");
   if (pathname !== `${root}/scholars`) return false;
-  return sectionParam === "payments";
+  return parseScholarsManagementSection(sectionParam) === "onboarding";
 }
 
-export function isScholarsPaymentSubActive(
-  item: ScholarsPaymentNavItem,
+export function isScholarsOnboardingSubActive(
+  item: ScholarsOnboardingNavItem,
   pathname: string,
   sectionParam: string | null,
-  paymentParam: string | null,
+  onboardingParam: string | null,
   basePath: string
 ): boolean {
-  if (!isScholarsPaymentsGroupActive(pathname, sectionParam, basePath)) {
+  if (!isScholarsOnboardingGroupActive(pathname, sectionParam, basePath)) {
     return false;
   }
-  return parseScholarsPaymentView(paymentParam) === item.id;
-}
-
-export function buildScholarsRecordNav(
-  basePath: string
-): ScholarsRecordNavItem[] {
-  const root = basePath.replace(/\/$/, "");
-  const scholarsBase = `${root}/scholars`;
-
-  return (Object.keys(SCHOLARS_RECORD_VIEW_LABELS) as ScholarsRecordView[]).map(
-    (view) => ({
-      id: view,
-      label: SCHOLARS_RECORD_VIEW_LABELS[view],
-      href:
-        view === DEFAULT_RECORD_VIEW
-          ? `${scholarsBase}?section=records`
-          : `${scholarsBase}?section=records&record=${view}`,
-    })
-  );
-}
-
-export function parseScholarsRecordView(
-  recordParam: string | null
-): ScholarsRecordView {
-  if (recordParam && recordParam in SCHOLARS_RECORD_VIEW_LABELS) {
-    return recordParam as ScholarsRecordView;
-  }
-  return DEFAULT_RECORD_VIEW;
-}
-
-export function isScholarsRecordsGroupActive(
-  pathname: string,
-  sectionParam: string | null,
-  basePath: string
-): boolean {
-  const root = basePath.replace(/\/$/, "");
-  if (pathname !== `${root}/scholars`) return false;
-  return sectionParam === "records";
-}
-
-export function isScholarsRecordSubActive(
-  item: ScholarsRecordNavItem,
-  pathname: string,
-  sectionParam: string | null,
-  recordParam: string | null,
-  basePath: string
-): boolean {
-  if (!isScholarsRecordsGroupActive(pathname, sectionParam, basePath)) {
-    return false;
-  }
-  return parseScholarsRecordView(recordParam) === item.id;
-}
-
-export function isScholarsGrievancesGroupActive(
-  pathname: string,
-  sectionParam: string | null,
-  basePath: string
-): boolean {
-  const root = basePath.replace(/\/$/, "");
-  if (pathname !== `${root}/scholars`) return false;
-  return sectionParam === "grievances";
-}
-
-export function isScholarsGrievanceSubActive(
-  item: ScholarsGrievanceNavItem,
-  pathname: string,
-  sectionParam: string | null,
-  grievanceParam: string | null,
-  basePath: string
-): boolean {
-  if (!isScholarsGrievancesGroupActive(pathname, sectionParam, basePath)) {
-    return false;
-  }
-  return parseScholarsGrievanceView(grievanceParam) === item.id;
-}
-
-export function isScholarsApprovalsGroupActive(
-  pathname: string,
-  sectionParam: string | null,
-  basePath: string
-): boolean {
-  const root = basePath.replace(/\/$/, "");
-  if (pathname !== `${root}/scholars`) return false;
-  return sectionParam === "approvals";
-}
-
-export function isScholarsApprovalSubActive(
-  item: ScholarsApprovalNavItem,
-  pathname: string,
-  sectionParam: string | null,
-  approvalParam: string | null,
-  basePath: string
-): boolean {
-  if (!isScholarsApprovalsGroupActive(pathname, sectionParam, basePath)) {
-    return false;
-  }
-  return parseScholarsApprovalView(approvalParam) === item.id;
-}
-
-export function isScholarsTasksGroupActive(
-  pathname: string,
-  sectionParam: string | null,
-  basePath: string
-): boolean {
-  const root = basePath.replace(/\/$/, "");
-  if (pathname !== `${root}/scholars`) return false;
-  return sectionParam === "tasks";
-}
-
-export function isScholarsTaskSubActive(
-  item: ScholarsTaskNavItem,
-  pathname: string,
-  sectionParam: string | null,
-  taskParam: string | null,
-  basePath: string
-): boolean {
-  if (!isScholarsTasksGroupActive(pathname, sectionParam, basePath)) {
-    return false;
-  }
-  return parseScholarsTaskView(taskParam) === item.id;
-}
-
-export function isScholarsMobilityGroupActive(
-  pathname: string,
-  sectionParam: string | null,
-  basePath: string
-): boolean {
-  const root = basePath.replace(/\/$/, "");
-  if (pathname !== `${root}/scholars`) return false;
-  return !sectionParam || sectionParam === DEFAULT_SCHOLARS_SECTION;
-}
-
-export function isScholarsMobilitySubActive(
-  item: ScholarsMobilityNavItem,
-  pathname: string,
-  sectionParam: string | null,
-  mobilityParam: string | null,
-  basePath: string
-): boolean {
-  if (!isScholarsMobilityGroupActive(pathname, sectionParam, basePath)) {
-    return false;
-  }
-  return parseScholarsMobilityView(mobilityParam) === item.id;
+  return parseScholarsOnboardingView(onboardingParam) === item.id;
 }
 
 export function isScholarsManagementSubActive(
@@ -525,25 +156,10 @@ export function isScholarsManagementSubActive(
 ): boolean {
   const root = basePath.replace(/\/$/, "");
   if (pathname !== `${root}/scholars`) return false;
-  if (item.nestedMenu === "mobilities") {
-    return isScholarsMobilityGroupActive(pathname, sectionParam, basePath);
+  if (item.nestedMenu === "onboarding") {
+    return isScholarsOnboardingGroupActive(pathname, sectionParam, basePath);
   }
-  if (item.nestedMenu === "tasks") {
-    return isScholarsTasksGroupActive(pathname, sectionParam, basePath);
-  }
-  if (item.nestedMenu === "approvals") {
-    return isScholarsApprovalsGroupActive(pathname, sectionParam, basePath);
-  }
-  if (item.nestedMenu === "grievances") {
-    return isScholarsGrievancesGroupActive(pathname, sectionParam, basePath);
-  }
-  if (item.nestedMenu === "payments") {
-    return isScholarsPaymentsGroupActive(pathname, sectionParam, basePath);
-  }
-  if (item.nestedMenu === "records") {
-    return isScholarsRecordsGroupActive(pathname, sectionParam, basePath);
-  }
-  return sectionParam === item.section;
+  return parseScholarsManagementSection(sectionParam) === item.section;
 }
 
 export function isScholarsManagementGroupActive(

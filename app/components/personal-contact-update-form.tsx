@@ -106,21 +106,45 @@ export function PersonalContactUpdateForm({
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const defaults = defaultsFromUser(user);
-    try {
-      const raw = localStorage.getItem(storageKey(applicationId));
-      if (!raw) {
-        setForm(defaults);
-        return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/applicant/personal-contact");
+        if (res.ok) {
+          const data = (await res.json()) as {
+            form?: Partial<FormState> | null;
+            submitted?: boolean;
+          };
+          if (!cancelled && data.form) {
+            setForm({ ...defaults, ...data.form });
+            if (data.submitted || data.form.signedAt) setSaved(true);
+            return;
+          }
+        }
+      } catch {
+        // Fall back to any local draft below.
       }
-      const parsed = JSON.parse(raw) as Partial<FormState>;
-      setForm({ ...defaults, ...parsed });
-      if (parsed.signedAt) setSaved(true);
-    } catch {
-      setForm(defaults);
-    }
+      if (cancelled) return;
+      try {
+        const raw = localStorage.getItem(storageKey(applicationId));
+        if (!raw) {
+          setForm(defaults);
+          return;
+        }
+        const parsed = JSON.parse(raw) as Partial<FormState>;
+        setForm({ ...defaults, ...parsed });
+        if (parsed.signedAt) setSaved(true);
+      } catch {
+        setForm(defaults);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [applicationId, user]);
 
   useEffect(() => {
@@ -166,12 +190,13 @@ export function PersonalContactUpdateForm({
   const mobilitySource = letter?.mobilityType || app?.typeOfMobility || "";
 
   const update = (patch: Partial<FormState>) => {
-    setSaved(false);
+    if (saved || submitting) return;
     setError(null);
     setForm((current) => ({ ...current, ...patch, signature: "", signedAt: "" }));
   };
 
   const sign = () => {
+    if (saved || submitting) return;
     if (!form.primaryEmail.trim()) {
       setError("Enter a primary email.");
       return;
@@ -200,14 +225,37 @@ export function PersonalContactUpdateForm({
       minute: "2-digit",
     });
     const next = { ...form, signature: fullName, signedAt };
-    setForm(next);
-    setSaved(true);
+    setSubmitting(true);
     setError(null);
-    try {
-      localStorage.setItem(storageKey(applicationId), JSON.stringify(next));
-    } catch {
-      setError("The update was signed in this session, but it could not be stored in this browser.");
-    }
+    void (async () => {
+      try {
+        const res = await fetch("/api/applicant/personal-contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ form: next }),
+        });
+        const data = (await res.json()) as {
+          form?: FormState;
+          error?: string;
+        };
+        if (!res.ok) {
+          setError(data.error ?? "Could not submit the contact update.");
+          return;
+        }
+        const submitted = data.form ? { ...EMPTY_FORM, ...data.form } : next;
+        setForm(submitted);
+        setSaved(true);
+        try {
+          localStorage.setItem(storageKey(applicationId), JSON.stringify(submitted));
+        } catch {
+          // Server save succeeded; local draft is optional.
+        }
+      } catch {
+        setError("Could not submit the contact update.");
+      } finally {
+        setSubmitting(false);
+      }
+    })();
   };
 
   return (
@@ -405,9 +453,10 @@ export function PersonalContactUpdateForm({
         <button
           type="button"
           onClick={sign}
-          className="inline-flex rounded-lg bg-[#062763] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0a3580]"
+          disabled={saved || submitting}
+          className="inline-flex rounded-lg bg-[#062763] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0a3580] disabled:opacity-50"
         >
-          Sign update
+          {submitting ? "Submitting…" : saved ? "Update signed" : "Sign update"}
         </button>
       </div>
       <footer className="border-t border-slate-200 bg-white px-6 py-4">

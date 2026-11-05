@@ -208,6 +208,26 @@ model Applicant {
   nomineeLetterSharedAt   DateTime? @map("nominee_letter_shared_at")
   nomineeLetterSentAt     DateTime? @map("nominee_letter_sent_at")
 
+  // --- Scholar onboarding: scholarship acceptance & funding declaration ---
+  scholarshipAcceptanceData        Json?     @map("scholarship_acceptance_data")
+  scholarshipAcceptanceSubmittedAt DateTime? @map("scholarship_acceptance_submitted_at")
+
+  // --- Scholar onboarding: scholarship agreement / e-signature ---
+  scholarshipAgreementData        Json?     @map("scholarship_agreement_data")
+  scholarshipAgreementSubmittedAt DateTime? @map("scholarship_agreement_submitted_at")
+
+  // --- Scholar onboarding: personal & contact information update ---
+  personalContactData        Json?     @map("personal_contact_data")
+  personalContactSubmittedAt DateTime? @map("personal_contact_submitted_at")
+
+  // --- Scholar onboarding: mobility details confirmation ---
+  mobilityDetailsData        Json?     @map("mobility_details_data")
+  mobilityDetailsSubmittedAt DateTime? @map("mobility_details_submitted_at")
+
+  // --- Scholar onboarding: photo & publication consent ---
+  photoPublicationConsentData        Json?     @map("photo_publication_consent_data")
+  photoPublicationConsentSubmittedAt DateTime? @map("photo_publication_consent_submitted_at")
+
   scholar Scholar?
 
   @@index([email])
@@ -352,6 +372,21 @@ model Scholar {
   nomineeLetterSharedData Json?     @map("nominee_letter_shared_data")
   nomineeLetterSharedAt   DateTime? @map("nominee_letter_shared_at")
   nomineeLetterSentAt     DateTime? @map("nominee_letter_sent_at")
+
+  scholarshipAcceptanceData        Json?     @map("scholarship_acceptance_data")
+  scholarshipAcceptanceSubmittedAt DateTime? @map("scholarship_acceptance_submitted_at")
+
+  scholarshipAgreementData        Json?     @map("scholarship_agreement_data")
+  scholarshipAgreementSubmittedAt DateTime? @map("scholarship_agreement_submitted_at")
+
+  personalContactData        Json?     @map("personal_contact_data")
+  personalContactSubmittedAt DateTime? @map("personal_contact_submitted_at")
+
+  mobilityDetailsData        Json?     @map("mobility_details_data")
+  mobilityDetailsSubmittedAt DateTime? @map("mobility_details_submitted_at")
+
+  photoPublicationConsentData        Json?     @map("photo_publication_consent_data")
+  photoPublicationConsentSubmittedAt DateTime? @map("photo_publication_consent_submitted_at")
 
   @@index([email])
   @@index([status])

@@ -33,6 +33,11 @@ export async function upsertScholarFromApplicant(applicant: Applicant): Promise<
     evaluator2EvaluationData,
     interviewEvaluationData,
     nomineeLetterSharedData,
+    scholarshipAcceptanceData,
+    scholarshipAgreementData,
+    personalContactData,
+    mobilityDetailsData,
+    photoPublicationConsentData,
     ...snapshot
   } = applicant;
   const migratedAt = new Date();
@@ -43,6 +48,11 @@ export async function upsertScholarFromApplicant(applicant: Applicant): Promise<
     evaluator2EvaluationData: toJsonInput(evaluator2EvaluationData),
     interviewEvaluationData: toJsonInput(interviewEvaluationData),
     nomineeLetterSharedData: toJsonInput(nomineeLetterSharedData),
+    scholarshipAcceptanceData: toJsonInput(scholarshipAcceptanceData),
+    scholarshipAgreementData: toJsonInput(scholarshipAgreementData),
+    personalContactData: toJsonInput(personalContactData),
+    mobilityDetailsData: toJsonInput(mobilityDetailsData),
+    photoPublicationConsentData: toJsonInput(photoPublicationConsentData),
   };
   await prisma.scholar.upsert({
     where: { applicantId: id },
@@ -88,7 +98,7 @@ export async function listScholars(options?: {
   });
 
   const applicantIds = rows.map((row) => row.applicantId);
-  const liveLetters =
+  const liveApplicants =
     applicantIds.length === 0
       ? []
       : await prisma.applicant.findMany({
@@ -98,19 +108,54 @@ export async function listScholars(options?: {
             nomineeLetterSharedData: true,
             nomineeLetterSharedAt: true,
             nomineeLetterSentAt: true,
+            scholarshipAcceptanceData: true,
+            scholarshipAcceptanceSubmittedAt: true,
+            scholarshipAgreementData: true,
+            scholarshipAgreementSubmittedAt: true,
+            personalContactData: true,
+            personalContactSubmittedAt: true,
+            mobilityDetailsData: true,
+            mobilityDetailsSubmittedAt: true,
+            photoPublicationConsentData: true,
+            photoPublicationConsentSubmittedAt: true,
           },
         });
-  const letterByApplicantId = new Map(
-    liveLetters.map((letter) => [letter.id, letter])
+  const liveByApplicantId = new Map(
+    liveApplicants.map((applicant) => [applicant.id, applicant])
   );
   const rowsWithLetter = rows.map((row) => {
-    const live = letterByApplicantId.get(row.applicantId);
-    if (!live?.nomineeLetterSharedData) return row;
+    const live = liveByApplicantId.get(row.applicantId);
+    if (!live) return row;
     return {
       ...row,
-      nomineeLetterSharedData: live.nomineeLetterSharedData,
-      nomineeLetterSharedAt: live.nomineeLetterSharedAt,
-      nomineeLetterSentAt: live.nomineeLetterSentAt,
+      nomineeLetterSharedData:
+        live.nomineeLetterSharedData ?? row.nomineeLetterSharedData,
+      nomineeLetterSharedAt:
+        live.nomineeLetterSharedAt ?? row.nomineeLetterSharedAt,
+      nomineeLetterSentAt: live.nomineeLetterSentAt ?? row.nomineeLetterSentAt,
+      scholarshipAcceptanceData:
+        live.scholarshipAcceptanceData ?? row.scholarshipAcceptanceData,
+      scholarshipAcceptanceSubmittedAt:
+        live.scholarshipAcceptanceSubmittedAt ??
+        row.scholarshipAcceptanceSubmittedAt,
+      scholarshipAgreementData:
+        live.scholarshipAgreementData ?? row.scholarshipAgreementData,
+      scholarshipAgreementSubmittedAt:
+        live.scholarshipAgreementSubmittedAt ??
+        row.scholarshipAgreementSubmittedAt,
+      personalContactData:
+        live.personalContactData ?? row.personalContactData,
+      personalContactSubmittedAt:
+        live.personalContactSubmittedAt ?? row.personalContactSubmittedAt,
+      mobilityDetailsData:
+        live.mobilityDetailsData ?? row.mobilityDetailsData,
+      mobilityDetailsSubmittedAt:
+        live.mobilityDetailsSubmittedAt ?? row.mobilityDetailsSubmittedAt,
+      photoPublicationConsentData:
+        live.photoPublicationConsentData ?? row.photoPublicationConsentData,
+      photoPublicationConsentSubmittedAt:
+        live.photoPublicationConsentSubmittedAt ??
+        row.photoPublicationConsentSubmittedAt,
     };
   });
 
