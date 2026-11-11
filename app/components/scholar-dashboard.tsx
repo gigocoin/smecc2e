@@ -10,7 +10,14 @@ import { AdditionalFundingDisclosureForm } from "./additional-funding-disclosure
 import { BankAccountDetailsForm } from "./bank-account-details-form";
 import { BankContactChangeRequestForm } from "./bank-contact-change-request-form";
 import { ConfirmationOfArrivalForm } from "./confirmation-of-arrival-form";
+import { DualAcademicSupervisionForm } from "./dual-academic-supervision-form";
 import { InsuranceRegistrationForm } from "./insurance-registration-form";
+import { LearningAgreementAmendmentCreditForm } from "./learning-agreement-amendment-credit-form";
+import { LearningAgreementAmendmentDegreeForm } from "./learning-agreement-amendment-degree-form";
+import { LearningAgreementCreditForm } from "./learning-agreement-credit-form";
+import { LearningAgreementDegreeForm } from "./learning-agreement-degree-form";
+import { MobilityAgreementStaffForm } from "./mobility-agreement-staff-form";
+import { ResearchThesisPlanForm } from "./research-thesis-plan-form";
 import { PaymentSuspensionCaseForm } from "./payment-suspension-case-form";
 import { MobilityDetailsConfirmationForm } from "./mobility-details-confirmation-form";
 import { PhotoPublicationConsentForm } from "./photo-publication-consent-form";
@@ -30,18 +37,22 @@ import { VisaResidencePermitForm } from "./visa-residence-permit-form";
 import type { ApplicantSessionUser } from "@/lib/applicant-auth-service";
 import type { ApplicationStatus } from "@/lib/application-types";
 import {
+  parseScholarAcademicPlanView,
   parseScholarArrivalView,
   parseScholarFinanceView,
   parseScholarOnboardingView,
   parseScholarSection,
+  SCHOLAR_ACADEMIC_PLAN_NAV,
   SCHOLAR_ARRIVAL_NAV,
   SCHOLAR_FINANCE_NAV,
   SCHOLAR_ONBOARDING_NAV,
+  scholarAcademicPlanHref,
   scholarArrivalHref,
   scholarFinanceHref,
   scholarNavForMobility,
   scholarOnboardingHref,
   scholarSectionHref,
+  type ScholarAcademicPlanView,
   type ScholarArrivalView,
   type ScholarFinanceView,
   type ScholarOnboardingView,
@@ -56,11 +67,12 @@ const SCHOLAR_STATUSES = new Set<ApplicationStatus>([
 ]);
 
 const SECTION_INTRO: Record<
-  Exclude<ScholarSectionId, "onboarding" | "pre_departure" | "finance">,
+  Exclude<
+    ScholarSectionId,
+    "onboarding" | "pre_departure" | "finance" | "academic_plan"
+  >,
   string
 > = {
-  academic_plan:
-    "Your host, programme, and mobility type are the plan for this scholarship stay.",
   supervision:
     "Supervision meetings and progress reports are collected with your host supervisor during the stay.",
   traineeships:
@@ -129,6 +141,23 @@ const FINANCE_INTRO: Record<ScholarFinanceView, string> = {
     "Disclose any additional funding received alongside the SMECC2E scholarship.",
   special_needs:
     "Request or record a special-needs disbursement linked to your mobility.",
+};
+
+const ACADEMIC_PLAN_INTRO: Record<ScholarAcademicPlanView, string> = {
+  dual_supervision:
+    "Record the dual academic supervision assignment for this mobility.",
+  learning_agreement_degree:
+    "Complete the learning agreement for degree-seeking mobility.",
+  learning_agreement_credit:
+    "Complete the learning agreement for credit-seeking mobility.",
+  mobility_agreement_staff:
+    "Complete the mobility agreement for staff mobility.",
+  learning_agreement_amendment_degree:
+    "Amend the learning agreement for degree-seeking mobility.",
+  learning_agreement_amendment_credit:
+    "Amend the learning agreement for credit-seeking mobility.",
+  research_thesis_plan:
+    "Record the research or thesis plan for this scholarship stay.",
 };
 
 function scholarStatusLabel(status: ApplicationStatus | null | undefined): string {
@@ -252,6 +281,7 @@ export function ScholarDashboard() {
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [preDepartureOpen, setPreDepartureOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
+  const [academicPlanOpen, setAcademicPlanOpen] = useState(false);
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [agreementOpen, setAgreementOpen] = useState(false);
   const [agreementMessage, setAgreementMessage] = useState<string | null>(null);
@@ -329,11 +359,13 @@ export function ScholarDashboard() {
   const onboardingParam = searchParams.get("onboarding");
   const arrivalParam = searchParams.get("arrival");
   const financeParam = searchParams.get("finance");
+  const planParam = searchParams.get("plan");
   useEffect(() => {
     setOnboardingOpen(false);
     setPreDepartureOpen(false);
     setFinanceOpen(false);
-  }, [sectionParam, onboardingParam, arrivalParam, financeParam]);
+    setAcademicPlanOpen(false);
+  }, [sectionParam, onboardingParam, arrivalParam, financeParam, planParam]);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -385,12 +417,19 @@ export function ScholarDashboard() {
     section === "finance"
       ? parseScholarFinanceView(searchParams.get("finance"))
       : null;
+  const academicPlanView =
+    section === "academic_plan"
+      ? parseScholarAcademicPlanView(searchParams.get("plan"))
+      : null;
   const activeItem = navItems.find((item) => item.id === section) ?? navItems[0];
   const onboardingItem = SCHOLAR_ONBOARDING_NAV.find(
     (item) => item.id === onboardingView
   );
   const arrivalItem = SCHOLAR_ARRIVAL_NAV.find((item) => item.id === arrivalView);
   const financeItem = SCHOLAR_FINANCE_NAV.find((item) => item.id === financeView);
+  const academicPlanItem = SCHOLAR_ACADEMIC_PLAN_NAV.find(
+    (item) => item.id === academicPlanView
+  );
 
   return (
     <div className="min-h-dvh bg-slate-50">
@@ -457,6 +496,7 @@ export function ScholarDashboard() {
                     setOnboardingOpen((open) => !open);
                     setPreDepartureOpen(false);
                     setFinanceOpen(false);
+                    setAcademicPlanOpen(false);
                   }}
                   onClose={() => setOnboardingOpen(false)}
                   onNavigate={() => {
@@ -481,6 +521,7 @@ export function ScholarDashboard() {
                     setPreDepartureOpen((open) => !open);
                     setOnboardingOpen(false);
                     setFinanceOpen(false);
+                    setAcademicPlanOpen(false);
                   }}
                   onClose={() => setPreDepartureOpen(false)}
                   onNavigate={() => {
@@ -505,10 +546,38 @@ export function ScholarDashboard() {
                     setFinanceOpen((open) => !open);
                     setOnboardingOpen(false);
                     setPreDepartureOpen(false);
+                    setAcademicPlanOpen(false);
                   }}
                   onClose={() => setFinanceOpen(false)}
                   onNavigate={() => {
                     setFinanceOpen(false);
+                    setSidebarOpen(false);
+                  }}
+                />
+              );
+            }
+            if (item.id === "academic_plan") {
+              return (
+                <ScholarNavFlyout
+                  key={item.id}
+                  label="Academic / Mobility Plan"
+                  items={SCHOLAR_ACADEMIC_PLAN_NAV}
+                  hrefFor={(id) =>
+                    scholarAcademicPlanHref(id as ScholarAcademicPlanView)
+                  }
+                  panelWidth={360}
+                  open={academicPlanOpen}
+                  groupActive={section === "academic_plan"}
+                  activeId={academicPlanView}
+                  onToggle={() => {
+                    setAcademicPlanOpen((open) => !open);
+                    setOnboardingOpen(false);
+                    setPreDepartureOpen(false);
+                    setFinanceOpen(false);
+                  }}
+                  onClose={() => setAcademicPlanOpen(false)}
+                  onNavigate={() => {
+                    setAcademicPlanOpen(false);
                     setSidebarOpen(false);
                   }}
                 />
@@ -704,6 +773,56 @@ export function ScholarDashboard() {
               }
               details={awardDetails}
             />
+          ) : section === "academic_plan" &&
+            academicPlanView === "dual_supervision" ? (
+            <DualAcademicSupervisionForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "academic_plan" &&
+            academicPlanView === "learning_agreement_degree" ? (
+            <LearningAgreementDegreeForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "academic_plan" &&
+            academicPlanView === "learning_agreement_credit" ? (
+            <LearningAgreementCreditForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "academic_plan" &&
+            academicPlanView === "mobility_agreement_staff" ? (
+            <MobilityAgreementStaffForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "academic_plan" &&
+            academicPlanView === "learning_agreement_amendment_degree" ? (
+            <LearningAgreementAmendmentDegreeForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "academic_plan" &&
+            academicPlanView === "learning_agreement_amendment_credit" ? (
+            <LearningAgreementAmendmentCreditForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "academic_plan" &&
+            academicPlanView === "research_thesis_plan" ? (
+            <ResearchThesisPlanForm user={user} displayName={displayName} />
+          ) : section === "academic_plan" ? (
+            <SectionPanel
+              eyebrow="Academic / Mobility Plan"
+              title={academicPlanItem?.label ?? "Academic / Mobility Plan"}
+              intro={
+                academicPlanView
+                  ? ACADEMIC_PLAN_INTRO[academicPlanView]
+                  : "Your host, programme, and mobility type are the plan for this scholarship stay."
+              }
+              details={awardDetails}
+            />
           ) : (
             <SectionPanel
               title={activeItem?.label ?? "Scholar"}
@@ -711,7 +830,7 @@ export function ScholarDashboard() {
                 SECTION_INTRO[
                   section as Exclude<
                     ScholarSectionId,
-                    "onboarding" | "pre_departure" | "finance"
+                    "onboarding" | "pre_departure" | "finance" | "academic_plan"
                   >
                 ]
               }

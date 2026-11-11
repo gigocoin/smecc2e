@@ -230,3 +230,59 @@ export function parseScholarFinanceView(
 export function scholarFinanceHref(id: ScholarFinanceView): string {
   return `/scholar?section=finance&finance=${id}`;
 }
+
+export type ScholarAcademicPlanView =
+  | "dual_supervision"
+  | "learning_agreement_degree"
+  | "learning_agreement_credit"
+  | "mobility_agreement_staff"
+  | "learning_agreement_amendment_degree"
+  | "learning_agreement_amendment_credit"
+  | "research_thesis_plan";
+
+export type ScholarAcademicPlanNavItem = {
+  id: ScholarAcademicPlanView;
+  label: string;
+};
+
+export const SCHOLAR_ACADEMIC_PLAN_NAV: readonly ScholarAcademicPlanNavItem[] = [
+  {
+    id: "dual_supervision",
+    label: "Dual Academic Supervision Assignment Form",
+  },
+  {
+    id: "learning_agreement_degree",
+    label: "Learning Agreement (Degree Seeking Only)",
+  },
+  {
+    id: "learning_agreement_credit",
+    label: "Learning Agreement (Credit Seeking Only)",
+  },
+  {
+    id: "mobility_agreement_staff",
+    label: "Mobility Agreement (Staff Mobility Only)",
+  },
+  {
+    id: "learning_agreement_amendment_degree",
+    label: "Learning Agreement Amendment (Degree Seeking)",
+  },
+  {
+    id: "learning_agreement_amendment_credit",
+    label: "Learning Agreement Amendment (Credit Seeking)",
+  },
+  {
+    id: "research_thesis_plan",
+    label: "Research/Thesis Plan",
+  },
+];
+
+export function parseScholarAcademicPlanView(
+  value: string | null | undefined
+): ScholarAcademicPlanView | null {
+  const match = SCHOLAR_ACADEMIC_PLAN_NAV.find((item) => item.id === value);
+  return match?.id ?? null;
+}
+
+export function scholarAcademicPlanHref(id: ScholarAcademicPlanView): string {
+  return `/scholar?section=academic_plan&plan=${id}`;
+}
