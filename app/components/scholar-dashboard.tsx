@@ -6,24 +6,44 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApplicantResetPasswordModal } from "./applicant-reset-password-modal";
 import { NomineeLetterModal } from "./nominee-letter-modal";
+import { AdditionalFundingDisclosureForm } from "./additional-funding-disclosure-form";
+import { BankAccountDetailsForm } from "./bank-account-details-form";
+import { BankContactChangeRequestForm } from "./bank-contact-change-request-form";
+import { ConfirmationOfArrivalForm } from "./confirmation-of-arrival-form";
+import { InsuranceRegistrationForm } from "./insurance-registration-form";
+import { PaymentSuspensionCaseForm } from "./payment-suspension-case-form";
 import { MobilityDetailsConfirmationForm } from "./mobility-details-confirmation-form";
 import { PhotoPublicationConsentForm } from "./photo-publication-consent-form";
 import { PersonalContactUpdateForm } from "./personal-contact-update-form";
+import { PreDepartureReadinessForm } from "./pre-departure-readiness-form";
+import { ResearchCostRequestForm } from "./research-cost-request-form";
+import { ResearchExpenditureReportForm } from "./research-expenditure-report-form";
+import { ScholarConfirmationOfPaymentForm } from "./scholar-confirmation-of-payment-form";
 import { ScholarshipAcceptanceForm } from "./scholarship-acceptance-form";
 import { ScholarshipAgreementForm } from "./scholarship-agreement-form";
+import { ScholarshipInstallmentPaymentForm } from "./scholarship-installment-payment-form";
+import { ScholarshipRepaymentRecoveryForm } from "./scholarship-repayment-recovery-form";
+import { SpecialNeedsDisbursementForm } from "./special-needs-disbursement-form";
+import { TravelEvidenceSubmissionForm } from "./travel-evidence-submission-form";
+import { TravelLogisticsArrangementForm } from "./travel-logistics-arrangement-form";
+import { VisaResidencePermitForm } from "./visa-residence-permit-form";
 import type { ApplicantSessionUser } from "@/lib/applicant-auth-service";
 import type { ApplicationStatus } from "@/lib/application-types";
 import {
   parseScholarArrivalView,
+  parseScholarFinanceView,
   parseScholarOnboardingView,
   parseScholarSection,
   SCHOLAR_ARRIVAL_NAV,
+  SCHOLAR_FINANCE_NAV,
   SCHOLAR_ONBOARDING_NAV,
   scholarArrivalHref,
+  scholarFinanceHref,
   scholarNavForMobility,
   scholarOnboardingHref,
   scholarSectionHref,
   type ScholarArrivalView,
+  type ScholarFinanceView,
   type ScholarOnboardingView,
   type ScholarSectionId,
 } from "@/lib/scholar-nav";
@@ -36,11 +56,9 @@ const SCHOLAR_STATUSES = new Set<ApplicationStatus>([
 ]);
 
 const SECTION_INTRO: Record<
-  Exclude<ScholarSectionId, "onboarding" | "pre_departure">,
+  Exclude<ScholarSectionId, "onboarding" | "pre_departure" | "finance">,
   string
 > = {
-  finance:
-    "Allowance schedules, bank details, insurance costs, and research-cost records are kept with your host university.",
   academic_plan:
     "Your host, programme, and mobility type are the plan for this scholarship stay.",
   supervision:
@@ -88,6 +106,29 @@ const PRE_DEPARTURE_INTRO: Record<ScholarArrivalView, string> = {
     "Register insurance cover and confirm that it meets the scholarship requirements.",
   arrival:
     "Confirm that you have arrived and completed registration at the host university.",
+};
+
+const FINANCE_INTRO: Record<ScholarFinanceView, string> = {
+  bank_account:
+    "Record the bank account used for SMECC2E scholarship payments.",
+  bank_contact_change:
+    "Request a change to your bank or payment contact details when your account information changes.",
+  repayment:
+    "Track scholarship repayment or recovery cases linked to your award.",
+  installment_record:
+    "Review installment payment records issued against your scholarship.",
+  payment_confirmation:
+    "Confirm that a scholarship payment has been received.",
+  payment_suspension:
+    "Open or follow a payment suspension, adjustment, or delay case.",
+  research_cost:
+    "Submit a research cost request for eligible mobility research expenses.",
+  research_expenditure:
+    "Report how approved research funds were spent or utilised.",
+  additional_funding:
+    "Disclose any additional funding received alongside the SMECC2E scholarship.",
+  special_needs:
+    "Request or record a special-needs disbursement linked to your mobility.",
 };
 
 function scholarStatusLabel(status: ApplicationStatus | null | undefined): string {
@@ -210,6 +251,7 @@ export function ScholarDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [preDepartureOpen, setPreDepartureOpen] = useState(false);
+  const [financeOpen, setFinanceOpen] = useState(false);
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [agreementOpen, setAgreementOpen] = useState(false);
   const [agreementMessage, setAgreementMessage] = useState<string | null>(null);
@@ -286,10 +328,12 @@ export function ScholarDashboard() {
   const sectionParam = searchParams.get("section");
   const onboardingParam = searchParams.get("onboarding");
   const arrivalParam = searchParams.get("arrival");
+  const financeParam = searchParams.get("finance");
   useEffect(() => {
     setOnboardingOpen(false);
     setPreDepartureOpen(false);
-  }, [sectionParam, onboardingParam, arrivalParam]);
+    setFinanceOpen(false);
+  }, [sectionParam, onboardingParam, arrivalParam, financeParam]);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -337,11 +381,16 @@ export function ScholarDashboard() {
     section === "pre_departure"
       ? parseScholarArrivalView(searchParams.get("arrival"))
       : null;
+  const financeView =
+    section === "finance"
+      ? parseScholarFinanceView(searchParams.get("finance"))
+      : null;
   const activeItem = navItems.find((item) => item.id === section) ?? navItems[0];
   const onboardingItem = SCHOLAR_ONBOARDING_NAV.find(
     (item) => item.id === onboardingView
   );
   const arrivalItem = SCHOLAR_ARRIVAL_NAV.find((item) => item.id === arrivalView);
+  const financeItem = SCHOLAR_FINANCE_NAV.find((item) => item.id === financeView);
 
   return (
     <div className="min-h-dvh bg-slate-50">
@@ -407,6 +456,7 @@ export function ScholarDashboard() {
                   onToggle={() => {
                     setOnboardingOpen((open) => !open);
                     setPreDepartureOpen(false);
+                    setFinanceOpen(false);
                   }}
                   onClose={() => setOnboardingOpen(false)}
                   onNavigate={() => {
@@ -430,10 +480,35 @@ export function ScholarDashboard() {
                   onToggle={() => {
                     setPreDepartureOpen((open) => !open);
                     setOnboardingOpen(false);
+                    setFinanceOpen(false);
                   }}
                   onClose={() => setPreDepartureOpen(false)}
                   onNavigate={() => {
                     setPreDepartureOpen(false);
+                    setSidebarOpen(false);
+                  }}
+                />
+              );
+            }
+            if (item.id === "finance") {
+              return (
+                <ScholarNavFlyout
+                  key={item.id}
+                  label="Scholars Finance"
+                  items={SCHOLAR_FINANCE_NAV}
+                  hrefFor={(id) => scholarFinanceHref(id as ScholarFinanceView)}
+                  panelWidth={360}
+                  open={financeOpen}
+                  groupActive={section === "finance"}
+                  activeId={financeView}
+                  onToggle={() => {
+                    setFinanceOpen((open) => !open);
+                    setOnboardingOpen(false);
+                    setPreDepartureOpen(false);
+                  }}
+                  onClose={() => setFinanceOpen(false)}
+                  onNavigate={() => {
+                    setFinanceOpen(false);
                     setSidebarOpen(false);
                   }}
                 />
@@ -547,6 +622,24 @@ export function ScholarDashboard() {
               }
               details={onboardingDetails(onboardingView, user, displayName, award)}
             />
+          ) : section === "pre_departure" && arrivalView === "readiness" ? (
+            <PreDepartureReadinessForm user={user} displayName={displayName} />
+          ) : section === "pre_departure" && arrivalView === "visa" ? (
+            <VisaResidencePermitForm user={user} displayName={displayName} />
+          ) : section === "pre_departure" && arrivalView === "travel" ? (
+            <TravelLogisticsArrangementForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "pre_departure" && arrivalView === "evidence" ? (
+            <TravelEvidenceSubmissionForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "pre_departure" && arrivalView === "insurance" ? (
+            <InsuranceRegistrationForm user={user} displayName={displayName} />
+          ) : section === "pre_departure" && arrivalView === "arrival" ? (
+            <ConfirmationOfArrivalForm user={user} displayName={displayName} />
           ) : section === "pre_departure" ? (
             <SectionPanel
               eyebrow="Pre-Departure & Arrival"
@@ -558,12 +651,68 @@ export function ScholarDashboard() {
               }
               details={awardDetails}
             />
+          ) : section === "finance" && financeView === "bank_account" ? (
+            <BankAccountDetailsForm user={user} displayName={displayName} />
+          ) : section === "finance" && financeView === "bank_contact_change" ? (
+            <BankContactChangeRequestForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "finance" && financeView === "repayment" ? (
+            <ScholarshipRepaymentRecoveryForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "finance" && financeView === "installment_record" ? (
+            <ScholarshipInstallmentPaymentForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "finance" &&
+            financeView === "payment_confirmation" ? (
+            <ScholarConfirmationOfPaymentForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "finance" && financeView === "payment_suspension" ? (
+            <PaymentSuspensionCaseForm user={user} displayName={displayName} />
+          ) : section === "finance" && financeView === "research_cost" ? (
+            <ResearchCostRequestForm user={user} displayName={displayName} />
+          ) : section === "finance" && financeView === "research_expenditure" ? (
+            <ResearchExpenditureReportForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "finance" && financeView === "additional_funding" ? (
+            <AdditionalFundingDisclosureForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "finance" && financeView === "special_needs" ? (
+            <SpecialNeedsDisbursementForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "finance" ? (
+            <SectionPanel
+              eyebrow="Scholars Finance"
+              title={financeItem?.label ?? "Scholars Finance"}
+              intro={
+                financeView
+                  ? FINANCE_INTRO[financeView]
+                  : "Allowance schedules, bank details, insurance costs, and research-cost records are kept with your host university."
+              }
+              details={awardDetails}
+            />
           ) : (
             <SectionPanel
               title={activeItem?.label ?? "Scholar"}
               intro={
                 SECTION_INTRO[
-                  section as Exclude<ScholarSectionId, "onboarding" | "pre_departure">
+                  section as Exclude<
+                    ScholarSectionId,
+                    "onboarding" | "pre_departure" | "finance"
+                  >
                 ]
               }
               details={awardDetails}

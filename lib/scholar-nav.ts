@@ -165,3 +165,68 @@ export function parseScholarArrivalView(
 export function scholarArrivalHref(id: ScholarArrivalView): string {
   return `/scholar?section=pre_departure&arrival=${id}`;
 }
+
+export type ScholarFinanceView =
+  | "bank_account"
+  | "bank_contact_change"
+  | "repayment"
+  | "installment_record"
+  | "payment_confirmation"
+  | "payment_suspension"
+  | "research_cost"
+  | "research_expenditure"
+  | "additional_funding"
+  | "special_needs";
+
+export type ScholarFinanceNavItem = {
+  id: ScholarFinanceView;
+  label: string;
+};
+
+export const SCHOLAR_FINANCE_NAV: readonly ScholarFinanceNavItem[] = [
+  { id: "bank_account", label: "Bank Account Details" },
+  {
+    id: "bank_contact_change",
+    label: "Bank/Contact Details Change Request",
+  },
+  {
+    id: "repayment",
+    label: "Scholarship Repayment/Recovery",
+  },
+  {
+    id: "installment_record",
+    label: "Scholarship Installment Payment Record",
+  },
+  {
+    id: "payment_confirmation",
+    label: "Scholar Confirmation of Payment",
+  },
+  {
+    id: "payment_suspension",
+    label: "Payment Suspension/Adjustment/Delay Case",
+  },
+  { id: "research_cost", label: "Research Cost Request" },
+  {
+    id: "research_expenditure",
+    label: "Research Expenditure/Utilisation Report",
+  },
+  {
+    id: "additional_funding",
+    label: "Additional Funding Disclosure",
+  },
+  {
+    id: "special_needs",
+    label: "Special needs Disbursement",
+  },
+];
+
+export function parseScholarFinanceView(
+  value: string | null | undefined
+): ScholarFinanceView | null {
+  const match = SCHOLAR_FINANCE_NAV.find((item) => item.id === value);
+  return match?.id ?? null;
+}
+
+export function scholarFinanceHref(id: ScholarFinanceView): string {
+  return `/scholar?section=finance&finance=${id}`;
+}
