@@ -6,11 +6,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApplicantResetPasswordModal } from "./applicant-reset-password-modal";
 import { NomineeLetterModal } from "./nominee-letter-modal";
+import { AcademicInterventionCorrectiveForm } from "./academic-intervention-corrective-form";
 import { AdditionalFundingDisclosureForm } from "./additional-funding-disclosure-form";
 import { BankAccountDetailsForm } from "./bank-account-details-form";
 import { BankContactChangeRequestForm } from "./bank-contact-change-request-form";
 import { ConfirmationOfArrivalForm } from "./confirmation-of-arrival-form";
+import { ContinuousMobilityPerformanceFinalForm } from "./continuous-mobility-performance-final-form";
+import { ContinuousMobilityPerformanceForm } from "./continuous-mobility-performance-form";
 import { DualAcademicSupervisionForm } from "./dual-academic-supervision-form";
+import { HomeAcademicMentorReviewForm } from "./home-academic-mentor-review-form";
 import { InsuranceRegistrationForm } from "./insurance-registration-form";
 import { LearningAgreementAmendmentCreditForm } from "./learning-agreement-amendment-credit-form";
 import { LearningAgreementAmendmentDegreeForm } from "./learning-agreement-amendment-degree-form";
@@ -19,6 +23,10 @@ import { LearningAgreementDegreeForm } from "./learning-agreement-degree-form";
 import { MobilityAgreementStaffForm } from "./mobility-agreement-staff-form";
 import { ResearchThesisPlanForm } from "./research-thesis-plan-form";
 import { PaymentSuspensionCaseForm } from "./payment-suspension-case-form";
+import { ProgressReportFinalForm } from "./progress-report-final-form";
+import { ProgressReportMidTermForm } from "./progress-report-mid-term-form";
+import { SupervisorEvaluationFinalForm } from "./supervisor-evaluation-final-form";
+import { SupervisorEvaluationMidTermForm } from "./supervisor-evaluation-mid-term-form";
 import { MobilityDetailsConfirmationForm } from "./mobility-details-confirmation-form";
 import { PhotoPublicationConsentForm } from "./photo-publication-consent-form";
 import { PersonalContactUpdateForm } from "./personal-contact-update-form";
@@ -26,6 +34,8 @@ import { PreDepartureReadinessForm } from "./pre-departure-readiness-form";
 import { ResearchCostRequestForm } from "./research-cost-request-form";
 import { ResearchExpenditureReportForm } from "./research-expenditure-report-form";
 import { ScholarConfirmationOfPaymentForm } from "./scholar-confirmation-of-payment-form";
+import { ScholarFeedbackSurveyFinalForm } from "./scholar-feedback-survey-final-form";
+import { ScholarFeedbackSurveyForm } from "./scholar-feedback-survey-form";
 import { ScholarshipAcceptanceForm } from "./scholarship-acceptance-form";
 import { ScholarshipAgreementForm } from "./scholarship-agreement-form";
 import { ScholarshipInstallmentPaymentForm } from "./scholarship-installment-payment-form";
@@ -42,21 +52,25 @@ import {
   parseScholarFinanceView,
   parseScholarOnboardingView,
   parseScholarSection,
+  parseScholarSupervisionView,
   SCHOLAR_ACADEMIC_PLAN_NAV,
   SCHOLAR_ARRIVAL_NAV,
   SCHOLAR_FINANCE_NAV,
   SCHOLAR_ONBOARDING_NAV,
+  SCHOLAR_SUPERVISION_NAV,
   scholarAcademicPlanHref,
   scholarArrivalHref,
   scholarFinanceHref,
   scholarNavForMobility,
   scholarOnboardingHref,
   scholarSectionHref,
+  scholarSupervisionHref,
   type ScholarAcademicPlanView,
   type ScholarArrivalView,
   type ScholarFinanceView,
   type ScholarOnboardingView,
   type ScholarSectionId,
+  type ScholarSupervisionView,
 } from "@/lib/scholar-nav";
 
 const SCHOLAR_STATUSES = new Set<ApplicationStatus>([
@@ -69,12 +83,14 @@ const SCHOLAR_STATUSES = new Set<ApplicationStatus>([
 const SECTION_INTRO: Record<
   Exclude<
     ScholarSectionId,
-    "onboarding" | "pre_departure" | "finance" | "academic_plan"
+    | "onboarding"
+    | "pre_departure"
+    | "finance"
+    | "academic_plan"
+    | "supervision"
   >,
   string
 > = {
-  supervision:
-    "Supervision meetings and progress reports are collected with your host supervisor during the stay.",
   traineeships:
     "This area is for the traineeship work plan, host placement, and the traineeship report.",
   internships:
@@ -158,6 +174,29 @@ const ACADEMIC_PLAN_INTRO: Record<ScholarAcademicPlanView, string> = {
     "Amend the learning agreement for credit-seeking mobility.",
   research_thesis_plan:
     "Record the research or thesis plan for this scholarship stay.",
+};
+
+const SUPERVISION_INTRO: Record<ScholarSupervisionView, string> = {
+  progress_report_mid_term:
+    "Submit the mid-term student/staff progress report for this mobility.",
+  progress_report_final:
+    "Submit the final student/staff progress report for this mobility.",
+  supervisor_evaluation_mid_term:
+    "Record the mid-term supervisor/host evaluation report.",
+  supervisor_evaluation_final:
+    "Record the final supervisor/host evaluation report.",
+  home_mentor_review:
+    "Record the home academic mentor review for this mobility.",
+  academic_invention_corrective:
+    "Open or update an academic intervention / corrective action plan.",
+  continuous_mobility_performance:
+    "Track continuous mobility performance at mid-term.",
+  continuous_mobility_performance_final:
+    "Track continuous mobility performance at the end of the mobility.",
+  scholar_feedback_survey:
+    "Complete the mid-term scholar feedback / satisfaction survey.",
+  scholar_feedback_survey_final:
+    "Complete the final scholar feedback / satisfaction survey.",
 };
 
 function scholarStatusLabel(status: ApplicationStatus | null | undefined): string {
@@ -282,6 +321,7 @@ export function ScholarDashboard() {
   const [preDepartureOpen, setPreDepartureOpen] = useState(false);
   const [financeOpen, setFinanceOpen] = useState(false);
   const [academicPlanOpen, setAcademicPlanOpen] = useState(false);
+  const [supervisionOpen, setSupervisionOpen] = useState(false);
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [agreementOpen, setAgreementOpen] = useState(false);
   const [agreementMessage, setAgreementMessage] = useState<string | null>(null);
@@ -360,12 +400,21 @@ export function ScholarDashboard() {
   const arrivalParam = searchParams.get("arrival");
   const financeParam = searchParams.get("finance");
   const planParam = searchParams.get("plan");
+  const progressParam = searchParams.get("progress");
   useEffect(() => {
     setOnboardingOpen(false);
     setPreDepartureOpen(false);
     setFinanceOpen(false);
     setAcademicPlanOpen(false);
-  }, [sectionParam, onboardingParam, arrivalParam, financeParam, planParam]);
+    setSupervisionOpen(false);
+  }, [
+    sectionParam,
+    onboardingParam,
+    arrivalParam,
+    financeParam,
+    planParam,
+    progressParam,
+  ]);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -421,6 +470,10 @@ export function ScholarDashboard() {
     section === "academic_plan"
       ? parseScholarAcademicPlanView(searchParams.get("plan"))
       : null;
+  const supervisionView =
+    section === "supervision"
+      ? parseScholarSupervisionView(searchParams.get("progress"))
+      : null;
   const activeItem = navItems.find((item) => item.id === section) ?? navItems[0];
   const onboardingItem = SCHOLAR_ONBOARDING_NAV.find(
     (item) => item.id === onboardingView
@@ -429,6 +482,9 @@ export function ScholarDashboard() {
   const financeItem = SCHOLAR_FINANCE_NAV.find((item) => item.id === financeView);
   const academicPlanItem = SCHOLAR_ACADEMIC_PLAN_NAV.find(
     (item) => item.id === academicPlanView
+  );
+  const supervisionItem = SCHOLAR_SUPERVISION_NAV.find(
+    (item) => item.id === supervisionView
   );
 
   return (
@@ -497,6 +553,7 @@ export function ScholarDashboard() {
                     setPreDepartureOpen(false);
                     setFinanceOpen(false);
                     setAcademicPlanOpen(false);
+                    setSupervisionOpen(false);
                   }}
                   onClose={() => setOnboardingOpen(false)}
                   onNavigate={() => {
@@ -522,6 +579,7 @@ export function ScholarDashboard() {
                     setOnboardingOpen(false);
                     setFinanceOpen(false);
                     setAcademicPlanOpen(false);
+                    setSupervisionOpen(false);
                   }}
                   onClose={() => setPreDepartureOpen(false)}
                   onNavigate={() => {
@@ -547,6 +605,7 @@ export function ScholarDashboard() {
                     setOnboardingOpen(false);
                     setPreDepartureOpen(false);
                     setAcademicPlanOpen(false);
+                    setSupervisionOpen(false);
                   }}
                   onClose={() => setFinanceOpen(false)}
                   onNavigate={() => {
@@ -574,10 +633,39 @@ export function ScholarDashboard() {
                     setOnboardingOpen(false);
                     setPreDepartureOpen(false);
                     setFinanceOpen(false);
+                    setSupervisionOpen(false);
                   }}
                   onClose={() => setAcademicPlanOpen(false)}
                   onNavigate={() => {
                     setAcademicPlanOpen(false);
+                    setSidebarOpen(false);
+                  }}
+                />
+              );
+            }
+            if (item.id === "supervision") {
+              return (
+                <ScholarNavFlyout
+                  key={item.id}
+                  label="Supervision & Progress"
+                  items={SCHOLAR_SUPERVISION_NAV}
+                  hrefFor={(id) =>
+                    scholarSupervisionHref(id as ScholarSupervisionView)
+                  }
+                  panelWidth={360}
+                  open={supervisionOpen}
+                  groupActive={section === "supervision"}
+                  activeId={supervisionView}
+                  onToggle={() => {
+                    setSupervisionOpen((open) => !open);
+                    setOnboardingOpen(false);
+                    setPreDepartureOpen(false);
+                    setFinanceOpen(false);
+                    setAcademicPlanOpen(false);
+                  }}
+                  onClose={() => setSupervisionOpen(false)}
+                  onNavigate={() => {
+                    setSupervisionOpen(false);
                     setSidebarOpen(false);
                   }}
                 />
@@ -823,6 +911,74 @@ export function ScholarDashboard() {
               }
               details={awardDetails}
             />
+          ) : section === "supervision" &&
+            supervisionView === "progress_report_mid_term" ? (
+            <ProgressReportMidTermForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "supervision" &&
+            supervisionView === "progress_report_final" ? (
+            <ProgressReportFinalForm user={user} displayName={displayName} />
+          ) : section === "supervision" &&
+            supervisionView === "supervisor_evaluation_mid_term" ? (
+            <SupervisorEvaluationMidTermForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "supervision" &&
+            supervisionView === "supervisor_evaluation_final" ? (
+            <SupervisorEvaluationFinalForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "supervision" &&
+            supervisionView === "home_mentor_review" ? (
+            <HomeAcademicMentorReviewForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "supervision" &&
+            supervisionView === "academic_invention_corrective" ? (
+            <AcademicInterventionCorrectiveForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "supervision" &&
+            supervisionView === "continuous_mobility_performance" ? (
+            <ContinuousMobilityPerformanceForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "supervision" &&
+            supervisionView === "continuous_mobility_performance_final" ? (
+            <ContinuousMobilityPerformanceFinalForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "supervision" &&
+            supervisionView === "scholar_feedback_survey" ? (
+            <ScholarFeedbackSurveyForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "supervision" &&
+            supervisionView === "scholar_feedback_survey_final" ? (
+            <ScholarFeedbackSurveyFinalForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "supervision" ? (
+            <SectionPanel
+              eyebrow="Supervision & Progress"
+              title={supervisionItem?.label ?? "Supervision & Progress"}
+              intro={
+                supervisionView
+                  ? SUPERVISION_INTRO[supervisionView]
+                  : "Supervision meetings and progress reports are collected with your host supervisor during the stay."
+              }
+              details={awardDetails}
+            />
           ) : (
             <SectionPanel
               title={activeItem?.label ?? "Scholar"}
@@ -830,7 +986,11 @@ export function ScholarDashboard() {
                 SECTION_INTRO[
                   section as Exclude<
                     ScholarSectionId,
-                    "onboarding" | "pre_departure" | "finance" | "academic_plan"
+                    | "onboarding"
+                    | "pre_departure"
+                    | "finance"
+                    | "academic_plan"
+                    | "supervision"
                   >
                 ]
               }

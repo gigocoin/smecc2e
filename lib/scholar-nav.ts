@@ -286,3 +286,74 @@ export function parseScholarAcademicPlanView(
 export function scholarAcademicPlanHref(id: ScholarAcademicPlanView): string {
   return `/scholar?section=academic_plan&plan=${id}`;
 }
+
+export type ScholarSupervisionView =
+  | "progress_report_mid_term"
+  | "progress_report_final"
+  | "supervisor_evaluation_mid_term"
+  | "supervisor_evaluation_final"
+  | "home_mentor_review"
+  | "academic_invention_corrective"
+  | "continuous_mobility_performance"
+  | "continuous_mobility_performance_final"
+  | "scholar_feedback_survey"
+  | "scholar_feedback_survey_final";
+
+export type ScholarSupervisionNavItem = {
+  id: ScholarSupervisionView;
+  label: string;
+};
+
+export const SCHOLAR_SUPERVISION_NAV: readonly ScholarSupervisionNavItem[] = [
+  {
+    id: "progress_report_mid_term",
+    label: "Student/Staff Progress Report (Mid-Term)",
+  },
+  {
+    id: "progress_report_final",
+    label: "Student/Staff Progress Report (Final)",
+  },
+  {
+    id: "supervisor_evaluation_mid_term",
+    label: "Supervisor/Host Evaluation Report (Mid-Term)",
+  },
+  {
+    id: "supervisor_evaluation_final",
+    label: "Supervisor/Host Evaluation Report (Final)",
+  },
+  {
+    id: "home_mentor_review",
+    label: "Home Academic Mentor Review",
+  },
+  {
+    id: "academic_invention_corrective",
+    label: "Academic Intervention/Corrective Action Plan",
+  },
+  {
+    id: "continuous_mobility_performance",
+    label: "Continous Mobility Performance Tracking (Mid-Term)",
+  },
+  {
+    id: "continuous_mobility_performance_final",
+    label: "Continous Mobility Performance Tracking (Final)",
+  },
+  {
+    id: "scholar_feedback_survey",
+    label: "Scholar Periodic Feedback/Satisfaction Survey (Mid-Term)",
+  },
+  {
+    id: "scholar_feedback_survey_final",
+    label: "Scholar Periodic Feedback/Satisfaction Survey (Final)",
+  },
+];
+
+export function parseScholarSupervisionView(
+  value: string | null | undefined
+): ScholarSupervisionView | null {
+  const match = SCHOLAR_SUPERVISION_NAV.find((item) => item.id === value);
+  return match?.id ?? null;
+}
+
+export function scholarSupervisionHref(id: ScholarSupervisionView): string {
+  return `/scholar?section=supervision&progress=${id}`;
+}
