@@ -10,21 +10,51 @@ import { AcademicInterventionCorrectiveForm } from "./academic-intervention-corr
 import { AdditionalFundingDisclosureForm } from "./additional-funding-disclosure-form";
 import { BankAccountDetailsForm } from "./bank-account-details-form";
 import { BankContactChangeRequestForm } from "./bank-contact-change-request-form";
+import { ChangeOfMobilityDatesDurationForm } from "./change-of-mobility-dates-duration-form";
+import { ComplaintGrievanceManagementForm } from "./complaint-grievance-management-form";
+import { ArrivalDepartureCertificationForm } from "./arrival-departure-certification-form";
 import { ConfirmationOfArrivalForm } from "./confirmation-of-arrival-form";
+import { ConfirmationOfDepartureForm } from "./confirmation-of-departure-form";
+import { ConfirmationOfParticipationForm } from "./confirmation-of-participation-form";
+import { CreditRecognitionActsTransferForm } from "./credit-recognition-acts-transfer-form";
+import { CreditRecognitionDisputeReviewForm } from "./credit-recognition-dispute-review-form";
+import { DegreeCertificateAwardForm } from "./degree-certificate-award-form";
+import { EndOfMobilityEvaluationExitSurveyForm } from "./end-of-mobility-evaluation-exit-survey-form";
+import { FinalMobilityAcademicReportForm } from "./final-mobility-academic-report-form";
+import { HostInstitutionFinalClearanceForm } from "./host-institution-final-clearance-form";
+import { MobilityCompletionChecklistForm } from "./mobility-completion-checklist-form";
+import { ConsortiumHostApprovalRegistrationForm } from "./consortium-host-approval-registration-form";
+import { FacilitiesAssessmentDueDiligenceForm } from "./facilities-assessment-due-diligence-form";
+import { OrganisationHostEligibilityScreeningForm } from "./organisation-host-eligibility-screening-form";
+import { OrganisationHostTechnicalAssessmentForm } from "./organisation-host-technical-assessment-form";
+import { OrganisationIdentificationNominationForm } from "./organisation-identification-nomination-form";
+import { SignedMousForm } from "./signed-mous-form";
+import { TeachingTraineeshipCertificateForm } from "./teaching-traineeship-certificate-form";
+import { TranscriptOfRecordsSubmissionForm } from "./transcript-of-records-submission-form";
 import { ContinuousMobilityPerformanceFinalForm } from "./continuous-mobility-performance-final-form";
 import { ContinuousMobilityPerformanceForm } from "./continuous-mobility-performance-form";
 import { DualAcademicSupervisionForm } from "./dual-academic-supervision-form";
+import { EarlyWithdrawalTerminationRequestForm } from "./early-withdrawal-termination-request-form";
 import { HomeAcademicMentorReviewForm } from "./home-academic-mentor-review-form";
+import { HostOrganisationInternshipEvaluationForm } from "./host-organisation-internship-evaluation-form";
+import { IncidentWelfareSafetyReportForm } from "./incident-welfare-safety-report-form";
 import { InsuranceRegistrationForm } from "./insurance-registration-form";
+import { InternshipCertificationForm } from "./internship-certification-form";
+import { InternshipCompletionReportForm } from "./internship-completion-report-form";
+import { InternshipPlacementForm } from "./internship-placement-form";
+import { InternshipWeeklyAttendanceForm } from "./internship-weekly-attendance-form";
 import { LearningAgreementAmendmentCreditForm } from "./learning-agreement-amendment-credit-form";
 import { LearningAgreementAmendmentDegreeForm } from "./learning-agreement-amendment-degree-form";
 import { LearningAgreementCreditForm } from "./learning-agreement-credit-form";
 import { LearningAgreementDegreeForm } from "./learning-agreement-degree-form";
 import { MobilityAgreementStaffForm } from "./mobility-agreement-staff-form";
+import { MobilityExtensionRequestForm } from "./mobility-extension-request-form";
+import { MobilityInterruptionSuspensionRequestForm } from "./mobility-interruption-suspension-request-form";
 import { ResearchThesisPlanForm } from "./research-thesis-plan-form";
 import { PaymentSuspensionCaseForm } from "./payment-suspension-case-form";
 import { ProgressReportFinalForm } from "./progress-report-final-form";
 import { ProgressReportMidTermForm } from "./progress-report-mid-term-form";
+import { PublicationResearchOutputRegistrationForm } from "./publication-research-output-registration-form";
 import { SupervisorEvaluationFinalForm } from "./supervisor-evaluation-final-form";
 import { SupervisorEvaluationMidTermForm } from "./supervisor-evaluation-mid-term-form";
 import { MobilityDetailsConfirmationForm } from "./mobility-details-confirmation-form";
@@ -33,6 +63,8 @@ import { PersonalContactUpdateForm } from "./personal-contact-update-form";
 import { PreDepartureReadinessForm } from "./pre-departure-readiness-form";
 import { ResearchCostRequestForm } from "./research-cost-request-form";
 import { ResearchExpenditureReportForm } from "./research-expenditure-report-form";
+import { ResumptionOfMobilityForm } from "./resumption-of-mobility-form";
+import { ScholarAlumniTracerSurveyForm } from "./scholar-alumni-tracer-survey-form";
 import { ScholarConfirmationOfPaymentForm } from "./scholar-confirmation-of-payment-form";
 import { ScholarFeedbackSurveyFinalForm } from "./scholar-feedback-survey-final-form";
 import { ScholarFeedbackSurveyForm } from "./scholar-feedback-survey-form";
@@ -40,7 +72,10 @@ import { ScholarshipAcceptanceForm } from "./scholarship-acceptance-form";
 import { ScholarshipAgreementForm } from "./scholarship-agreement-form";
 import { ScholarshipInstallmentPaymentForm } from "./scholarship-installment-payment-form";
 import { ScholarshipRepaymentRecoveryForm } from "./scholarship-repayment-recovery-form";
+import { ScholarshipTerminationDecisionForm } from "./scholarship-termination-decision-form";
+import { SignedInternshipAgreementPlanUploadForm } from "./signed-internship-agreement-plan-upload-form";
 import { SpecialNeedsDisbursementForm } from "./special-needs-disbursement-form";
+import { ThesisDissertationProgressForm } from "./thesis-dissertation-progress-form";
 import { TravelEvidenceSubmissionForm } from "./travel-evidence-submission-form";
 import { TravelLogisticsArrangementForm } from "./travel-logistics-arrangement-form";
 import { VisaResidencePermitForm } from "./visa-residence-permit-form";
@@ -50,25 +85,53 @@ import {
   parseScholarAcademicPlanView,
   parseScholarArrivalView,
   parseScholarFinanceView,
+  parseScholarInternshipView,
+  parseScholarCollaborationView,
+  parseScholarCompletionView,
+  parseScholarGrievanceView,
+  parseScholarMobilityChangeView,
   parseScholarOnboardingView,
+  parseScholarQualityAssuranceView,
+  parseScholarResearchAlumniView,
   parseScholarSection,
   parseScholarSupervisionView,
   SCHOLAR_ACADEMIC_PLAN_NAV,
   SCHOLAR_ARRIVAL_NAV,
+  SCHOLAR_COLLABORATION_NAV,
+  SCHOLAR_COMPLETION_NAV,
   SCHOLAR_FINANCE_NAV,
+  SCHOLAR_GRIEVANCE_NAV,
+  SCHOLAR_INTERNSHIP_NAV,
+  SCHOLAR_MOBILITY_CHANGE_NAV,
   SCHOLAR_ONBOARDING_NAV,
+  SCHOLAR_QUALITY_ASSURANCE_NAV,
+  SCHOLAR_RESEARCH_ALUMNI_NAV,
   SCHOLAR_SUPERVISION_NAV,
   scholarAcademicPlanHref,
   scholarArrivalHref,
+  scholarCollaborationHref,
+  scholarCompletionHref,
   scholarFinanceHref,
+  scholarGrievanceHref,
+  scholarInternshipHref,
+  scholarMobilityChangeHref,
   scholarNavForMobility,
   scholarOnboardingHref,
+  scholarQualityAssuranceHref,
+  scholarResearchAlumniHref,
   scholarSectionHref,
   scholarSupervisionHref,
   type ScholarAcademicPlanView,
   type ScholarArrivalView,
+  type ScholarCollaborationView,
+  type ScholarCompletionView,
   type ScholarFinanceView,
+  type ScholarGrievanceView,
+  type ScholarInternshipView,
+  type ScholarMobilityChangeView,
   type ScholarOnboardingView,
+  type ScholarQualityAssuranceView,
+  type ScholarResearchAlumniView,
   type ScholarSectionId,
   type ScholarSupervisionView,
 } from "@/lib/scholar-nav";
@@ -88,23 +151,18 @@ const SECTION_INTRO: Record<
     | "finance"
     | "academic_plan"
     | "supervision"
+    | "internships"
+    | "research_alumni"
+    | "grievance"
+    | "mobility_changes"
+    | "completion"
+    | "quality_assurance"
+    | "collaborations"
   >,
   string
 > = {
   traineeships:
     "This area is for the traineeship work plan, host placement, and the traineeship report.",
-  internships:
-    "This area is for the internship placement and internship report. Traineeship and staff mobilities use their own records.",
-  research_alumni:
-    "Publications, research outputs, and your alumni record are kept after the mobility.",
-  grievance:
-    "Welfare concerns and complaints are logged with your host contact and the SMECC2E coordination team.",
-  mobility_changes:
-    "Requests to change host, duration, or programme are agreed with your host university and the coordination team.",
-  completion:
-    "Completion documents and recognition of the mobility are recorded when the scholarship stay ends.",
-  collaborations:
-    "Joint work with partner universities during the mobility is recorded here.",
 };
 
 const ONBOARDING_INTRO: Record<
@@ -197,6 +255,113 @@ const SUPERVISION_INTRO: Record<ScholarSupervisionView, string> = {
     "Complete the mid-term scholar feedback / satisfaction survey.",
   scholar_feedback_survey_final:
     "Complete the final scholar feedback / satisfaction survey.",
+};
+
+const INTERNSHIP_INTRO: Record<ScholarInternshipView, string> = {
+  signed_agreement_plan_upload:
+    "Upload the signed internship agreement and plan for this mobility.",
+  placement:
+    "Record the internship placement details with the host organization.",
+  weekly_attendance:
+    "Track weekly internship attendance and monitoring records.",
+  host_evaluation:
+    "Record the host organization internship evaluation.",
+  completion_report:
+    "Submit the internship completion report at the end of the placement.",
+  certification:
+    "Record internship certification issued for this mobility.",
+};
+
+const RESEARCH_ALUMNI_INTRO: Record<ScholarResearchAlumniView, string> = {
+  publication_research_output:
+    "Register publications and other research outputs from this mobility.",
+  thesis_dissertation_progress:
+    "Track thesis or dissertation progress during and after the mobility.",
+  alumni_tracer_survey:
+    "Complete the scholar alumni / tracer survey after the mobility.",
+};
+
+const GRIEVANCE_INTRO: Record<ScholarGrievanceView, string> = {
+  complaint_grievance_system:
+    "Lodge or follow up a complaint or grievance with the SMECC2E coordination team.",
+  incident_welfare_safety_report:
+    "Report an incident, welfare, or safety concern during the mobility.",
+};
+
+const MOBILITY_CHANGE_INTRO: Record<ScholarMobilityChangeView, string> = {
+  change_dates_duration:
+    "Request and record approval for a change to mobility dates or duration.",
+  temporary_interruption_suspension:
+    "Request a temporary interruption or suspension of the mobility.",
+  resumption_of_mobility:
+    "Confirm resumption of mobility after an approved interruption.",
+  mobility_extension:
+    "Request and record approval for a mobility extension.",
+  early_withdrawal_termination:
+    "Request early withdrawal or termination of the mobility.",
+  scholarship_termination_decision:
+    "Record the scholarship termination decision for this mobility.",
+};
+
+const COMPLETION_INTRO: Record<ScholarCompletionView, string> = {
+  confirmation_of_participation:
+    "Confirm participation for the completed mobility period.",
+  confirmation_of_departure:
+    "Confirm departure at the end of the mobility stay.",
+  arrival_departure_certification:
+    "Record arrival and departure certification for the mobility.",
+  transcript_of_records_submission:
+    "Submit the transcript of records from the host institution.",
+  internship_certificate_upload:
+    "Upload the internship certificate for this mobility.",
+  teaching_traineeship_certificate_upload:
+    "Upload the teaching or traineeship certificate.",
+  degree_certificate_award_upload:
+    "Upload the degree or certificate award evidence.",
+  credit_recognition_acts_transfer:
+    "Record credit recognition or ACTS transfer outcomes.",
+  credit_recognition_dispute_review:
+    "Lodge or follow a credit recognition dispute or review.",
+  final_mobility_report_supervisor_approval:
+    "Submit the final mobility report for supervisor approval.",
+  host_institution_final_clearance:
+    "Record host institution final clearance for the mobility.",
+  end_of_mobility_evaluation_exit_survey:
+    "Complete the end-of-mobility evaluation / exit survey.",
+  mobility_completion_checklist:
+    "Track the mobility completion checklist before close-out.",
+};
+
+const COLLABORATION_INTRO: Record<ScholarCollaborationView, string> = {
+  organization_identification:
+    "Identify organisations for host placement or collaboration.",
+  organization_host_eligibility_screening:
+    "Screen organisation host eligibility for SMECC2E collaboration.",
+  organization_host_technical_assessment:
+    "Record the organisation host technical assessment.",
+  facilities_assessment_due_diligence:
+    "Complete facilities assessment and due diligence verification.",
+  consortium_host_approval_registration:
+    "Record consortium host approval and host registration.",
+  signed_mous:
+    "Upload or track signed memoranda of understanding.",
+  industrial_projects:
+    "Record industrial projects linked to the mobility or consortium.",
+};
+
+const QUALITY_ASSURANCE_INTRO: Record<ScholarQualityAssuranceView, string> = {
+  partner_hei_quarterly_progress:
+    "Partner HEI quarterly progress reporting for project quality assurance.",
+  internal_quality_assurance_review:
+    "Internal quality assurance review records for authorised project staff.",
+  external_peer_industry_evaluation:
+    "External peer or industry evaluation of project delivery.",
+  mid_term_project_evaluation:
+    "Mid-term project evaluation for SMECC2E quality monitoring.",
+  final_project_evaluation:
+    "Final project evaluation at the close of the grant.",
+  quality_improvement_corrective_action_log:
+    "Quality improvement and corrective action log for project QA.",
 };
 
 function scholarStatusLabel(status: ApplicationStatus | null | undefined): string {
@@ -322,6 +487,13 @@ export function ScholarDashboard() {
   const [financeOpen, setFinanceOpen] = useState(false);
   const [academicPlanOpen, setAcademicPlanOpen] = useState(false);
   const [supervisionOpen, setSupervisionOpen] = useState(false);
+  const [internshipOpen, setInternshipOpen] = useState(false);
+  const [researchAlumniOpen, setResearchAlumniOpen] = useState(false);
+  const [grievanceOpen, setGrievanceOpen] = useState(false);
+  const [mobilityChangeOpen, setMobilityChangeOpen] = useState(false);
+  const [completionOpen, setCompletionOpen] = useState(false);
+  const [qualityAssuranceOpen, setQualityAssuranceOpen] = useState(false);
+  const [collaborationOpen, setCollaborationOpen] = useState(false);
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [agreementOpen, setAgreementOpen] = useState(false);
   const [agreementMessage, setAgreementMessage] = useState<string | null>(null);
@@ -401,12 +573,26 @@ export function ScholarDashboard() {
   const financeParam = searchParams.get("finance");
   const planParam = searchParams.get("plan");
   const progressParam = searchParams.get("progress");
+  const internshipParam = searchParams.get("internship");
+  const researchParam = searchParams.get("research");
+  const grievanceParam = searchParams.get("grievance");
+  const changeParam = searchParams.get("change");
+  const completionParam = searchParams.get("completion");
+  const collabParam = searchParams.get("collab");
+  const qaParam = searchParams.get("qa");
   useEffect(() => {
     setOnboardingOpen(false);
     setPreDepartureOpen(false);
     setFinanceOpen(false);
     setAcademicPlanOpen(false);
     setSupervisionOpen(false);
+    setInternshipOpen(false);
+    setResearchAlumniOpen(false);
+    setGrievanceOpen(false);
+    setMobilityChangeOpen(false);
+    setCompletionOpen(false);
+    setQualityAssuranceOpen(false);
+    setCollaborationOpen(false);
   }, [
     sectionParam,
     onboardingParam,
@@ -414,6 +600,13 @@ export function ScholarDashboard() {
     financeParam,
     planParam,
     progressParam,
+    internshipParam,
+    researchParam,
+    grievanceParam,
+    changeParam,
+    completionParam,
+    collabParam,
+    qaParam,
   ]);
 
   const handleLogout = async () => {
@@ -474,6 +667,34 @@ export function ScholarDashboard() {
     section === "supervision"
       ? parseScholarSupervisionView(searchParams.get("progress"))
       : null;
+  const internshipView =
+    section === "internships"
+      ? parseScholarInternshipView(searchParams.get("internship"))
+      : null;
+  const researchAlumniView =
+    section === "research_alumni"
+      ? parseScholarResearchAlumniView(searchParams.get("research"))
+      : null;
+  const grievanceView =
+    section === "grievance"
+      ? parseScholarGrievanceView(searchParams.get("grievance"))
+      : null;
+  const mobilityChangeView =
+    section === "mobility_changes"
+      ? parseScholarMobilityChangeView(searchParams.get("change"))
+      : null;
+  const completionView =
+    section === "completion"
+      ? parseScholarCompletionView(searchParams.get("completion"))
+      : null;
+  const qualityAssuranceView =
+    section === "quality_assurance"
+      ? parseScholarQualityAssuranceView(searchParams.get("qa"))
+      : null;
+  const collaborationView =
+    section === "collaborations"
+      ? parseScholarCollaborationView(searchParams.get("collab"))
+      : null;
   const activeItem = navItems.find((item) => item.id === section) ?? navItems[0];
   const onboardingItem = SCHOLAR_ONBOARDING_NAV.find(
     (item) => item.id === onboardingView
@@ -485,6 +706,27 @@ export function ScholarDashboard() {
   );
   const supervisionItem = SCHOLAR_SUPERVISION_NAV.find(
     (item) => item.id === supervisionView
+  );
+  const internshipItem = SCHOLAR_INTERNSHIP_NAV.find(
+    (item) => item.id === internshipView
+  );
+  const researchAlumniItem = SCHOLAR_RESEARCH_ALUMNI_NAV.find(
+    (item) => item.id === researchAlumniView
+  );
+  const grievanceItem = SCHOLAR_GRIEVANCE_NAV.find(
+    (item) => item.id === grievanceView
+  );
+  const mobilityChangeItem = SCHOLAR_MOBILITY_CHANGE_NAV.find(
+    (item) => item.id === mobilityChangeView
+  );
+  const completionItem = SCHOLAR_COMPLETION_NAV.find(
+    (item) => item.id === completionView
+  );
+  const qualityAssuranceItem = SCHOLAR_QUALITY_ASSURANCE_NAV.find(
+    (item) => item.id === qualityAssuranceView
+  );
+  const collaborationItem = SCHOLAR_COLLABORATION_NAV.find(
+    (item) => item.id === collaborationView
   );
 
   return (
@@ -554,6 +796,13 @@ export function ScholarDashboard() {
                     setFinanceOpen(false);
                     setAcademicPlanOpen(false);
                     setSupervisionOpen(false);
+                    setInternshipOpen(false);
+                    setResearchAlumniOpen(false);
+                    setGrievanceOpen(false);
+                    setMobilityChangeOpen(false);
+                    setCompletionOpen(false);
+                    setQualityAssuranceOpen(false);
+                    setCollaborationOpen(false);
                   }}
                   onClose={() => setOnboardingOpen(false)}
                   onNavigate={() => {
@@ -580,6 +829,13 @@ export function ScholarDashboard() {
                     setFinanceOpen(false);
                     setAcademicPlanOpen(false);
                     setSupervisionOpen(false);
+                    setInternshipOpen(false);
+                    setResearchAlumniOpen(false);
+                    setGrievanceOpen(false);
+                    setMobilityChangeOpen(false);
+                    setCompletionOpen(false);
+                    setQualityAssuranceOpen(false);
+                    setCollaborationOpen(false);
                   }}
                   onClose={() => setPreDepartureOpen(false)}
                   onNavigate={() => {
@@ -606,6 +862,13 @@ export function ScholarDashboard() {
                     setPreDepartureOpen(false);
                     setAcademicPlanOpen(false);
                     setSupervisionOpen(false);
+                    setInternshipOpen(false);
+                    setResearchAlumniOpen(false);
+                    setGrievanceOpen(false);
+                    setMobilityChangeOpen(false);
+                    setCompletionOpen(false);
+                    setQualityAssuranceOpen(false);
+                    setCollaborationOpen(false);
                   }}
                   onClose={() => setFinanceOpen(false)}
                   onNavigate={() => {
@@ -634,6 +897,13 @@ export function ScholarDashboard() {
                     setPreDepartureOpen(false);
                     setFinanceOpen(false);
                     setSupervisionOpen(false);
+                    setInternshipOpen(false);
+                    setResearchAlumniOpen(false);
+                    setGrievanceOpen(false);
+                    setMobilityChangeOpen(false);
+                    setCompletionOpen(false);
+                    setQualityAssuranceOpen(false);
+                    setCollaborationOpen(false);
                   }}
                   onClose={() => setAcademicPlanOpen(false)}
                   onNavigate={() => {
@@ -662,10 +932,264 @@ export function ScholarDashboard() {
                     setPreDepartureOpen(false);
                     setFinanceOpen(false);
                     setAcademicPlanOpen(false);
+                    setInternshipOpen(false);
+                    setResearchAlumniOpen(false);
+                    setGrievanceOpen(false);
+                    setMobilityChangeOpen(false);
+                    setCompletionOpen(false);
+                    setQualityAssuranceOpen(false);
+                    setCollaborationOpen(false);
                   }}
                   onClose={() => setSupervisionOpen(false)}
                   onNavigate={() => {
                     setSupervisionOpen(false);
+                    setSidebarOpen(false);
+                  }}
+                />
+              );
+            }
+            if (item.id === "internships") {
+              return (
+                <ScholarNavFlyout
+                  key={item.id}
+                  label="Internships Only"
+                  items={SCHOLAR_INTERNSHIP_NAV}
+                  hrefFor={(id) =>
+                    scholarInternshipHref(id as ScholarInternshipView)
+                  }
+                  panelWidth={360}
+                  open={internshipOpen}
+                  groupActive={section === "internships"}
+                  activeId={internshipView}
+                  onToggle={() => {
+                    setInternshipOpen((open) => !open);
+                    setOnboardingOpen(false);
+                    setPreDepartureOpen(false);
+                    setFinanceOpen(false);
+                    setAcademicPlanOpen(false);
+                    setSupervisionOpen(false);
+                    setResearchAlumniOpen(false);
+                    setGrievanceOpen(false);
+                    setMobilityChangeOpen(false);
+                    setCompletionOpen(false);
+                    setQualityAssuranceOpen(false);
+                    setCollaborationOpen(false);
+                  }}
+                  onClose={() => setInternshipOpen(false)}
+                  onNavigate={() => {
+                    setInternshipOpen(false);
+                    setSidebarOpen(false);
+                  }}
+                />
+              );
+            }
+            if (item.id === "research_alumni") {
+              return (
+                <ScholarNavFlyout
+                  key={item.id}
+                  label="Research Outputs & Alumni"
+                  items={SCHOLAR_RESEARCH_ALUMNI_NAV}
+                  hrefFor={(id) =>
+                    scholarResearchAlumniHref(id as ScholarResearchAlumniView)
+                  }
+                  panelWidth={360}
+                  open={researchAlumniOpen}
+                  groupActive={section === "research_alumni"}
+                  activeId={researchAlumniView}
+                  onToggle={() => {
+                    setResearchAlumniOpen((open) => !open);
+                    setOnboardingOpen(false);
+                    setPreDepartureOpen(false);
+                    setFinanceOpen(false);
+                    setAcademicPlanOpen(false);
+                    setSupervisionOpen(false);
+                    setInternshipOpen(false);
+                    setGrievanceOpen(false);
+                    setMobilityChangeOpen(false);
+                    setCompletionOpen(false);
+                    setQualityAssuranceOpen(false);
+                    setCollaborationOpen(false);
+                  }}
+                  onClose={() => setResearchAlumniOpen(false)}
+                  onNavigate={() => {
+                    setResearchAlumniOpen(false);
+                    setSidebarOpen(false);
+                  }}
+                />
+              );
+            }
+            if (item.id === "grievance") {
+              return (
+                <ScholarNavFlyout
+                  key={item.id}
+                  label="Grievance & Welfare"
+                  items={SCHOLAR_GRIEVANCE_NAV}
+                  hrefFor={(id) =>
+                    scholarGrievanceHref(id as ScholarGrievanceView)
+                  }
+                  panelWidth={360}
+                  open={grievanceOpen}
+                  groupActive={section === "grievance"}
+                  activeId={grievanceView}
+                  onToggle={() => {
+                    setGrievanceOpen((open) => !open);
+                    setOnboardingOpen(false);
+                    setPreDepartureOpen(false);
+                    setFinanceOpen(false);
+                    setAcademicPlanOpen(false);
+                    setSupervisionOpen(false);
+                    setInternshipOpen(false);
+                    setResearchAlumniOpen(false);
+                    setMobilityChangeOpen(false);
+                    setCompletionOpen(false);
+                    setQualityAssuranceOpen(false);
+                    setCollaborationOpen(false);
+                  }}
+                  onClose={() => setGrievanceOpen(false)}
+                  onNavigate={() => {
+                    setGrievanceOpen(false);
+                    setSidebarOpen(false);
+                  }}
+                />
+              );
+            }
+            if (item.id === "mobility_changes") {
+              return (
+                <ScholarNavFlyout
+                  key={item.id}
+                  label="Mobility changes"
+                  items={SCHOLAR_MOBILITY_CHANGE_NAV}
+                  hrefFor={(id) =>
+                    scholarMobilityChangeHref(id as ScholarMobilityChangeView)
+                  }
+                  panelWidth={380}
+                  open={mobilityChangeOpen}
+                  groupActive={section === "mobility_changes"}
+                  activeId={mobilityChangeView}
+                  onToggle={() => {
+                    setMobilityChangeOpen((open) => !open);
+                    setOnboardingOpen(false);
+                    setPreDepartureOpen(false);
+                    setFinanceOpen(false);
+                    setAcademicPlanOpen(false);
+                    setSupervisionOpen(false);
+                    setInternshipOpen(false);
+                    setResearchAlumniOpen(false);
+                    setGrievanceOpen(false);
+                    setCompletionOpen(false);
+                    setQualityAssuranceOpen(false);
+                    setCollaborationOpen(false);
+                  }}
+                  onClose={() => setMobilityChangeOpen(false)}
+                  onNavigate={() => {
+                    setMobilityChangeOpen(false);
+                    setSidebarOpen(false);
+                  }}
+                />
+              );
+            }
+            if (item.id === "completion") {
+              return (
+                <ScholarNavFlyout
+                  key={item.id}
+                  label="Completion & Recognition"
+                  items={SCHOLAR_COMPLETION_NAV}
+                  hrefFor={(id) =>
+                    scholarCompletionHref(id as ScholarCompletionView)
+                  }
+                  panelWidth={400}
+                  open={completionOpen}
+                  groupActive={section === "completion"}
+                  activeId={completionView}
+                  onToggle={() => {
+                    setCompletionOpen((open) => !open);
+                    setOnboardingOpen(false);
+                    setPreDepartureOpen(false);
+                    setFinanceOpen(false);
+                    setAcademicPlanOpen(false);
+                    setSupervisionOpen(false);
+                    setInternshipOpen(false);
+                    setResearchAlumniOpen(false);
+                    setGrievanceOpen(false);
+                    setMobilityChangeOpen(false);
+                    setQualityAssuranceOpen(false);
+                    setCollaborationOpen(false);
+                  }}
+                  onClose={() => setCompletionOpen(false)}
+                  onNavigate={() => {
+                    setCompletionOpen(false);
+                    setSidebarOpen(false);
+                  }}
+                />
+              );
+            }
+            if (item.id === "quality_assurance") {
+              return (
+                <ScholarNavFlyout
+                  key={item.id}
+                  label="Quality Assurance (Not for Scholars)"
+                  items={SCHOLAR_QUALITY_ASSURANCE_NAV}
+                  hrefFor={(id) =>
+                    scholarQualityAssuranceHref(
+                      id as ScholarQualityAssuranceView
+                    )
+                  }
+                  panelWidth={400}
+                  open={qualityAssuranceOpen}
+                  groupActive={section === "quality_assurance"}
+                  activeId={qualityAssuranceView}
+                  onToggle={() => {
+                    setQualityAssuranceOpen((open) => !open);
+                    setOnboardingOpen(false);
+                    setPreDepartureOpen(false);
+                    setFinanceOpen(false);
+                    setAcademicPlanOpen(false);
+                    setSupervisionOpen(false);
+                    setInternshipOpen(false);
+                    setResearchAlumniOpen(false);
+                    setGrievanceOpen(false);
+                    setMobilityChangeOpen(false);
+                    setCompletionOpen(false);
+                    setCollaborationOpen(false);
+                  }}
+                  onClose={() => setQualityAssuranceOpen(false)}
+                  onNavigate={() => {
+                    setQualityAssuranceOpen(false);
+                    setSidebarOpen(false);
+                  }}
+                />
+              );
+            }
+            if (item.id === "collaborations") {
+              return (
+                <ScholarNavFlyout
+                  key={item.id}
+                  label="Collaborations"
+                  items={SCHOLAR_COLLABORATION_NAV}
+                  hrefFor={(id) =>
+                    scholarCollaborationHref(id as ScholarCollaborationView)
+                  }
+                  panelWidth={400}
+                  open={collaborationOpen}
+                  groupActive={section === "collaborations"}
+                  activeId={collaborationView}
+                  onToggle={() => {
+                    setCollaborationOpen((open) => !open);
+                    setOnboardingOpen(false);
+                    setPreDepartureOpen(false);
+                    setFinanceOpen(false);
+                    setAcademicPlanOpen(false);
+                    setSupervisionOpen(false);
+                    setInternshipOpen(false);
+                    setResearchAlumniOpen(false);
+                    setGrievanceOpen(false);
+                    setMobilityChangeOpen(false);
+                    setCompletionOpen(false);
+                    setQualityAssuranceOpen(false);
+                  }}
+                  onClose={() => setCollaborationOpen(false)}
+                  onNavigate={() => {
+                    setCollaborationOpen(false);
                     setSidebarOpen(false);
                   }}
                 />
@@ -979,6 +1503,295 @@ export function ScholarDashboard() {
               }
               details={awardDetails}
             />
+          ) : section === "internships" &&
+            internshipView === "signed_agreement_plan_upload" ? (
+            <SignedInternshipAgreementPlanUploadForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "internships" &&
+            internshipView === "placement" ? (
+            <InternshipPlacementForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "internships" &&
+            internshipView === "weekly_attendance" ? (
+            <InternshipWeeklyAttendanceForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "internships" &&
+            internshipView === "host_evaluation" ? (
+            <HostOrganisationInternshipEvaluationForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "internships" &&
+            internshipView === "completion_report" ? (
+            <InternshipCompletionReportForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "internships" &&
+            internshipView === "certification" ? (
+            <InternshipCertificationForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "internships" ? (
+            <SectionPanel
+              eyebrow="Internships Only"
+              title={internshipItem?.label ?? "Internships Only"}
+              intro={
+                internshipView
+                  ? INTERNSHIP_INTRO[internshipView]
+                  : "This area is for the internship placement and internship report. Traineeship and staff mobilities use their own records."
+              }
+              details={awardDetails}
+            />
+          ) : section === "research_alumni" &&
+            researchAlumniView === "publication_research_output" ? (
+            <PublicationResearchOutputRegistrationForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "research_alumni" &&
+            researchAlumniView === "thesis_dissertation_progress" ? (
+            <ThesisDissertationProgressForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "research_alumni" &&
+            researchAlumniView === "alumni_tracer_survey" ? (
+            <ScholarAlumniTracerSurveyForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "research_alumni" ? (
+            <SectionPanel
+              eyebrow="Research Outputs & Alumni"
+              title={
+                researchAlumniItem?.label ?? "Research Outputs & Alumni"
+              }
+              intro={
+                researchAlumniView
+                  ? RESEARCH_ALUMNI_INTRO[researchAlumniView]
+                  : "Publications, research outputs, and your alumni record are kept after the mobility."
+              }
+              details={awardDetails}
+            />
+          ) : section === "grievance" &&
+            grievanceView === "complaint_grievance_system" ? (
+            <ComplaintGrievanceManagementForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "grievance" &&
+            grievanceView === "incident_welfare_safety_report" ? (
+            <IncidentWelfareSafetyReportForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "grievance" ? (
+            <SectionPanel
+              eyebrow="Grievance & Welfare"
+              title={grievanceItem?.label ?? "Grievance & Welfare"}
+              intro={
+                grievanceView
+                  ? GRIEVANCE_INTRO[grievanceView]
+                  : "Welfare concerns and complaints are logged with your host contact and the SMECC2E coordination team."
+              }
+              details={awardDetails}
+            />
+          ) : section === "mobility_changes" &&
+            mobilityChangeView === "change_dates_duration" ? (
+            <ChangeOfMobilityDatesDurationForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "mobility_changes" &&
+            mobilityChangeView === "temporary_interruption_suspension" ? (
+            <MobilityInterruptionSuspensionRequestForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "mobility_changes" &&
+            mobilityChangeView === "resumption_of_mobility" ? (
+            <ResumptionOfMobilityForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "mobility_changes" &&
+            mobilityChangeView === "mobility_extension" ? (
+            <MobilityExtensionRequestForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "mobility_changes" &&
+            mobilityChangeView === "early_withdrawal_termination" ? (
+            <EarlyWithdrawalTerminationRequestForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "mobility_changes" &&
+            mobilityChangeView === "scholarship_termination_decision" ? (
+            <ScholarshipTerminationDecisionForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "mobility_changes" ? (
+            <SectionPanel
+              eyebrow="Mobility changes"
+              title={mobilityChangeItem?.label ?? "Mobility changes"}
+              intro={
+                mobilityChangeView
+                  ? MOBILITY_CHANGE_INTRO[mobilityChangeView]
+                  : "Requests to change host, duration, or programme are agreed with your host university and the coordination team."
+              }
+              details={awardDetails}
+            />
+          ) : section === "completion" &&
+            completionView === "confirmation_of_participation" ? (
+            <ConfirmationOfParticipationForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "completion" &&
+            completionView === "confirmation_of_departure" ? (
+            <ConfirmationOfDepartureForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "completion" &&
+            completionView === "arrival_departure_certification" ? (
+            <ArrivalDepartureCertificationForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "completion" &&
+            completionView === "transcript_of_records_submission" ? (
+            <TranscriptOfRecordsSubmissionForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "completion" &&
+            completionView === "teaching_traineeship_certificate_upload" ? (
+            <TeachingTraineeshipCertificateForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "completion" &&
+            completionView === "degree_certificate_award_upload" ? (
+            <DegreeCertificateAwardForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "completion" &&
+            completionView === "credit_recognition_acts_transfer" ? (
+            <CreditRecognitionActsTransferForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "completion" &&
+            completionView === "credit_recognition_dispute_review" ? (
+            <CreditRecognitionDisputeReviewForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "completion" &&
+            completionView === "final_mobility_report_supervisor_approval" ? (
+            <FinalMobilityAcademicReportForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "completion" &&
+            completionView === "host_institution_final_clearance" ? (
+            <HostInstitutionFinalClearanceForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "completion" &&
+            completionView === "end_of_mobility_evaluation_exit_survey" ? (
+            <EndOfMobilityEvaluationExitSurveyForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "completion" &&
+            completionView === "mobility_completion_checklist" ? (
+            <MobilityCompletionChecklistForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "completion" ? (
+            <SectionPanel
+              eyebrow="Completion & Recognition"
+              title={completionItem?.label ?? "Completion & Recognition"}
+              intro={
+                completionView
+                  ? COMPLETION_INTRO[completionView]
+                  : "Completion documents and recognition of the mobility are recorded when the scholarship stay ends."
+              }
+              details={awardDetails}
+            />
+          ) : section === "quality_assurance" ? (
+            <SectionPanel
+              eyebrow="Quality Assurance (Not for Scholars)"
+              title={
+                qualityAssuranceItem?.label ??
+                "Quality Assurance (Not for Scholars)"
+              }
+              intro={
+                qualityAssuranceView
+                  ? QUALITY_ASSURANCE_INTRO[qualityAssuranceView]
+                  : "Quality assurance records are managed by authorised project staff. Scholars do not complete forms in this area."
+              }
+              details={awardDetails}
+            />
+          ) : section === "collaborations" &&
+            collaborationView === "organization_identification" ? (
+            <OrganisationIdentificationNominationForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "collaborations" &&
+            collaborationView === "organization_host_eligibility_screening" ? (
+            <OrganisationHostEligibilityScreeningForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "collaborations" &&
+            collaborationView === "organization_host_technical_assessment" ? (
+            <OrganisationHostTechnicalAssessmentForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "collaborations" &&
+            collaborationView === "facilities_assessment_due_diligence" ? (
+            <FacilitiesAssessmentDueDiligenceForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "collaborations" &&
+            collaborationView === "consortium_host_approval_registration" ? (
+            <ConsortiumHostApprovalRegistrationForm
+              user={user}
+              displayName={displayName}
+            />
+          ) : section === "collaborations" &&
+            collaborationView === "signed_mous" ? (
+            <SignedMousForm user={user} displayName={displayName} />
+          ) : section === "collaborations" ? (
+            <SectionPanel
+              eyebrow="Collaborations"
+              title={collaborationItem?.label ?? "Collaborations"}
+              intro={
+                collaborationView
+                  ? COLLABORATION_INTRO[collaborationView]
+                  : "Joint work with partner universities during the mobility is recorded here."
+              }
+              details={awardDetails}
+            />
           ) : (
             <SectionPanel
               title={activeItem?.label ?? "Scholar"}
@@ -991,6 +1804,13 @@ export function ScholarDashboard() {
                     | "finance"
                     | "academic_plan"
                     | "supervision"
+                    | "internships"
+                    | "research_alumni"
+                    | "grievance"
+                    | "mobility_changes"
+                    | "completion"
+                    | "quality_assurance"
+                    | "collaborations"
                   >
                 ]
               }

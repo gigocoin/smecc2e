@@ -10,6 +10,7 @@ export type ScholarSectionId =
   | "grievance"
   | "mobility_changes"
   | "completion"
+  | "quality_assurance"
   | "collaborations";
 
 export type ScholarNavAudience = "traineeship" | "internship";
@@ -17,7 +18,7 @@ export type ScholarNavAudience = "traineeship" | "internship";
 export type ScholarNavItem = {
   id: ScholarSectionId;
   label: string;
-  /** Limits the item to one mobility group. Quality Assurance is omitted for scholars. */
+  /** Limits the item to one mobility group. */
   audience?: ScholarNavAudience;
 };
 
@@ -33,6 +34,7 @@ export const SCHOLAR_NAV: readonly ScholarNavItem[] = [
   { id: "grievance", label: "Grievance & Welfare" },
   { id: "mobility_changes", label: "Mobility changes" },
   { id: "completion", label: "Completion & Recognition" },
+  { id: "quality_assurance", label: "Quality Assurance (Not for Scholars)" },
   { id: "collaborations", label: "Collaborations" },
 ];
 
@@ -356,4 +358,378 @@ export function parseScholarSupervisionView(
 
 export function scholarSupervisionHref(id: ScholarSupervisionView): string {
   return `/scholar?section=supervision&progress=${id}`;
+}
+
+export type ScholarInternshipView =
+  | "signed_agreement_plan_upload"
+  | "placement"
+  | "weekly_attendance"
+  | "host_evaluation"
+  | "completion_report"
+  | "certification";
+
+export type ScholarInternshipNavItem = {
+  id: ScholarInternshipView;
+  label: string;
+};
+
+export const SCHOLAR_INTERNSHIP_NAV: readonly ScholarInternshipNavItem[] = [
+  {
+    id: "signed_agreement_plan_upload",
+    label: "Signed Internship Agreement & Plan Upload Form",
+  },
+  {
+    id: "placement",
+    label: "Internship Placement Form",
+  },
+  {
+    id: "weekly_attendance",
+    label: "Monitoring (Weekly Attendance)",
+  },
+  {
+    id: "host_evaluation",
+    label: "Host Organization Internship Evaluation Form",
+  },
+  {
+    id: "completion_report",
+    label: "Internship Completion Report Form",
+  },
+  {
+    id: "certification",
+    label: "Internship Certification Form",
+  },
+];
+
+export function parseScholarInternshipView(
+  value: string | null | undefined
+): ScholarInternshipView | null {
+  const match = SCHOLAR_INTERNSHIP_NAV.find((item) => item.id === value);
+  return match?.id ?? null;
+}
+
+export function scholarInternshipHref(id: ScholarInternshipView): string {
+  return `/scholar?section=internships&internship=${id}`;
+}
+
+export type ScholarResearchAlumniView =
+  | "publication_research_output"
+  | "thesis_dissertation_progress"
+  | "alumni_tracer_survey";
+
+export type ScholarResearchAlumniNavItem = {
+  id: ScholarResearchAlumniView;
+  label: string;
+};
+
+export const SCHOLAR_RESEARCH_ALUMNI_NAV: readonly ScholarResearchAlumniNavItem[] =
+  [
+    {
+      id: "publication_research_output",
+      label: "Publication/Research Output Registration",
+    },
+    {
+      id: "thesis_dissertation_progress",
+      label: "Thesis/Dissertation Progress",
+    },
+    {
+      id: "alumni_tracer_survey",
+      label: "Scholar Alumni/Tracer Survey",
+    },
+  ];
+
+export function parseScholarResearchAlumniView(
+  value: string | null | undefined
+): ScholarResearchAlumniView | null {
+  const match = SCHOLAR_RESEARCH_ALUMNI_NAV.find((item) => item.id === value);
+  return match?.id ?? null;
+}
+
+export function scholarResearchAlumniHref(
+  id: ScholarResearchAlumniView
+): string {
+  return `/scholar?section=research_alumni&research=${id}`;
+}
+
+export type ScholarGrievanceView =
+  | "complaint_grievance_system"
+  | "incident_welfare_safety_report";
+
+export type ScholarGrievanceNavItem = {
+  id: ScholarGrievanceView;
+  label: string;
+};
+
+export const SCHOLAR_GRIEVANCE_NAV: readonly ScholarGrievanceNavItem[] = [
+  {
+    id: "complaint_grievance_system",
+    label: "Complaint/Grievance System",
+  },
+  {
+    id: "incident_welfare_safety_report",
+    label: "Incident/Welfare/Safety Report",
+  },
+];
+
+export function parseScholarGrievanceView(
+  value: string | null | undefined
+): ScholarGrievanceView | null {
+  const match = SCHOLAR_GRIEVANCE_NAV.find((item) => item.id === value);
+  return match?.id ?? null;
+}
+
+export function scholarGrievanceHref(id: ScholarGrievanceView): string {
+  return `/scholar?section=grievance&grievance=${id}`;
+}
+
+export type ScholarMobilityChangeView =
+  | "change_dates_duration"
+  | "temporary_interruption_suspension"
+  | "resumption_of_mobility"
+  | "mobility_extension"
+  | "early_withdrawal_termination"
+  | "scholarship_termination_decision";
+
+export type ScholarMobilityChangeNavItem = {
+  id: ScholarMobilityChangeView;
+  label: string;
+};
+
+export const SCHOLAR_MOBILITY_CHANGE_NAV: readonly ScholarMobilityChangeNavItem[] =
+  [
+    {
+      id: "change_dates_duration",
+      label: "Change of Mobility Dates/Duration Request & Approval",
+    },
+    {
+      id: "temporary_interruption_suspension",
+      label: "Temporary Interruption/Suspension Request",
+    },
+    {
+      id: "resumption_of_mobility",
+      label: "Resumption of Mobility",
+    },
+    {
+      id: "mobility_extension",
+      label: "Mobility Extension Request & Approval",
+    },
+    {
+      id: "early_withdrawal_termination",
+      label: "Early Withdrawal/Termination Request",
+    },
+    {
+      id: "scholarship_termination_decision",
+      label: "Scholarship Termination Decision",
+    },
+  ];
+
+export function parseScholarMobilityChangeView(
+  value: string | null | undefined
+): ScholarMobilityChangeView | null {
+  const match = SCHOLAR_MOBILITY_CHANGE_NAV.find((item) => item.id === value);
+  return match?.id ?? null;
+}
+
+export function scholarMobilityChangeHref(
+  id: ScholarMobilityChangeView
+): string {
+  return `/scholar?section=mobility_changes&change=${id}`;
+}
+
+export type ScholarCompletionView =
+  | "confirmation_of_participation"
+  | "confirmation_of_departure"
+  | "arrival_departure_certification"
+  | "transcript_of_records_submission"
+  | "internship_certificate_upload"
+  | "teaching_traineeship_certificate_upload"
+  | "degree_certificate_award_upload"
+  | "credit_recognition_acts_transfer"
+  | "credit_recognition_dispute_review"
+  | "final_mobility_report_supervisor_approval"
+  | "host_institution_final_clearance"
+  | "end_of_mobility_evaluation_exit_survey"
+  | "mobility_completion_checklist";
+
+export type ScholarCompletionNavItem = {
+  id: ScholarCompletionView;
+  label: string;
+};
+
+export const SCHOLAR_COMPLETION_NAV: readonly ScholarCompletionNavItem[] = [
+  {
+    id: "confirmation_of_participation",
+    label: "Confirmation of Participation",
+  },
+  {
+    id: "confirmation_of_departure",
+    label: "Confirmation of Departure",
+  },
+  {
+    id: "arrival_departure_certification",
+    label: "Arrival & Departure Certification",
+  },
+  {
+    id: "transcript_of_records_submission",
+    label: "Transcript of Records Submission",
+  },
+  {
+    id: "internship_certificate_upload",
+    label: "Internship Certificate Upload",
+  },
+  {
+    id: "teaching_traineeship_certificate_upload",
+    label: "Teaching/Traineeship Certificate Upload",
+  },
+  {
+    id: "degree_certificate_award_upload",
+    label: "Degree/Certificate Award Upload",
+  },
+  {
+    id: "credit_recognition_acts_transfer",
+    label: "Credit Recognition/ACTS Transfer",
+  },
+  {
+    id: "credit_recognition_dispute_review",
+    label: "Credit Recognition Dispute/Review",
+  },
+  {
+    id: "final_mobility_report_supervisor_approval",
+    label: "Final Mobility Report & Supervisor Approval",
+  },
+  {
+    id: "host_institution_final_clearance",
+    label: "Host Institution Final Clearance",
+  },
+  {
+    id: "end_of_mobility_evaluation_exit_survey",
+    label: "End-of-Mobility Evaluation/Exit Survey",
+  },
+  {
+    id: "mobility_completion_checklist",
+    label: "Mobility Completion Checklist",
+  },
+];
+
+export function parseScholarCompletionView(
+  value: string | null | undefined
+): ScholarCompletionView | null {
+  const match = SCHOLAR_COMPLETION_NAV.find((item) => item.id === value);
+  return match?.id ?? null;
+}
+
+export function scholarCompletionHref(id: ScholarCompletionView): string {
+  return `/scholar?section=completion&completion=${id}`;
+}
+
+export type ScholarCollaborationView =
+  | "organization_identification"
+  | "organization_host_eligibility_screening"
+  | "organization_host_technical_assessment"
+  | "facilities_assessment_due_diligence"
+  | "consortium_host_approval_registration"
+  | "signed_mous"
+  | "industrial_projects";
+
+export type ScholarCollaborationNavItem = {
+  id: ScholarCollaborationView;
+  label: string;
+};
+
+export const SCHOLAR_COLLABORATION_NAV: readonly ScholarCollaborationNavItem[] =
+  [
+    {
+      id: "organization_identification",
+      label: "Organization Identification",
+    },
+    {
+      id: "organization_host_eligibility_screening",
+      label: "Organization Host Eligibility Screening",
+    },
+    {
+      id: "organization_host_technical_assessment",
+      label: "Organization Host Technical Assessment",
+    },
+    {
+      id: "facilities_assessment_due_diligence",
+      label: "Facilities Assessment & Due Diligence Verification",
+    },
+    {
+      id: "consortium_host_approval_registration",
+      label: "Consortium Host Approval & Host Registration",
+    },
+    {
+      id: "signed_mous",
+      label: "Signed MOUs",
+    },
+    {
+      id: "industrial_projects",
+      label: "Industrial Projects",
+    },
+  ];
+
+export function parseScholarCollaborationView(
+  value: string | null | undefined
+): ScholarCollaborationView | null {
+  const match = SCHOLAR_COLLABORATION_NAV.find((item) => item.id === value);
+  return match?.id ?? null;
+}
+
+export function scholarCollaborationHref(
+  id: ScholarCollaborationView
+): string {
+  return `/scholar?section=collaborations&collab=${id}`;
+}
+
+export type ScholarQualityAssuranceView =
+  | "partner_hei_quarterly_progress"
+  | "internal_quality_assurance_review"
+  | "external_peer_industry_evaluation"
+  | "mid_term_project_evaluation"
+  | "final_project_evaluation"
+  | "quality_improvement_corrective_action_log";
+
+export type ScholarQualityAssuranceNavItem = {
+  id: ScholarQualityAssuranceView;
+  label: string;
+};
+
+export const SCHOLAR_QUALITY_ASSURANCE_NAV: readonly ScholarQualityAssuranceNavItem[] =
+  [
+    {
+      id: "partner_hei_quarterly_progress",
+      label: "Partner HEI Quarterly Progress Report",
+    },
+    {
+      id: "internal_quality_assurance_review",
+      label: "Internal Quality Assurance Review",
+    },
+    {
+      id: "external_peer_industry_evaluation",
+      label: "External Peer/Industry Evaluation",
+    },
+    {
+      id: "mid_term_project_evaluation",
+      label: "Mid-Term Project Evaluation",
+    },
+    {
+      id: "final_project_evaluation",
+      label: "Final Project Evaluation",
+    },
+    {
+      id: "quality_improvement_corrective_action_log",
+      label: "Quality Improvement/Corrective Action Log",
+    },
+  ];
+
+export function parseScholarQualityAssuranceView(
+  value: string | null | undefined
+): ScholarQualityAssuranceView | null {
+  const match = SCHOLAR_QUALITY_ASSURANCE_NAV.find((item) => item.id === value);
+  return match?.id ?? null;
+}
+
+export function scholarQualityAssuranceHref(
+  id: ScholarQualityAssuranceView
+): string {
+  return `/scholar?section=quality_assurance&qa=${id}`;
 }
