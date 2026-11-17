@@ -43,11 +43,12 @@ import {
 } from "@/lib/coordinator-project-nav";
 import {
   buildScholarsManagementNav,
-  buildScholarsOnboardingNav,
+  buildScholarsNestedNav,
+  getScholarsNestedViewParam,
   isScholarsManagementGroupActive,
-  isScholarsManagementSubActive,
-  isScholarsOnboardingGroupActive,
-  isScholarsOnboardingSubActive,
+  isScholarsNestedGroupActive,
+  isScholarsNestedSubActive,
+  type ScholarsManagementSection,
 } from "@/lib/coordinator-scholars-nav";
 import { useDashboardPortal } from "./dashboard-portal-provider";
 
@@ -416,22 +417,16 @@ function ScholarsManagementNav({
   basePath,
   pathname,
   sectionParam,
-  onboardingParam,
+  searchParams,
   onNavigate,
 }: {
   basePath: string;
   pathname: string;
   sectionParam: string | null;
-  onboardingParam: string | null;
+  searchParams: { get: (key: string) => string | null };
   onNavigate: () => void;
 }) {
   const items = buildScholarsManagementNav(basePath);
-  const onboardingItems = buildScholarsOnboardingNav(basePath);
-  const onboardingGroupActive = isScholarsOnboardingGroupActive(
-    pathname,
-    sectionParam,
-    basePath
-  );
   const groupActive = isScholarsManagementGroupActive(
     items,
     pathname,
@@ -439,12 +434,17 @@ function ScholarsManagementNav({
     basePath
   );
   const [open, setOpen] = useState(false);
-  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [openNested, setOpenNested] = useState<ScholarsManagementSection | null>(
+    null
+  );
+  const nestedQueryKey = items
+    .map((item) => getScholarsNestedViewParam(item.section, searchParams) ?? "")
+    .join("|");
 
   useEffect(() => {
     setOpen(false);
-    setOnboardingOpen(false);
-  }, [pathname, sectionParam, onboardingParam]);
+    setOpenNested(null);
+  }, [pathname, sectionParam, nestedQueryKey]);
 
   return (
     <SidebarFlyoutSubmenu
@@ -456,61 +456,53 @@ function ScholarsManagementNav({
       onClose={() => setOpen(false)}
     >
       {items.map((item) => {
-        if (item.nestedMenu === "onboarding") {
-          return (
-            <FlyoutNestedSubmenu
-              key={item.id}
-              label={item.label}
-              groupActive={onboardingGroupActive}
-              open={onboardingOpen}
-              onToggle={() => setOnboardingOpen((prev) => !prev)}
-              onClose={() => setOnboardingOpen(false)}
-            >
-              {onboardingItems.map((onboardingItem) => {
-                const active = isScholarsOnboardingSubActive(
-                  onboardingItem,
-                  pathname,
-                  sectionParam,
-                  onboardingParam,
-                  basePath
-                );
-                return (
-                  <FlyoutSubmenuLink
-                    key={onboardingItem.id}
-                    href={onboardingItem.href}
-                    active={active}
-                    onNavigate={() => {
-                      setOnboardingOpen(false);
-                      setOpen(false);
-                      onNavigate();
-                    }}
-                  >
-                    {onboardingItem.label}
-                  </FlyoutSubmenuLink>
-                );
-              })}
-            </FlyoutNestedSubmenu>
-          );
-        }
-
-        const active = isScholarsManagementSubActive(
-          item,
+        const nestedItems = buildScholarsNestedNav(basePath, item.section);
+        const nestedGroupActive = isScholarsNestedGroupActive(
           pathname,
           sectionParam,
-          basePath
+          basePath,
+          item.section
         );
+        const viewParam = getScholarsNestedViewParam(item.section, searchParams);
+        const nestedOpen = openNested === item.section;
+
         return (
-          <FlyoutSubmenuLink
+          <FlyoutNestedSubmenu
             key={item.id}
-            href={item.href!}
-            active={active}
-            onNavigate={() => {
-              setOpen(false);
-              onNavigate();
-            }}
+            label={item.label}
+            groupActive={nestedGroupActive}
+            open={nestedOpen}
+            onToggle={() =>
+              setOpenNested((prev) =>
+                prev === item.section ? null : item.section
+              )
+            }
+            onClose={() => setOpenNested(null)}
           >
-            {item.label}
-          </FlyoutSubmenuLink>
+            {nestedItems.map((nestedItem) => {
+              const active = isScholarsNestedSubActive(
+                nestedItem,
+                pathname,
+                sectionParam,
+                viewParam,
+                basePath
+              );
+              return (
+                <FlyoutSubmenuLink
+                  key={nestedItem.id}
+                  href={nestedItem.href}
+                  active={active}
+                  onNavigate={() => {
+                    setOpenNested(null);
+                    setOpen(false);
+                    onNavigate();
+                  }}
+                >
+                  {nestedItem.label}
+                </FlyoutSubmenuLink>
+              );
+            })}
+          </FlyoutNestedSubmenu>
         );
       })}
     </SidebarFlyoutSubmenu>
@@ -1022,10 +1014,10 @@ export function CoordinatorSidebar({
   const statusParam = isHydrated ? searchParams.get("status") : null;
   const scholarsSectionParam =
     isHydrated && pathname.includes("/scholars") ? section : null;
-  const scholarsOnboardingParam =
+  const scholarsSearchParams =
     isHydrated && pathname.includes("/scholars")
-      ? searchParams.get("onboarding")
-      : null;
+      ? searchParams
+      : { get: () => null };
   const financeSectionParam =
     isHydrated && pathname.includes("/finance") ? section : null;
   const projectSectionParam =
@@ -1158,7 +1150,7 @@ export function CoordinatorSidebar({
                           basePath={basePath}
                           pathname={pathname}
                           sectionParam={scholarsSectionParam}
-                          onboardingParam={scholarsOnboardingParam}
+                          searchParams={scholarsSearchParams}
                           onNavigate={close}
                         />
                         <FinancialManagementNav
