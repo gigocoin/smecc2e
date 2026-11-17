@@ -657,7 +657,7 @@ function DateStatusRow({
   date: string;
   status: string;
   disabled: boolean;
-  statusOptions: [string, string][];
+  statusOptions: ReadonlyArray<readonly [string, string]>;
   statusName: string;
   onDateChange: (value: string) => void;
   onStatusChange: (value: string) => void;
@@ -737,7 +737,7 @@ function RadioGroup({
 }: {
   name: string;
   value: string;
-  options: [string, string][];
+  options: ReadonlyArray<readonly [string, string]>;
   onChange: (value: string) => void;
   disabled?: boolean;
 }) {

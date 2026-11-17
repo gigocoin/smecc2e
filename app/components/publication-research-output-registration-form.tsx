@@ -791,7 +791,7 @@ function RadioGroup({
 }: {
   name: string;
   value: string;
-  options: [string, string][];
+  options: ReadonlyArray<readonly [string, string]>;
   onChange: (value: string) => void;
   disabled?: boolean;
 }) {
@@ -823,7 +823,7 @@ function CheckboxGroup({
   onToggle,
   disabled = false,
 }: {
-  options: [string, string][];
+  options: ReadonlyArray<readonly [string, string]>;
   values: string[];
   onToggle: (value: string) => void;
   disabled?: boolean;
