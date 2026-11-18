@@ -18,6 +18,10 @@ enum UserRole {
   COORDINATOR
   EVALUATOR
   ADMINISTRATOR
+  SUPER_ADMIN
+  FINANCE_COORDINATOR
+  FINANCE_OFFICER
+  FINANCE_AUDITOR
 }
 
 enum UserStatus {
@@ -418,6 +422,8 @@ model User {
   assignedApplicationsAsEvaluator2 Applicant[] @relation("ApplicantEvaluator2")
   assignedApplicationsAsInterviewer Applicant[] @relation("ApplicantInterviewer")
   projectTaskLeadAssignments ProjectTaskLeadPartner[]
+  preFinancingsAsOfficer PreFinancing[] @relation("PreFinancingFinanceOfficer")
+  preFinancingsCreated   PreFinancing[] @relation("PreFinancingCreatedBy")
 
   @@map("users")
 }
@@ -443,6 +449,7 @@ model University {
   name           String   @unique
   thematicAreas  String[]  @default([]) @map("thematic_areas")
   programs       Program[]
+  preFinancings  PreFinancing[]
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
@@ -729,4 +736,43 @@ model ProjectTaskLeadPartner {
   @@id([taskId, userId])
   @@index([userId])
   @@map("project_task_lead_partners")
+}
+
+// ---------------------------------------------------------------------------
+// Finance coordinator — pre-financing records
+// ---------------------------------------------------------------------------
+
+/// Tranche for Finance Coordinator → Financial Records pre-financing.
+/// UI views: first_pre_financing / second_pre_financing / third_pre_financing
+enum PreFinancingTranche {
+  FIRST
+  SECOND
+  THIRD
+}
+
+/// Pre-financing release recorded against a partner institution.
+model PreFinancing {
+  id                 String              @id @default(cuid())
+  /// Human-readable reference, e.g. PF1-2026-001
+  reference          String              @unique
+  tranche            PreFinancingTranche
+  universityId       String              @map("university_id")
+  university         University          @relation(fields: [universityId], references: [id], onDelete: Restrict)
+  financeOfficerId   String              @map("finance_officer_id")
+  financeOfficer     User                @relation("PreFinancingFinanceOfficer", fields: [financeOfficerId], references: [id], onDelete: Restrict)
+  amount             Decimal             @db.Decimal(14, 2)
+  currency           String              @default("EUR") @db.VarChar(3)
+  releaseDate        DateTime            @map("release_date") @db.Date
+  notes              String              @default("") @db.Text
+  createdById        String?             @map("created_by_id")
+  createdBy          User?               @relation("PreFinancingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  @@index([tranche])
+  @@index([universityId])
+  @@index([financeOfficerId])
+  @@index([releaseDate])
+  @@index([createdAt])
+  @@map("pre_financings")
 }

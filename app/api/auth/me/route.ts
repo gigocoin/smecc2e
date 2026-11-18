@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth-service";
-import { toUserFacingDatabaseError } from "@/lib/prisma-errors";
+import { resolveApiError, toUserFacingDatabaseError } from "@/lib/prisma-errors";
 
 export async function GET() {
   try {
@@ -13,7 +13,9 @@ export async function GET() {
     console.error("GET /api/auth/me", err);
     const connectionError = toUserFacingDatabaseError(err);
     return NextResponse.json(
-      { error: connectionError ?? "Failed to load session" },
+      {
+        error: resolveApiError(err, "Failed to load session"),
+      },
       { status: connectionError ? 503 : 500 }
     );
   }

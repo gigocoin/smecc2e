@@ -80,13 +80,17 @@ export async function requireAdministratorSessionUser(): Promise<DashboardUser> 
   return user;
 }
 
-/** Coordinators, administrators, and evaluators may access dashboard APIs. */
+/** Staff dashboard roles may access dashboard APIs. */
 export async function requireDashboardSessionUser(): Promise<DashboardUser> {
   const user = await requireSessionUser();
   if (
     user.role !== "Coordinator" &&
     user.role !== "Administrator" &&
-    user.role !== "Evaluator"
+    user.role !== "Evaluator" &&
+    user.role !== "Super Admin" &&
+    user.role !== "Finance Coordinator" &&
+    user.role !== "Finance Officer" &&
+    user.role !== "Finance Auditor"
   ) {
     throw new AuthError("Forbidden", 403);
   }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { AppErrorProvider } from "./components/app-error-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,7 +34,9 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} scroll-smooth antialiased`}
     >
-      <body>{children}</body>
+      <body>
+        <AppErrorProvider>{children}</AppErrorProvider>
+      </body>
     </html>
   );
 }

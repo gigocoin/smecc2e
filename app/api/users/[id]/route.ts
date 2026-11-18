@@ -1,8 +1,21 @@
 import { NextResponse } from "next/server";
-import type { DashboardUser } from "@/lib/dashboard-users";
+import {
+  canAssignRole,
+  isDashboardUserRole,
+  isSuperAdminRole,
+  usersVisibleTo,
+  type DashboardUser,
+} from "@/lib/dashboard-users";
 import { AuthError, requireDashboardSessionUser } from "@/lib/auth-service";
-import { toUserFacingDatabaseError } from "@/lib/prisma-errors";
-import { deleteUser, updateUser } from "@/lib/users-service";
+import {
+  resolveApiError,
+  toUserFacingDatabaseError,
+} from "@/lib/prisma-errors";
+import {
+  deleteUser,
+  getUserByPublicId,
+  updateUser,
+} from "@/lib/users-service";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -13,6 +26,17 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const { id } = await context.params;
+    const existing = await getUserByPublicId(id);
+    if (!existing) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+    if (
+      isSuperAdminRole(existing.role) &&
+      !isSuperAdminRole(sessionUser.role)
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const body = (await request.json()) as {
       name?: string;
       email?: string;
@@ -29,18 +53,20 @@ export async function PATCH(request: Request, context: RouteContext) {
     const role = body.role ?? "Coordinator";
     const status = body.status ?? "Active";
 
-    if (
-      role !== "Coordinator" &&
-      role !== "Evaluator" &&
-      role !== "Administrator"
-    ) {
+    if (!isDashboardUserRole(role)) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    }
+    if (!canAssignRole(sessionUser.role, role)) {
+      return NextResponse.json(
+        { error: "Only Super Admin users can assign the Super Admin role." },
+        { status: 403 }
+      );
     }
     if (status !== "Active" && status !== "Inactive") {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const { users } = await updateUser(id, {
+    const updated = await updateUser(id, {
       name: body.name ?? "",
       email: body.email ?? "",
       address: body.address ?? "",
@@ -53,7 +79,9 @@ export async function PATCH(request: Request, context: RouteContext) {
       password: body.password,
     });
 
-    return NextResponse.json({ users });
+    return NextResponse.json({
+      users: usersVisibleTo(updated.users, sessionUser.role),
+    });
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json(
@@ -66,8 +94,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (connectionError) {
       return NextResponse.json({ error: connectionError }, { status: 503 });
     }
-    const message =
-      err instanceof Error ? err.message : "Failed to update user";
+    const message = resolveApiError(err, "Failed to update user");
     const status =
       message === "User not found"
         ? 404
@@ -87,8 +114,21 @@ export async function DELETE(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     const { id } = await context.params;
-    const { users } = await deleteUser(id);
-    return NextResponse.json({ users });
+    const existing = await getUserByPublicId(id);
+    if (!existing) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+    if (
+      isSuperAdminRole(existing.role) &&
+      !isSuperAdminRole(sessionUser.role)
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const deleted = await deleteUser(id);
+    return NextResponse.json({
+      users: usersVisibleTo(deleted.users, sessionUser.role),
+    });
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json(
@@ -101,8 +141,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     if (connectionError) {
       return NextResponse.json({ error: connectionError }, { status: 503 });
     }
-    const message =
-      err instanceof Error ? err.message : "Failed to delete user";
+    const message = resolveApiError(err, "Failed to delete user");
     const status = message === "User not found" ? 404 : 400;
     return NextResponse.json({ error: message }, { status });
   }

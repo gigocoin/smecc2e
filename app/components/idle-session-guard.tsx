@@ -51,12 +51,18 @@ export function IdleSessionGuard() {
     if (document.visibilityState !== "visible") return;
     try {
       const res = await fetch("/api/auth/me");
+      if (res.status === 503 || res.status >= 500) {
+        // Connection/server issues are shown by AppErrorProvider; keep session.
+        resetIdleTimer();
+        return;
+      }
       if (!res.ok) {
         await signOutIdle();
         return;
       }
       resetIdleTimer();
     } catch {
+      // Network failures are shown by AppErrorProvider; keep session.
       resetIdleTimer();
     }
   }, [resetIdleTimer]);

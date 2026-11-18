@@ -83,6 +83,13 @@ export async function listUsers(): Promise<DashboardUser[]> {
   return users.map(mapPrismaUser);
 }
 
+export async function getUserByPublicId(
+  publicId: string
+): Promise<DashboardUser | null> {
+  const user = await prisma.user.findUnique({ where: { publicId } });
+  return user ? mapPrismaUser(user) : null;
+}
+
 export async function createUser(
   input: CreateUserInput
 ): Promise<{ user: DashboardUser; users: DashboardUser[] }> {

@@ -128,7 +128,11 @@ export async function verifySessionToken(
   if (
     roleRaw === "Coordinator" ||
     roleRaw === "Evaluator" ||
-    roleRaw === "Administrator"
+    roleRaw === "Administrator" ||
+    roleRaw === "Super Admin" ||
+    roleRaw === "Finance Coordinator" ||
+    roleRaw === "Finance Officer" ||
+    roleRaw === "Finance Auditor"
   ) {
     role = roleRaw;
   } else if (roleRaw === "Reviewer") {

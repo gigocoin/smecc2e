@@ -16,6 +16,10 @@ const userRoleLabels: Record<UserRole, DashboardUser["role"]> = {
   COORDINATOR: "Coordinator",
   EVALUATOR: "Evaluator",
   ADMINISTRATOR: "Administrator",
+  SUPER_ADMIN: "Super Admin",
+  FINANCE_COORDINATOR: "Finance Coordinator",
+  FINANCE_OFFICER: "Finance Officer",
+  FINANCE_AUDITOR: "Finance Auditor",
 };
 
 const userStatusLabels: Record<UserStatus, DashboardUser["status"]> = {
@@ -79,6 +83,10 @@ export function parseUserRole(
     Coordinator: "COORDINATOR",
     Evaluator: "EVALUATOR",
     Administrator: "ADMINISTRATOR",
+    "Super Admin": "SUPER_ADMIN",
+    "Finance Coordinator": "FINANCE_COORDINATOR",
+    "Finance Officer": "FINANCE_OFFICER",
+    "Finance Auditor": "FINANCE_AUDITOR",
   };
   return map[role];
 }

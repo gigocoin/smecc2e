@@ -1,4 +1,6 @@
 import { CoordinatorUsers } from "../../components/coordinator-users";
+import { getSessionUser } from "@/lib/auth-service";
+import { usersVisibleTo } from "@/lib/dashboard-users";
 import { resolveApiError } from "@/lib/prisma-errors";
 import { listUsers } from "@/lib/users-service";
 import { listUniversities } from "@/lib/universities-service";
@@ -16,7 +18,11 @@ export default async function EvaluatorUsersPage() {
   let initialInstitutions: string[] = [];
 
   try {
-    initialUsers = await listUsers();
+    const [sessionUser, users] = await Promise.all([
+      getSessionUser(),
+      listUsers(),
+    ]);
+    initialUsers = usersVisibleTo(users, sessionUser?.role);
   } catch (err) {
     console.error("EvaluatorUsersPage: failed to load users", err);
     initialLoadError = resolveApiError(

@@ -1,13 +1,21 @@
 import { NextResponse } from "next/server";
-import type { DashboardUser } from "@/lib/dashboard-users";
+import {
+  canAssignRole,
+  isDashboardUserRole,
+  usersVisibleTo,
+  type DashboardUser,
+} from "@/lib/dashboard-users";
 import { AuthError, requireDashboardSessionUser } from "@/lib/auth-service";
-import { toUserFacingDatabaseError } from "@/lib/prisma-errors";
+import {
+  resolveApiError,
+  toUserFacingDatabaseError,
+} from "@/lib/prisma-errors";
 import { createUser, listUsers } from "@/lib/users-service";
 
 export async function GET() {
   try {
-    await requireDashboardSessionUser();
-    const users = await listUsers();
+    const sessionUser = await requireDashboardSessionUser();
+    const users = usersVisibleTo(await listUsers(), sessionUser.role);
     return NextResponse.json({ users });
   } catch (err) {
     if (err instanceof AuthError) {
@@ -20,8 +28,7 @@ export async function GET() {
     const connectionError = toUserFacingDatabaseError(err);
     return NextResponse.json(
       {
-        error:
-          connectionError ?? "Failed to load users from database",
+        error: resolveApiError(err, "Failed to load users from database"),
       },
       { status: connectionError ? 503 : 500 }
     );
@@ -59,18 +66,20 @@ export async function POST(request: Request) {
       );
     }
 
-    if (
-      role !== "Coordinator" &&
-      role !== "Evaluator" &&
-      role !== "Administrator"
-    ) {
+    if (!isDashboardUserRole(role)) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    }
+    if (!canAssignRole(sessionUser.role, role)) {
+      return NextResponse.json(
+        { error: "Only Super Admin users can create Super Admin accounts." },
+        { status: 403 }
+      );
     }
     if (status !== "Active" && status !== "Inactive") {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const { users } = await createUser({
+    const created = await createUser({
       name: body.name ?? "",
       email: body.email ?? "",
       address: body.address ?? "",
@@ -83,7 +92,12 @@ export async function POST(request: Request) {
       status,
     });
 
-    return NextResponse.json({ users }, { status: 201 });
+    return NextResponse.json(
+      {
+        users: usersVisibleTo(created.users, sessionUser.role),
+      },
+      { status: 201 }
+    );
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json(
@@ -96,8 +110,7 @@ export async function POST(request: Request) {
     if (connectionError) {
       return NextResponse.json({ error: connectionError }, { status: 503 });
     }
-    const message =
-      err instanceof Error ? err.message : "Failed to create user";
+    const message = resolveApiError(err, "Failed to create user");
     const status =
       message.includes("already exists") ||
       message.includes("already the focal person") ||

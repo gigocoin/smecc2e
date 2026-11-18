@@ -1,19 +1,18 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useRef, useState } from "react";
-import type { DashboardUser } from "@/lib/dashboard-users";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  rolesVisibleTo,
+  usersVisibleTo,
+  type DashboardUser,
+  type DashboardUserRole,
+} from "@/lib/dashboard-users";
 import { useDashboardPortal } from "./dashboard-portal-provider";
 import {
   MIN_PASSWORD_LENGTH,
   passwordLengthError,
 } from "@/lib/password-policy";
-
-const USER_ROLES: DashboardUser["role"][] = [
-  "Coordinator",
-  "Evaluator",
-  "Administrator",
-];
 
 const USER_STATUSES: DashboardUser["status"][] = ["Active", "Inactive"];
 
@@ -280,13 +279,18 @@ export function CoordinatorUsers({
   const { portalKey } = useDashboardPortal();
   const defaultCreateRole: DashboardUser["role"] =
     portalKey === "administrator" ? "Evaluator" : "Coordinator";
-  const createUserRoles: DashboardUser["role"][] =
-    portalKey === "administrator" ? ["Evaluator"] : USER_ROLES;
   const canManageExistingUsers = portalKey === "coordinator";
   const canCreateUsers =
     portalKey === "coordinator" || portalKey === "administrator";
 
-  const [users, setUsers] = useState<DashboardUser[]>(initialUsers);
+  const [viewerRole, setViewerRole] = useState<DashboardUserRole | null>(null);
+  const manageableRoles = useMemo(() => {
+    if (portalKey === "administrator") return ["Evaluator" as const];
+    return rolesVisibleTo(viewerRole);
+  }, [portalKey, viewerRole]);
+  const [users, setUsers] = useState<DashboardUser[]>(() =>
+    usersVisibleTo(initialUsers, null)
+  );
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(initialLoadError);
   const [createOpen, setCreateOpen] = useState(false);
@@ -338,6 +342,32 @@ export function CoordinatorUsers({
 
   const tableBusy = creating || updating || deleting;
 
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          user?: { role?: DashboardUserRole };
+        };
+        if (!cancelled && data.user?.role) {
+          setViewerRole(data.user.role);
+          setUsers((prev) => usersVisibleTo(prev, data.user!.role));
+        }
+      } catch {
+        // Keep the safer non–Super Admin view when session role cannot be loaded.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    setUsers(usersVisibleTo(initialUsers, viewerRole));
+  }, [initialUsers, viewerRole]);
+
   const loadUsers = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
@@ -352,14 +382,14 @@ export function CoordinatorUsers({
         setUsers([]);
         return;
       }
-      setUsers(data.users ?? []);
+      setUsers(usersVisibleTo(data.users ?? [], viewerRole));
     } catch {
       setLoadError("Failed to load users.");
       setUsers([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [viewerRole]);
 
   const clearProfileImage = useCallback(() => {
     if (profilePreviewRef.current) {
@@ -996,7 +1026,7 @@ export function CoordinatorUsers({
                     disabled={creating}
                     className={inputClass}
                   >
-                    {createUserRoles.map((role) => (
+                    {manageableRoles.map((role) => (
                       <option key={role} value={role}>
                         {role}
                       </option>
@@ -1278,7 +1308,7 @@ export function CoordinatorUsers({
                     disabled={updating}
                     className={inputClass}
                   >
-                    {USER_ROLES.map((role) => (
+                    {manageableRoles.map((role) => (
                       <option key={role} value={role}>
                         {role}
                       </option>

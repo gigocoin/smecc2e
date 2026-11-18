@@ -3,15 +3,23 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 import { defaultDashboardPathForRole } from "@/lib/dashboard-portal";
+import type { DashboardUserRole } from "@/lib/dashboard-users";
 import { APPLICANT_LOGIN_PATH } from "@/lib/applicant-login-paths";
+import {
+  DATABASE_CONNECTION_MESSAGE,
+  NETWORK_ERROR_MESSAGE,
+  sanitizeUserFacingError,
+} from "@/lib/prisma-errors";
+import { useAppError } from "./app-error-provider";
 
 function LoginFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect");
   const idleLogout = searchParams.get("reason") === "idle";
+  const { showError, showNetworkError } = useAppError();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,8 +27,7 @@ function LoginFormContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitLogin = useCallback(async () => {
     setError(null);
     setLoading(true);
 
@@ -38,11 +45,28 @@ function LoginFormContent() {
         ok?: boolean;
         error?: string;
         redirectTo?: string;
-        user?: { role: "Coordinator" | "Evaluator" | "Administrator" };
+        user?: { role: DashboardUserRole };
       };
 
       if (!res.ok) {
-        setError(data.error ?? "Login failed. Please try again.");
+        const friendly = sanitizeUserFacingError(
+          data.error,
+          "Login failed. Please try again."
+        );
+        if (
+          res.status === 503 ||
+          friendly === DATABASE_CONNECTION_MESSAGE ||
+          friendly === NETWORK_ERROR_MESSAGE
+        ) {
+          showError(friendly, {
+            title: "Connection problem",
+            onRetry: () => {
+              void submitLogin();
+            },
+          });
+          return;
+        }
+        setError(friendly);
         return;
       }
 
@@ -52,10 +76,19 @@ function LoginFormContent() {
       router.replace(data.redirectTo ?? fallback);
       router.refresh();
     } catch {
-      setError("A network error occurred. Check your connection and try again.");
+      showNetworkError({
+        onRetry: () => {
+          void submitLogin();
+        },
+      });
     } finally {
       setLoading(false);
     }
+  }, [email, password, redirect, router, showError, showNetworkError]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitLogin();
   };
 
   return (

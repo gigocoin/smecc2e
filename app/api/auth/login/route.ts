@@ -5,7 +5,10 @@ import {
   AUTH_SESSION_COOKIE,
   authSessionCookieOptions,
 } from "@/lib/auth-session";
-import { toUserFacingDatabaseError } from "@/lib/prisma-errors";
+import {
+  resolveApiError,
+  toUserFacingDatabaseError,
+} from "@/lib/prisma-errors";
 
 export async function POST(request: Request) {
   try {
@@ -56,7 +59,9 @@ export async function POST(request: Request) {
     console.error("POST /api/auth/login", err);
     const connectionError = toUserFacingDatabaseError(err);
     return NextResponse.json(
-      { error: connectionError ?? "Login failed. Please try again." },
+      {
+        error: resolveApiError(err, "Login failed. Please try again."),
+      },
       { status: connectionError ? 503 : 500 }
     );
   }

@@ -4,12 +4,15 @@ const globalForPrisma = globalThis as typeof globalThis & {
   prisma?: PrismaClient;
 };
 
-/** Neon cold starts can exceed Prisma's default connect window; allow more time. */
+/** Neon cold starts / pool waits can exceed Prisma defaults; allow more time. */
 function databaseUrlWithConnectTimeout(raw: string): string {
   try {
     const url = new URL(raw);
     if (!url.searchParams.has("connect_timeout")) {
       url.searchParams.set("connect_timeout", "30");
+    }
+    if (!url.searchParams.has("pool_timeout")) {
+      url.searchParams.set("pool_timeout", "30");
     }
     return url.toString();
   } catch {
