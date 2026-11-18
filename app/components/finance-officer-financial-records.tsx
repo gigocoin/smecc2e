@@ -11,10 +11,8 @@ import {
   formatEuros,
   formatEuroString,
   formatReportPeriod,
-  loadOfficerReports,
   openPdfAttachment,
   reportExpenseTotal,
-  saveOfficerReports,
   sortReportsByLatestDate,
   type PreFinancingReportRecord,
 } from "@/lib/pre-financing-reports";
@@ -75,18 +73,6 @@ function toDraft(report: PreFinancingReportRecord): PreFinancingReportDraft {
     contributionToInstitution: report.contributionToInstitution,
     specialNeeds: report.specialNeeds,
     createdAt: report.createdAt,
-  };
-}
-
-function toRecord(
-  draft: PreFinancingReportDraft,
-  officerId: string,
-  tranche: FinanceRecordsView
-): PreFinancingReportRecord {
-  return {
-    ...draft,
-    tranche,
-    financeOfficerId: officerId,
   };
 }
 
@@ -206,11 +192,28 @@ export function FinanceOfficerFinancialRecords() {
         if (!cancelled) setRecords([]);
       }
     })();
-    setReports(
-      sessionProfile?.id
-        ? loadOfficerReports(activeView, sessionProfile.id)
-        : []
-    );
+
+    void (async () => {
+      if (!sessionProfile?.id) {
+        if (!cancelled) setReports([]);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `/api/pre-financing-reports?tranche=${encodeURIComponent(activeView)}`,
+          { cache: "no-store" }
+        );
+        const data = (await res.json()) as {
+          reports?: PreFinancingReportRecord[];
+        };
+        if (!cancelled) {
+          setReports(res.ok ? (data.reports ?? []) : []);
+        }
+      } catch {
+        if (!cancelled) setReports([]);
+      }
+    })();
+
     setReportOpen(false);
     setEditingReport(null);
     setDeletingReport(null);
@@ -266,15 +269,57 @@ export function FinanceOfficerFinancialRecords() {
     setEditingReport(null);
   };
 
-  const handleSaveReport = (report: PreFinancingReportDraft) => {
-    if (!sessionProfile) return;
+  const handleSaveReport = async (report: PreFinancingReportDraft) => {
+    if (!sessionProfile) {
+      throw new Error("Sign in as a finance officer to submit a report.");
+    }
     setSavingReport(true);
     try {
-      const next = toRecord(report, sessionProfile.id, activeView);
+      const payload = {
+        tranche: activeView,
+        institutionName: report.institutionName,
+        financeOfficerName: report.financeOfficerName,
+        year: report.year,
+        month: report.month,
+        financialReportFileName: report.financialReportFileName,
+        financialReportFileDataUrl: report.financialReportFileDataUrl,
+        ledgerFileName: report.ledgerFileName,
+        ledgerFileDataUrl: report.ledgerFileDataUrl,
+        supportingDocumentFileName: report.supportingDocumentFileName,
+        supportingDocumentFileDataUrl: report.supportingDocumentFileDataUrl,
+        contributionToScholarship: report.contributionToScholarship,
+        contributionToInstitution: report.contributionToInstitution,
+        specialNeeds: report.specialNeeds,
+      };
+
+      const res = editingReport
+        ? await fetch(
+            `/api/pre-financing-reports/${encodeURIComponent(editingReport.id)}`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            }
+          )
+        : await fetch("/api/pre-financing-reports", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+      const data = (await res.json()) as {
+        report?: PreFinancingReportRecord;
+        error?: string;
+      };
+      if (!res.ok || !data.report) {
+        throw new Error(data.error ?? "Could not save pre-financing report.");
+      }
+
       const updated = editingReport
-        ? reports.map((item) => (item.id === next.id ? next : item))
-        : [next, ...reports];
-      saveOfficerReports(activeView, sessionProfile.id, updated);
+        ? reports.map((item) =>
+            item.id === data.report!.id ? data.report! : item
+          )
+        : [data.report, ...reports];
       setReports(updated);
       setReportOpen(false);
       setEditingReport(null);
@@ -283,15 +328,25 @@ export function FinanceOfficerFinancialRecords() {
     }
   };
 
-  const handleDeleteReport = () => {
+  const handleDeleteReport = async () => {
     if (!sessionProfile || !deletingReport) return;
     setDeleteError(null);
     setDeleting(true);
     try {
+      const res = await fetch(
+        `/api/pre-financing-reports/${encodeURIComponent(deletingReport.id)}`,
+        { method: "DELETE" }
+      );
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setDeleteError(
+          data.error ?? "Could not delete this pre-financing report."
+        );
+        return;
+      }
       const updated = reports.filter(
         (report) => report.id !== deletingReport.id
       );
-      saveOfficerReports(activeView, sessionProfile.id, updated);
       setReports(updated);
       if (expandedId === deletingReport.id) setExpandedId(null);
       setDeletingReport(null);

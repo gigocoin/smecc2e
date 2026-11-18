@@ -11,7 +11,6 @@ import {
   formatEuros,
   formatEuroString,
   formatReportPeriod,
-  loadAllPreFinancingReports,
   reportExpenseTotal,
   sortReportsByLatestDate,
   trancheLabel,
@@ -142,9 +141,28 @@ export function FinanceCoordinatorFinancialReports() {
     useState<PreviewAttachment | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    setReports(loadAllPreFinancingReports());
-    setLoading(false);
+    let cancelled = false;
+    void (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch("/api/pre-financing-reports", {
+          cache: "no-store",
+        });
+        const data = (await res.json()) as {
+          reports?: PreFinancingReportRecord[];
+        };
+        if (!cancelled) {
+          setReports(res.ok ? (data.reports ?? []) : []);
+        }
+      } catch {
+        if (!cancelled) setReports([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {

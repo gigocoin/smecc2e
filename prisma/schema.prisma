@@ -424,6 +424,7 @@ model User {
   projectTaskLeadAssignments ProjectTaskLeadPartner[]
   preFinancingsAsOfficer PreFinancing[] @relation("PreFinancingFinanceOfficer")
   preFinancingsCreated   PreFinancing[] @relation("PreFinancingCreatedBy")
+  preFinancingReports    PreFinancingReport[] @relation("PreFinancingReportOfficer")
 
   @@map("users")
 }
@@ -775,4 +776,35 @@ model PreFinancing {
   @@index([releaseDate])
   @@index([createdAt])
   @@map("pre_financings")
+}
+
+/// Finance officer pre-financing expenditure report for a tranche period.
+model PreFinancingReport {
+  id                              String              @id @default(cuid())
+  tranche                         PreFinancingTranche
+  financeOfficerId                String              @map("finance_officer_id")
+  financeOfficer                  User                @relation("PreFinancingReportOfficer", fields: [financeOfficerId], references: [id], onDelete: Restrict)
+  institutionName                 String              @map("institution_name")
+  financeOfficerName              String              @map("finance_officer_name")
+  /// Calendar year as string, e.g. "2026"
+  year                            String              @db.VarChar(4)
+  /// Calendar month "01"–"12"
+  month                           String              @db.VarChar(2)
+  financialReportFileName         String              @map("financial_report_file_name")
+  financialReportFileDataUrl      String              @map("financial_report_file_data_url") @db.Text
+  ledgerFileName                  String              @map("ledger_file_name")
+  ledgerFileDataUrl               String              @map("ledger_file_data_url") @db.Text
+  supportingDocumentFileName      String              @map("supporting_document_file_name")
+  supportingDocumentFileDataUrl   String              @map("supporting_document_file_data_url") @db.Text
+  contributionToScholarship       Decimal             @map("contribution_to_scholarship") @db.Decimal(14, 2)
+  contributionToInstitution       Decimal             @map("contribution_to_institution") @db.Decimal(14, 2)
+  specialNeeds                    Decimal             @map("special_needs") @db.Decimal(14, 2)
+  createdAt                       DateTime            @default(now()) @map("created_at")
+  updatedAt                       DateTime            @updatedAt @map("updated_at")
+
+  @@index([tranche])
+  @@index([financeOfficerId])
+  @@index([year, month])
+  @@index([createdAt])
+  @@map("pre_financing_reports")
 }

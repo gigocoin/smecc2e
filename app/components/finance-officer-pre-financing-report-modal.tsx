@@ -75,7 +75,7 @@ type Props = {
   initialReport?: PreFinancingReportDraft | null;
   saving: boolean;
   onClose: () => void;
-  onSave: (report: PreFinancingReportDraft) => void;
+  onSave: (report: PreFinancingReportDraft) => void | Promise<void>;
 };
 
 function isPdfFile(file: File | undefined | null): boolean {
@@ -279,7 +279,7 @@ export function FinanceOfficerPreFinancingReportModal({
     setForm((current) => ({ ...current, ...patch }));
   };
 
-  const handleSubmit = (event: FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setFormError(null);
 
@@ -339,24 +339,30 @@ export function FinanceOfficerPreFinancingReportModal({
       }
     }
 
-    onSave({
-      id: initialReport?.id ?? `PFR-${Date.now()}`,
-      tranche,
-      institutionName,
-      financeOfficerName,
-      year,
-      month,
-      financialReportFileName: form.financialReportFileName,
-      financialReportFileDataUrl: form.financialReportFileDataUrl,
-      ledgerFileName: form.ledgerFileName,
-      ledgerFileDataUrl: form.ledgerFileDataUrl,
-      supportingDocumentFileName: form.supportingDocumentFileName,
-      supportingDocumentFileDataUrl: form.supportingDocumentFileDataUrl,
-      contributionToScholarship: scholarship,
-      contributionToInstitution: institution,
-      specialNeeds,
-      createdAt: initialReport?.createdAt ?? new Date().toISOString(),
-    });
+    try {
+      await onSave({
+        id: initialReport?.id ?? `PFR-${Date.now()}`,
+        tranche,
+        institutionName,
+        financeOfficerName,
+        year,
+        month,
+        financialReportFileName: form.financialReportFileName,
+        financialReportFileDataUrl: form.financialReportFileDataUrl,
+        ledgerFileName: form.ledgerFileName,
+        ledgerFileDataUrl: form.ledgerFileDataUrl,
+        supportingDocumentFileName: form.supportingDocumentFileName,
+        supportingDocumentFileDataUrl: form.supportingDocumentFileDataUrl,
+        contributionToScholarship: scholarship,
+        contributionToInstitution: institution,
+        specialNeeds,
+        createdAt: initialReport?.createdAt ?? new Date().toISOString(),
+      });
+    } catch (err) {
+      setFormError(
+        err instanceof Error ? err.message : "Could not save pre-financing report."
+      );
+    }
   };
 
   return (
@@ -531,69 +537,31 @@ export function FinanceOfficerPreFinancingReportModal({
           <section className="space-y-4">
             <SectionHeading>Expenditure in Euro</SectionHeading>
             <div className="grid gap-4 sm:grid-cols-3">
-              <div>
-                <label
-                  htmlFor="report-scholarship"
-                  className="block text-xs font-bold text-slate-800"
-                >
-                  Contribution to Scholarship
-                </label>
-                <input
-                  id="report-scholarship"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.contributionToScholarship}
-                  onChange={(event) =>
-                    update({ contributionToScholarship: event.target.value })
-                  }
-                  disabled={saving}
-                  className={inputClass}
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="report-institution-contrib"
-                  className="block text-xs font-bold text-slate-800"
-                >
-                  Contribution to Institution
-                </label>
-                <input
-                  id="report-institution-contrib"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.contributionToInstitution}
-                  onChange={(event) =>
-                    update({ contributionToInstitution: event.target.value })
-                  }
-                  disabled={saving}
-                  className={inputClass}
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="report-special-needs"
-                  className="block text-xs font-bold text-slate-800"
-                >
-                  Special Needs
-                </label>
-                <input
-                  id="report-special-needs"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.specialNeeds}
-                  onChange={(event) =>
-                    update({ specialNeeds: event.target.value })
-                  }
-                  disabled={saving}
-                  className={inputClass}
-                  placeholder="0.00"
-                />
-              </div>
+              <EuroAmountField
+                id="report-scholarship"
+                label="Contribution to Scholarship"
+                value={form.contributionToScholarship}
+                disabled={saving}
+                onChange={(value) =>
+                  update({ contributionToScholarship: value })
+                }
+              />
+              <EuroAmountField
+                id="report-institution-contrib"
+                label="Contribution to Institution"
+                value={form.contributionToInstitution}
+                disabled={saving}
+                onChange={(value) =>
+                  update({ contributionToInstitution: value })
+                }
+              />
+              <EuroAmountField
+                id="report-special-needs"
+                label="Special Needs"
+                value={form.specialNeeds}
+                disabled={saving}
+                onChange={(value) => update({ specialNeeds: value })}
+              />
             </div>
           </section>
 
