@@ -9,7 +9,6 @@ import {
 } from "@/lib/finance-coordinator-nav";
 import {
   formatReleasedEuros,
-  loadPreFinancingReleases,
   sumReleasedAmount,
   type PreFinancingReleaseRecord,
 } from "@/lib/pre-financing-records";
@@ -42,9 +41,29 @@ export function FinanceAuditorFinancialRecords() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
-    setRecords(loadPreFinancingReleases(activeView));
-    setLoading(false);
+    let cancelled = false;
+    void (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `/api/pre-financings?tranche=${encodeURIComponent(activeView)}`,
+          { cache: "no-store" }
+        );
+        const data = (await res.json()) as {
+          records?: PreFinancingReleaseRecord[];
+        };
+        if (!cancelled) {
+          setRecords(res.ok ? (data.records ?? []) : []);
+        }
+      } catch {
+        if (!cancelled) setRecords([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [activeView]);
 
   const sortedRecords = useMemo(

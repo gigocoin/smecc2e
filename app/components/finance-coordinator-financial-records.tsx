@@ -63,45 +63,6 @@ const inputClass =
 const iconBtnClass =
   "inline-flex rounded-lg border-2 p-1.5 transition disabled:opacity-50";
 
-function storageKey(view: FinanceRecordsView): string {
-  return `smecc2e.finance-coordinator.pre-financing.${view}`;
-}
-
-function normalizeRecord(raw: Partial<PreFinancingRecord>): PreFinancingRecord | null {
-  if (!raw.id || !raw.partner || !raw.reference) return null;
-  return {
-    id: raw.id,
-    partner: raw.partner,
-    financeOfficerId: raw.financeOfficerId ?? "",
-    financeOfficerName: raw.financeOfficerName ?? "",
-    reference: raw.reference,
-    amount: raw.amount ?? "",
-    currency: raw.currency ?? "EUR",
-    releaseDate: raw.releaseDate ?? "",
-    notes: raw.notes ?? "",
-    createdAt: raw.createdAt ?? new Date().toISOString(),
-  };
-}
-
-function loadRecords(view: FinanceRecordsView): PreFinancingRecord[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(storageKey(view));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Partial<PreFinancingRecord>[];
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map(normalizeRecord)
-      .filter((record): record is PreFinancingRecord => record != null);
-  } catch {
-    return [];
-  }
-}
-
-function saveRecords(view: FinanceRecordsView, records: PreFinancingRecord[]) {
-  localStorage.setItem(storageKey(view), JSON.stringify(records));
-}
-
 function formatAmount(amount: string, currency: string): string {
   const value = Number(amount);
   if (!Number.isFinite(value)) return `${currency} ${amount}`;
@@ -222,22 +183,60 @@ export function FinanceCoordinatorFinancialRecords() {
     useState<PreFinancingRecord | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [loadingRecords, setLoadingRecords] = useState(true);
+  const [recordsError, setRecordsError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [form, setForm] = useState<PreFinancingFormState>(EMPTY_FORM);
 
   const modalOpen = createOpen || editingRecord != null;
-  const tableBusy = saving || deleting;
+  const tableBusy = saving || deleting || loadingRecords;
 
   useEffect(() => {
-    const loaded = loadRecords(activeView);
-    setRecords(loaded);
-    setCreateOpen(false);
-    setEditingRecord(null);
-    setDeletingRecord(null);
-    setFormError(null);
-    setDeleteError(null);
-    setForm(emptyFormWithReference(activeView, loaded));
+    let cancelled = false;
+    void (async () => {
+      setLoadingRecords(true);
+      setRecordsError(null);
+      setCreateOpen(false);
+      setEditingRecord(null);
+      setDeletingRecord(null);
+      setFormError(null);
+      setDeleteError(null);
+      try {
+        const res = await fetch(
+          `/api/pre-financings?tranche=${encodeURIComponent(activeView)}`,
+          { cache: "no-store" }
+        );
+        const data = (await res.json()) as {
+          records?: PreFinancingRecord[];
+          error?: string;
+        };
+        if (!res.ok) {
+          if (!cancelled) {
+            setRecords([]);
+            setRecordsError(data.error ?? "Could not load pre-financing records.");
+            setForm(emptyFormWithReference(activeView, []));
+          }
+          return;
+        }
+        const loaded = data.records ?? [];
+        if (!cancelled) {
+          setRecords(loaded);
+          setForm(emptyFormWithReference(activeView, loaded));
+        }
+      } catch {
+        if (!cancelled) {
+          setRecords([]);
+          setRecordsError("Could not load pre-financing records.");
+          setForm(emptyFormWithReference(activeView, []));
+        }
+      } finally {
+        if (!cancelled) setLoadingRecords(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [activeView]);
 
   useEffect(() => {
@@ -422,7 +421,7 @@ export function FinanceCoordinatorFinancialRecords() {
     return null;
   };
 
-  const handleSave = (event: FormEvent) => {
+  const handleSave = async (event: FormEvent) => {
     event.preventDefault();
     setFormError(null);
 
@@ -434,16 +433,6 @@ export function FinanceCoordinatorFinancialRecords() {
 
     const partner = form.partner.trim();
     const financeOfficerId = form.financeOfficerId.trim();
-    const selectedOfficer =
-      financeOfficers.find((officer) => officer.id === financeOfficerId) ??
-      (editingRecord?.financeOfficerId === financeOfficerId
-        ? {
-            id: editingRecord.financeOfficerId,
-            name: editingRecord.financeOfficerName,
-            email: "",
-          }
-        : null);
-    const financeOfficerName = selectedOfficer?.name ?? "";
     const amount = form.amount.trim();
     const currency = form.currency.trim().toUpperCase() || "EUR";
     const releaseDate = form.releaseDate.trim();
@@ -451,59 +440,92 @@ export function FinanceCoordinatorFinancialRecords() {
 
     setSaving(true);
     try {
-      let updated = records;
       if (editingRecord) {
-        updated = records.map((record) =>
-          record.id === editingRecord.id
-            ? {
-                ...record,
-                partner,
-                financeOfficerId,
-                financeOfficerName,
-                amount,
-                currency,
-                releaseDate,
-                notes,
-              }
-            : record
+        const res = await fetch(
+          `/api/pre-financings/${encodeURIComponent(editingRecord.id)}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              partner,
+              financeOfficerId,
+              amount,
+              currency,
+              releaseDate,
+              notes,
+            }),
+          }
         );
-      } else {
-        const reference =
-          form.reference.trim() || nextReference(activeView, records);
-        const next: PreFinancingRecord = {
-          id: `PF-${Date.now()}`,
-          partner,
-          financeOfficerId,
-          financeOfficerName,
-          reference,
-          amount,
-          currency,
-          releaseDate,
-          notes,
-          createdAt: new Date().toISOString(),
+        const data = (await res.json()) as {
+          record?: PreFinancingRecord;
+          error?: string;
         };
-        updated = [next, ...records];
+        if (!res.ok || !data.record) {
+          setFormError(data.error ?? "Could not save pre-financing.");
+          return;
+        }
+        const updated = records.map((record) =>
+          record.id === data.record!.id ? data.record! : record
+        );
+        setRecords(updated);
+        setCreateOpen(false);
+        setEditingRecord(null);
+        setFormError(null);
+        setForm(emptyFormWithReference(activeView, updated));
+      } else {
+        const res = await fetch("/api/pre-financings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tranche: activeView,
+            partner,
+            financeOfficerId,
+            reference: form.reference.trim() || undefined,
+            amount,
+            currency,
+            releaseDate,
+            notes,
+          }),
+        });
+        const data = (await res.json()) as {
+          record?: PreFinancingRecord;
+          error?: string;
+        };
+        if (!res.ok || !data.record) {
+          setFormError(data.error ?? "Could not save pre-financing.");
+          return;
+        }
+        const updated = [data.record, ...records];
+        setRecords(updated);
+        setCreateOpen(false);
+        setEditingRecord(null);
+        setFormError(null);
+        setForm(emptyFormWithReference(activeView, updated));
       }
-      saveRecords(activeView, updated);
-      setRecords(updated);
-      setCreateOpen(false);
-      setEditingRecord(null);
-      setFormError(null);
-      setForm(emptyFormWithReference(activeView, updated));
+    } catch {
+      setFormError("Could not save pre-financing.");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deletingRecord) return;
     setDeleteError(null);
     setDeleting(true);
     try {
+      const res = await fetch(
+        `/api/pre-financings/${encodeURIComponent(deletingRecord.id)}`,
+        { method: "DELETE" }
+      );
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setDeleteError(data.error ?? "Could not delete this pre-financing record.");
+        return;
+      }
       const updated = records.filter(
         (record) => record.id !== deletingRecord.id
       );
-      saveRecords(activeView, updated);
       setRecords(updated);
       setDeletingRecord(null);
       setForm(emptyFormWithReference(activeView, updated));
@@ -545,7 +567,17 @@ export function FinanceCoordinatorFinancialRecords() {
             {RECORD_COPY[activeView]}
           </p>
 
-          {sortedRecords.length === 0 ? (
+          {loadingRecords ? (
+            <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
+              <p className="text-sm font-semibold text-slate-800">
+                Loading {pageTitle.toLowerCase()} records…
+              </p>
+            </div>
+          ) : recordsError ? (
+            <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-8 text-center">
+              <p className="text-sm font-semibold text-red-800">{recordsError}</p>
+            </div>
+          ) : sortedRecords.length === 0 ? (
             <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
               <p className="text-sm font-semibold text-slate-800">
                 No {pageTitle.toLowerCase()} records yet.

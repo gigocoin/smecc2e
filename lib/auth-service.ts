@@ -105,6 +105,14 @@ export async function requireCoordinatorOrAdministratorSessionUser(): Promise<Da
   return user;
 }
 
+export async function requireFinanceCoordinatorSessionUser(): Promise<DashboardUser> {
+  const user = await requireSessionUser();
+  if (user.role !== "Finance Coordinator" && user.role !== "Super Admin") {
+    throw new AuthError("Forbidden", 403);
+  }
+  return user;
+}
+
 export function safeRedirectPath(
   redirect: string | null | undefined,
   role: DashboardUser["role"],

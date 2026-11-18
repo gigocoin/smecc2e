@@ -4,10 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { FinanceRecordsView } from "@/lib/finance-coordinator-nav";
 import { FINANCE_AUDITOR_BASE_PATH } from "@/lib/finance-auditor-nav";
-import {
-  formatReleasedEuros,
-  loadReleasedTotalsByTranche,
-} from "@/lib/pre-financing-records";
+import { formatReleasedEuros } from "@/lib/pre-financing-records";
 
 type OverviewCard = {
   label: string;
@@ -61,7 +58,25 @@ export function FinanceAuditorOverview() {
   }, []);
 
   useEffect(() => {
-    setTotals(loadReleasedTotalsByTranche());
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/pre-financings/totals", {
+          cache: "no-store",
+        });
+        const data = (await res.json()) as {
+          totals?: Record<FinanceRecordsView, number>;
+        };
+        if (!cancelled && res.ok && data.totals) {
+          setTotals(data.totals);
+        }
+      } catch {
+        if (!cancelled) setTotals(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (

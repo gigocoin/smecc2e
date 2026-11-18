@@ -51,26 +51,6 @@ type SessionProfile = {
   institution: string;
 };
 
-function storageKey(view: FinanceRecordsView): string {
-  return `smecc2e.finance-coordinator.pre-financing.${view}`;
-}
-
-function loadRecords(view: FinanceRecordsView): PreFinancingRecord[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(storageKey(view));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Partial<PreFinancingRecord>[];
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (record): record is PreFinancingRecord =>
-        Boolean(record?.id && record.partner && record.reference)
-    ) as PreFinancingRecord[];
-  } catch {
-    return [];
-  }
-}
-
 function toEuroAmount(record: PreFinancingRecord): number {
   const value = Number(record.amount);
   if (!Number.isFinite(value)) return 0;
@@ -209,7 +189,23 @@ export function FinanceOfficerFinancialRecords() {
   }, []);
 
   useEffect(() => {
-    setRecords(loadRecords(activeView));
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/pre-financings?tranche=${encodeURIComponent(activeView)}`,
+          { cache: "no-store" }
+        );
+        const data = (await res.json()) as {
+          records?: PreFinancingRecord[];
+        };
+        if (!cancelled) {
+          setRecords(res.ok ? (data.records ?? []) : []);
+        }
+      } catch {
+        if (!cancelled) setRecords([]);
+      }
+    })();
     setReports(
       sessionProfile?.id
         ? loadOfficerReports(activeView, sessionProfile.id)
@@ -220,6 +216,9 @@ export function FinanceOfficerFinancialRecords() {
     setDeletingReport(null);
     setDeleteError(null);
     setExpandedId(null);
+    return () => {
+      cancelled = true;
+    };
   }, [activeView, sessionProfile?.id]);
 
   const assignedRecords = useMemo(() => {
